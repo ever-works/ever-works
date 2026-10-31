@@ -87,6 +87,13 @@ export interface GoalDto {
     loopStatus: GoalLoopStatus | null;
     loopStartedAt: Date | null;
     archivedAt: Date | null;
+    /** APW-08 T31 (FR-45) — the Work this Goal works on, or `null`. */
+    workId: string | null;
+    /**
+     * The Work's name, when the read resolved it (the single-Goal read does); `null` when the
+     * Goal has no Work or the Work is gone. Absent on list rows.
+     */
+    workName?: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -136,6 +143,7 @@ export function toGoalDto(goal: Goal): GoalDto {
         loopStatus: goal.loopStatus ?? null,
         loopStartedAt: goal.loopStartedAt ?? null,
         archivedAt: goal.archivedAt ?? null,
+        workId: goal.workId ?? null,
         createdAt: goal.createdAt,
         updatedAt: goal.updatedAt,
     };
@@ -229,6 +237,8 @@ export interface CreateGoalInput {
     visibility?: 'team' | 'organization';
     /** EW-P2-2 — Teams (`team_resources` type `goal`) of the Goal's Organization. */
     teamIds?: string[];
+    /** APW-08 T31 (FR-45) — a Work reachable in the Goal's scope; omitted / `null` = none. */
+    workId?: string | null;
 }
 
 /**
@@ -252,6 +262,11 @@ export interface UpdateGoalInput {
     /** `null` explicitly clears the weighted path (back to single-metric). */
     criteria?: GoalCriterion[] | null;
     constraints?: GoalConstraint[] | null;
+    /**
+     * APW-08 T31 (FR-45) — a Work reachable in the Goal's scope, or `null` to clear it. Refused
+     * with `409 loopRunning` while the loop runs.
+     */
+    workId?: string | null;
 }
 
 export interface ListGoalsFilter {

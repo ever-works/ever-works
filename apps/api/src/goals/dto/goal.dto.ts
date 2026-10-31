@@ -426,6 +426,17 @@ export class CreateGoalDto {
     @ValidateNested({ each: true })
     @Type(() => GoalDoDCriterionDto)
     dodCriteria?: GoalDoDCriterionDto[];
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        format: 'uuid',
+        description:
+            'APW-08 T31 (FR-45) — the one Work this Goal works on; its iteration Tasks are filed on it. Must be reachable in the Goal’s scope (404 workNotFound otherwise). `null` clears it; refused with 409 loopRunning while the loop runs.',
+    })
+    @IsOptional()
+    @IsUUID()
+    workId?: string | null;
 }
 
 /**
@@ -550,6 +561,17 @@ export class UpdateGoalDto {
     @ValidateNested({ each: true })
     @Type(() => GoalConstraintDto)
     constraints?: GoalConstraintDto[] | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        format: 'uuid',
+        description:
+            'APW-08 T31 (FR-45) — the one Work this Goal works on; its iteration Tasks are filed on it. Must be reachable in the Goal’s scope (404 workNotFound otherwise). `null` clears it; refused with 409 loopRunning while the loop runs.',
+    })
+    @IsOptional()
+    @IsUUID()
+    workId?: string | null;
 }
 
 /**

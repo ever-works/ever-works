@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     Injectable,
     Logger,
     NotFoundException,
@@ -41,11 +42,13 @@ import { validateGoalJudgment } from './goal-criteria';
 import { hasDefinitionOfDone, normalizeDoDCriteria, validateDoDCriteria } from './goal-dod';
 import { isDeliveryGoal, metricOnlyFieldsPresent, validateGoalKindInput } from './goal-kind';
 import {
+    ownershipScopeMatches,
     ownershipStamp,
     ownershipWhere,
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
+import { Work } from '../entities/work.entity';
 import {
     DEFAULT_CHECK_FREQUENCY_MINUTES,
     MIN_CHECK_FREQUENCY_MINUTES,
@@ -136,7 +139,44 @@ export class GoalsService {
         @Optional() private readonly domainEvents?: DomainEventPublisher,
         // EW-P2-2 — integration-created Goals' Teams + D11 (`createExternal`).
         @Optional() private readonly recordVisibility?: RecordVisibilityService,
+        // APW-08 T31 (FR-45) — the Goal's Work: its reachability on write and its name on read.
+        // Appended LAST + @Optional(): absent, a Goal that names a Work is refused (never stored
+        // unchecked) and reads carry no name.
+        @Optional() @InjectRepository(Work) private readonly works?: Repository<Work>,
     ) {}
+
+    /**
+     * APW-08 T31 (FR-45) — the Work a Goal may name: it must exist, belong to the acting user and
+     * sit in the same scope (the rule Task creation applies). Another account's Work answers the
+     * same `404` as a missing one, so the endpoint is not an existence oracle.
+     */
+    private async resolveGoalWork(
+        userId: string,
+        workId: string | null | undefined,
+        scope?: OwnershipScope,
+    ): Promise<string | null> {
+        if (!workId) return null;
+        if (!this.works) {
+            throw new BadRequestException('Work repository not wired in this context.');
+        }
+        const work = await this.works.findOne({ where: { id: workId } });
+        if (!work || work.userId !== userId || !ownershipScopeMatches(work, scope)) {
+            throw new NotFoundException({
+                code: 'workNotFound',
+                message: `Work ${workId} not found.`,
+            });
+        }
+        return work.id;
+    }
+
+    /** APW-08 T31 — the single-Goal read names its Work (`null` when it has none or it is gone). */
+    private async withWorkName(dto: GoalDto): Promise<GoalDto> {
+        if (!dto.workId || !this.works) return { ...dto, workName: null };
+        const work = await this.works
+            .findOne({ where: { id: dto.workId }, select: ['id', 'name'] })
+            .catch(() => null);
+        return { ...dto, workName: work?.name ?? null };
+    }
 
     // ─── CRUD ───────────────────────────────────────────────────────
 
@@ -190,7 +230,7 @@ export class GoalsService {
     }
 
     async getForUser(userId: string, goalId: string, scope?: OwnershipScope): Promise<GoalDto> {
-        return toGoalDto(await this.findOrThrow(userId, goalId, scope));
+        return this.withWorkName(toGoalDto(await this.findOrThrow(userId, goalId, scope)));
     }
 
     /**
@@ -211,7 +251,7 @@ export class GoalsService {
                 scope,
             });
             if (!shared) throw error;
-            return toGoalDto(shared);
+            return this.withWorkName(toGoalDto(shared));
         }
     }
 
@@ -274,6 +314,7 @@ export class GoalsService {
         }
         this.assertGoalKindShape({ ...input, goalKind });
         const dodCriteria = this.normalizeDodInput(input.dodCriteria);
+        const workId = await this.resolveGoalWork(userId, input.workId, scope);
 
         const saved = await this.persist(
             this.goals.create({
@@ -315,6 +356,7 @@ export class GoalsService {
                 status: GoalStatus.DRAFT,
                 outcome: null,
                 dodCriteria,
+                workId,
                 ...(input.createdBy
                     ? { createdByType: input.createdBy.type, createdById: input.createdBy.id }
                     : {}),
@@ -606,6 +648,21 @@ export class GoalsService {
                 }
             }
             if (input.constraints !== undefined) existing.constraints = input.constraints;
+        }
+        if (input.workId !== undefined) {
+            const next = input.workId ?? null;
+            if (next !== (existing.workId ?? null)) {
+                // FR-45 — a running loop keeps the Work it started on: its iteration Tasks, its
+                // in-flight pull requests and the awaiting-merge count all point at it.
+                if (existing.loopStatus === 'running') {
+                    throw new ConflictException({
+                        code: 'loopRunning',
+                        message:
+                            "The Goal's Work can't change while its loop is running. Pause the loop first.",
+                    });
+                }
+                existing.workId = await this.resolveGoalWork(userId, next, scope);
+            }
         }
         const statusBefore = existing.status;
         if (input.outcome !== undefined) {

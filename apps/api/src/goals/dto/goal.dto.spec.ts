@@ -299,3 +299,24 @@ describe('UpdateGoalDto', () => {
         expect(await validateUpdate({})).toEqual([]);
     });
 });
+
+/** APW-08 T31 (FR-45) — the Goal's Work: a uuid, `null` to clear, nothing else. */
+describe('workId on CreateGoalDto and UpdateGoalDto (APW-08 T31)', () => {
+    const WORK = '11111111-1111-4111-8111-111111111111';
+
+    it('accepts a uuid, null, or nothing', async () => {
+        expect(await validateCreate({ ...METRIC_BODY, workId: WORK })).toEqual([]);
+        expect(await validateCreate({ ...DELIVERY_BODY, workId: null })).toEqual([]);
+        expect(await validateCreate(DELIVERY_BODY)).toEqual([]);
+        expect(await validateUpdate({ workId: WORK })).toEqual([]);
+        expect(await validateUpdate({ workId: null })).toEqual([]);
+    });
+
+    it('rejects any other string, and a non-string', async () => {
+        expect(await validateCreate({ ...DELIVERY_BODY, workId: 'my-work' })).toEqual([
+            'workId:isUuid',
+        ]);
+        expect(await validateUpdate({ workId: 'not-a-uuid' })).toEqual(['workId:isUuid']);
+        expect(await validateUpdate({ workId: 42 })).toEqual(['workId:isUuid']);
+    });
+});

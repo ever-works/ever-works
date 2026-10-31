@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import type { Repository } from 'typeorm';
 import { Goal, GoalOutcome, GoalStatus } from '../../entities/goal.entity';
 import type { GoalMetricSample } from '../../entities/goal-metric-sample.entity';
@@ -765,5 +765,108 @@ describe('GoalsService', () => {
             const updated = await service.update('u1', created.id, { targetValue: 2500 });
             expect(updated.targetValue).toBe(2500);
         });
+    });
+});
+
+/**
+ * APW-08 T31 (FR-45) — a Goal may name one Work, reachable in the Goal's own scope, at creation or
+ * while its loop is not running.
+ */
+describe('GoalsService — the Goal’s Work (APW-08 T31)', () => {
+    const WORK = '11111111-1111-4111-8111-111111111111';
+    const OTHER = '22222222-2222-4222-8222-222222222222';
+    const ORG = '33333333-3333-4333-8333-333333333333';
+    let goalsRepo: ReturnType<typeof makeRepo>;
+    let worksRepo: ReturnType<typeof makeRepo>;
+
+    const build = (works: unknown = worksRepo) =>
+        new GoalsService(
+            goalsRepo as unknown as Repository<Goal>,
+            makeRepo('s') as unknown as Repository<GoalMetricSample>,
+            makeRepo('mg') as unknown as Repository<MissionGoal>,
+            makeRepo('m') as unknown as Repository<Mission>,
+            { evaluateOne: jest.fn() } as unknown as GoalEvaluationService,
+            undefined,
+            undefined,
+            undefined,
+            works as never,
+        );
+
+    beforeEach(() => {
+        goalsRepo = makeRepo('g');
+        worksRepo = makeRepo('w');
+        worksRepo._rows.push(
+            { id: WORK, userId: 'u1', name: 'Bookings', tenantId: null, organizationId: null },
+            { id: OTHER, userId: 'u2', name: 'Not yours', tenantId: null, organizationId: null },
+        );
+    });
+
+    it('stores a reachable Work on create, and the single read names it', async () => {
+        const service = build();
+        const created = await service.create('u1', deliveryInput({ workId: WORK }));
+        expect(created.workId).toBe(WORK);
+        const read = await service.getForUser('u1', created.id);
+        expect(read).toMatchObject({ workId: WORK, workName: 'Bookings' });
+    });
+
+    it('a Goal with no Work reads as workId null, workName null (every Goal before P2)', async () => {
+        const service = build();
+        const created = await service.create('u1', deliveryInput());
+        expect(created.workId).toBeNull();
+        expect(await service.getForUser('u1', created.id)).toMatchObject({
+            workId: null,
+            workName: null,
+        });
+    });
+
+    it('refuses another account’s Work, a missing one, and one in another scope — the same 404, nothing stored', async () => {
+        const service = build();
+        for (const workId of [OTHER, '44444444-4444-4444-8444-444444444444']) {
+            await expect(service.create('u1', deliveryInput({ workId }))).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+        }
+        // A personal Work is not reachable from an Organization's scope.
+        await expect(
+            service.create('u1', deliveryInput({ workId: WORK }), {
+                tenantId: null,
+                organizationId: ORG,
+            } as never),
+        ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'workNotFound' }) });
+        expect(goalsRepo._rows).toHaveLength(0);
+    });
+
+    it('never stores a Work unchecked: without a Work repository a workId is refused', async () => {
+        await expect(
+            build(null).create('u1', deliveryInput({ workId: WORK })),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(goalsRepo._rows).toHaveLength(0);
+    });
+
+    it('update: sets, changes and clears the Work while the loop is not running', async () => {
+        const service = build();
+        goalsRepo._rows.push(makeGoalRow({ id: 'g-paused', loopStatus: 'paused' } as never));
+        expect((await service.update('u1', 'g-paused', { workId: WORK })).workId).toBe(WORK);
+        expect((await service.update('u1', 'g-paused', { workId: null })).workId).toBeNull();
+        await expect(service.update('u1', 'g-paused', { workId: OTHER })).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+    });
+
+    it('update: a change while the loop runs is 409 loopRunning; resending the same Work is not a change', async () => {
+        const service = build();
+        goalsRepo._rows.push(
+            makeGoalRow({ id: 'g-run', loopStatus: 'running', workId: WORK } as never),
+        );
+        const refused = service.update('u1', 'g-run', { workId: null });
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toMatchObject({
+            response: expect.objectContaining({ code: 'loopRunning' }),
+        });
+        expect(goalsRepo._rows[0].workId).toBe(WORK);
+        // The form resends the current Work with every save: that must still save.
+        await expect(
+            service.update('u1', 'g-run', { workId: WORK, title: 'Renamed' }),
+        ).resolves.toMatchObject({ workId: WORK, title: 'Renamed' });
     });
 });
