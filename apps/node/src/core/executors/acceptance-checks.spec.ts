@@ -383,6 +383,64 @@ describe('buildNodeCheckEnv — a check never inherits this machine', () => {
  * over `DATABASE_PASSWORD`. Every adjacent-name case below exists because
  * getting this wrong is silent.
  */
+describe('buildNodeCheckEnv — the host\'s own credentials are not self-grantable', () => {
+	const host: NodeJS.ProcessEnv = {
+		PATH: '/usr/bin',
+		KUBECONFIG: 'C:/Users/owner/.kube/cluster-admin.yaml',
+		GITHUB_TOKEN: 'ghp_host-token',
+		GITHUB_PAT: 'github_pat_host',
+		GITHUB_APP_PRIVATE_KEY: '-----BEGIN KEY-----',
+		NPM_TOKEN: 'npm_host-token',
+		NODE_AUTH_TOKEN: 'npm_setup-node-token',
+		CLOUDFLARE_API_TOKEN: 'cf-token',
+		CF_API_KEY: 'cf-global-key',
+		VAULT_TOKEN: 'hvs.host',
+		BAO_TOKEN: 'bao.host',
+		DIGITALOCEAN_ACCESS_TOKEN: 'dop_v1_host',
+		DOCKER_AUTH_CONFIG: '{"auths":{}}',
+		PROXMOX_TOKEN_SECRET: 'pve-secret',
+		PVE_TOKEN: 'pve-token',
+		GITHUB_ACTIONS: 'true',
+		DOCKER_HOST: 'npipe:////./pipe/docker_engine',
+		CUSTOM_BUILD_FLAG: 'yes'
+	};
+	const credentials = [
+		'KUBECONFIG',
+		'GITHUB_TOKEN',
+		'GITHUB_PAT',
+		'GITHUB_APP_PRIVATE_KEY',
+		'NPM_TOKEN',
+		'NODE_AUTH_TOKEN',
+		'CLOUDFLARE_API_TOKEN',
+		'CF_API_KEY',
+		'VAULT_TOKEN',
+		'BAO_TOKEN',
+		'DIGITALOCEAN_ACCESS_TOKEN',
+		'DOCKER_AUTH_CONFIG',
+		'PROXMOX_TOKEN_SECRET',
+		'PVE_TOKEN'
+	];
+
+	it('drops every host credential a check asks for in its own passthrough', () => {
+		const env = buildNodeCheckEnv(credentials, host);
+		for (const name of credentials) expect(env[name], name).toBeUndefined();
+		expect(JSON.stringify(env)).not.toMatch(/ghp_|github_pat_|npm_|hvs\.|dop_v1_|cluster-admin/);
+	});
+
+	it('still lets an OPERATOR grant one per repository (a private-registry NPM_TOKEN)', () => {
+		const env = buildNodeCheckEnv(undefined, host, ['NPM_TOKEN']);
+		expect(env.NPM_TOKEN).toBe('npm_host-token');
+		expect(env.NODE_AUTH_TOKEN).toBeUndefined();
+	});
+
+	it('leaves harmless neighbours alone (GITHUB_ACTIONS, DOCKER_HOST stay passable)', () => {
+		const env = buildNodeCheckEnv(['GITHUB_ACTIONS', 'DOCKER_HOST', 'CUSTOM_BUILD_FLAG'], host);
+		expect(env.GITHUB_ACTIONS).toBe('true');
+		expect(env.DOCKER_HOST).toBe('npipe:////./pipe/docker_engine');
+		expect(env.CUSTOM_BUILD_FLAG).toBe('yes');
+	});
+});
+
 describe('buildNodeCheckEnv — per-repository grants open the platform-owned refusal', () => {
 	const parent: NodeJS.ProcessEnv = {
 		PATH: '/usr/bin',
