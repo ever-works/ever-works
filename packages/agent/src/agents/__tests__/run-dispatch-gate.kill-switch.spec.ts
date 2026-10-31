@@ -6,6 +6,10 @@ import {
 } from '../run-dispatch-gate.service';
 import { FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON } from '@ever-works/contracts';
 import { KILL_SWITCH_ACTIVE_ERROR_NAME } from '../run-kill-switch';
+import {
+    QUEUED_REASON_APP_CHANGES_PAUSED,
+    QUEUED_REASON_WORK_BUDGET,
+} from '../run-admission-chain';
 import { AgentRunSweeperService } from '../agent-run-sweeper.service';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -167,6 +171,28 @@ describe('RunDispatchGateService — kill switch (EW-778)', () => {
                 QUEUED_REASON_CONCURRENCY,
             );
             expect(runs.claimQueuedForDispatch).not.toHaveBeenCalled();
+        });
+
+        // Review of #3053 — the App changes switch's drain is a "stop was lifted" drain too: a run
+        // released while the stop flag holds is handed to `kill-switch`, whose clear resumes it,
+        // instead of staying `app-changes-paused` and being re-admitted on every sweeper tick.
+        it('an `app-changes-paused` run the stop flag now refuses is relabelled `kill-switch`', async () => {
+            killSwitch.shouldHaltDispatch.mockResolvedValue(true);
+            runs.findOldestQueuedForConcurrency.mockResolvedValueOnce(
+                parkedRun({ queuedReason: QUEUED_REASON_APP_CHANGES_PAUSED }),
+            );
+            const result = await makeGate().drainForWork(
+                'work-1',
+                QUEUED_REASON_APP_CHANGES_PAUSED,
+            );
+            expect(result).toEqual({ dispatched: false, reason: 'over-limit' });
+            expect(runs.relabelQueuedReason).toHaveBeenCalledWith(
+                'run-parked',
+                QUEUED_REASON_APP_CHANGES_PAUSED,
+                QUEUED_REASON_KILL_SWITCH,
+            );
+            expect(runs.claimQueuedForDispatch).not.toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
         });
 
         it('the default reason is still `concurrency-limit` and never relabels', async () => {
@@ -377,7 +403,9 @@ describe('AgentRunSweeperService — kill-switch-parked runs are never reaped (E
         // is what stops a future exemption from quietly displacing it.
         // #2682 then APPENDED `model-usage-limit`: a fleet run parked until
         // its node's model CLI resets (possibly a weekly limit) is waiting,
-        // not stuck. Appended, so `kill-switch` still leads.
+        // not stuck. Appended, so `kill-switch` still leads. APW-08 T56 then
+        // APPENDED `work-budget` (an App Work run waiting for a new budget
+        // period) and T49 `app-changes-paused` (waiting for the operator).
         expect(runs.findStuckNonTerminal).toHaveBeenCalledWith(
             expect.any(Date),
             expect.any(Number),
@@ -385,6 +413,8 @@ describe('AgentRunSweeperService — kill-switch-parked runs are never reaped (E
                 QUEUED_REASON_KILL_SWITCH,
                 QUEUED_REASON_AGENT_PAUSED,
                 FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
+                QUEUED_REASON_WORK_BUDGET,
+                QUEUED_REASON_APP_CHANGES_PAUSED,
             ],
         );
     });

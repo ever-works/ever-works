@@ -1621,11 +1621,11 @@ export class TaskTransitionService {
         // `app-changes-paused` (below, in place of the gate): its row exists, nothing starts, and
         // the sweeper releases it once changes resume (R-30: "turning it back on resumes"). A
         // review run is not a change (it reads the PR and records a verdict), so it passes.
-        // Without a run repository there is no row to park in, and the run is refused as before.
+        // Without a run repository there is no row to park in, and the run is refused as before;
+        // so is an Agent-session fire (below: a session has no run row of its own here to park).
         // Review of #3040 (minor 8) — the Task's Work is read at most ONCE for this dispatch.
         const readWork = this.dispatchWorkRead(task);
-        const appChangesPaused =
-            !opts.reviewId && (await this.appChangesPausedFor(task, readWork));
+        const appChangesPaused = !opts.reviewId && (await this.appChangesPausedFor(task, readWork));
         if (appChangesPaused && !this.runs) {
             const error = describeAppChangesPaused();
             this.logger.warn(`Task ${task.id}: no run dispatched — ${error}`);
@@ -1676,6 +1676,14 @@ export class TaskTransitionService {
         // FR-9 refuses App Work Tasks only (it fails open). The paused switch and
         // T12 fail CLOSED: a Task whose Work is unreadable is refused.
         if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
+            // Review of #3053 — the session path starts the Fleet session at once and has no run
+            // row to park, so while App changes are paused the fire is refused, as before T49's
+            // park (a recurring schedule fires again once changes resume).
+            if (appChangesPaused) {
+                const error = describeAppChangesPaused();
+                this.logger.warn(`Task ${task.id}: no session started — ${error}`);
+                return { runId: null, dispatched: false, parked: false, error };
+            }
             return this.sessionSchedules.dispatch(task, agentId);
         }
         {
