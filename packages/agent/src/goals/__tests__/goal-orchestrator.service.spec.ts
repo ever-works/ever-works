@@ -32,6 +32,8 @@ function matchesValue(actual: unknown, expected: unknown): boolean {
         const op = expected as { _type: string; _value: unknown };
         if (op._type === 'in') return (op._value as unknown[]).includes(actual);
         if (op._type === 'isNull') return actual === null || actual === undefined;
+        // APW-08 T32 — `Not(In([...]))` for the open-pull-request read.
+        if (op._type === 'not') return !matchesValue(actual, op._value);
     }
     return actual === expected;
 }
@@ -2066,19 +2068,26 @@ describe('GoalOrchestratorService — the Goal’s Work (APW-08 T32)', () => {
         expect(tasksService.create.mock.calls[0][1]).not.toHaveProperty('workId');
     });
 
-    it('waits while an earlier iteration’s pull request is open on an App Work (S10)', async () => {
-        const { service, tasksService, tasks } = build({
+    const openChange = (over: Record<string, unknown> = {}) => ({
+        id: 'task-it3',
+        goalId: 'g1',
+        workId: WORK,
+        title: '[Goal] Customer self-service — iteration 3',
+        status: 'in_review',
+        prNumber: 7,
+        prUrl: 'https://github.com/acme/bookings/pull/7',
+        prState: 'open',
+        branchState: 'pushed',
+        createdAt: new Date('2026-10-31T10:00:00.000Z'),
+        ...over,
+    });
+
+    it('waits while an earlier iteration’s pull request is open on an App Work (S10), and logs it ONCE', async () => {
+        const { service, tasksService, tasks, events } = build({
             goal: running({ iteration: 3, lastProgressIteration: 3 }),
             works: worksWith(APP_WORK),
         });
-        tasks._rows.push({
-            id: 'task-it3',
-            goalId: 'g1',
-            title: '[Goal] Customer self-service — iteration 3',
-            status: 'in_review',
-            prState: 'open',
-            createdAt: new Date('2026-10-31T10:00:00.000Z'),
-        });
+        tasks._rows.push(openChange());
         const result = await service.advance('u1', 'g1');
         expect(result).toMatchObject({
             action: 'wait',
@@ -2086,36 +2095,50 @@ describe('GoalOrchestratorService — the Goal’s Work (APW-08 T32)', () => {
             reasoning: "Waiting for iteration 3's pull request to be merged or closed.",
         });
         expect(tasksService.create).not.toHaveBeenCalled();
+        await service.advance('u1', 'g1');
+        const lines = events._rows.filter(
+            (row) =>
+                row.message === "Waiting for iteration 3's pull request to be merged or closed.",
+        );
+        expect(lines).toHaveLength(1);
     });
 
-    it('a merged pull request frees the slot, and a non-App Work never counts one', async () => {
-        const merged = build({
-            goal: running({ iteration: 3, lastProgressIteration: 3 }),
-            works: worksWith(APP_WORK),
-        });
-        merged.tasks._rows.push({
-            id: 'task-it3',
-            goalId: 'g1',
-            title: '[Goal] Customer self-service — iteration 3',
-            status: 'in_review',
-            prState: 'merged',
-            createdAt: new Date('2026-10-31T10:00:00.000Z'),
-        });
-        expect((await merged.service.advance('u1', 'g1')).action).toBe('dispatch');
+    it('an open PR counts whatever the state field and the Task status say: unknown, draft, BLOCKED', async () => {
+        for (const over of [{ prState: null }, { prState: 'draft' }, { status: 'blocked' }]) {
+            const { service, tasks } = build({
+                goal: running({ iteration: 3, lastProgressIteration: 3 }),
+                works: worksWith(APP_WORK),
+            });
+            tasks._rows.push(openChange(over));
+            expect((await service.advance('u1', 'g1')).reasonCode).toBe('awaiting-merge');
+        }
+    });
 
-        const site = build({
+    it('frees the slot once merged, closed, done or the branch is gone; another Work’s PR never counts', async () => {
+        for (const over of [
+            { prState: 'merged' },
+            { prState: 'closed' },
+            { status: 'done' },
+            { branchState: 'discarded' },
+            { prNumber: null },
+            { workId: '99999999-9999-4999-8999-999999999999' },
+        ]) {
+            const { service, tasks } = build({
+                goal: running({ iteration: 3, lastProgressIteration: 3 }),
+                works: worksWith(APP_WORK),
+            });
+            tasks._rows.push(openChange(over));
+            expect((await service.advance('u1', 'g1')).action).toBe('dispatch');
+        }
+    });
+
+    it('a non-App Work never counts an open pull request', async () => {
+        const { service, tasks } = build({
             goal: running({ iteration: 3, lastProgressIteration: 3 }),
             works: worksWith({ ...APP_WORK, kind: 'directory' }),
         });
-        site.tasks._rows.push({
-            id: 'task-it3',
-            goalId: 'g1',
-            title: '[Goal] Customer self-service — iteration 3',
-            status: 'in_review',
-            prState: 'open',
-            createdAt: new Date('2026-10-31T10:00:00.000Z'),
-        });
-        expect((await site.service.advance('u1', 'g1')).action).toBe('dispatch');
+        tasks._rows.push(openChange());
+        expect((await service.advance('u1', 'g1')).action).toBe('dispatch');
     });
 
     it('pauses with the S26 message when the Work is gone or no longer the owner’s (FR-48)', async () => {
@@ -2135,11 +2158,25 @@ describe('GoalOrchestratorService — the Goal’s Work (APW-08 T32)', () => {
         }
     });
 
-    it('a failed Work READ is not proof of absence: the loop is not paused on a blip', async () => {
-        const { service } = build({
+    it('a failed Work READ is neither absence nor "nothing awaits": the loop waits', async () => {
+        const { service, tasksService, goals } = build({
             goal: running(),
             works: { findOne: jest.fn(async () => Promise.reject(new Error('db down'))) },
         });
-        expect((await service.advance('u1', 'g1')).action).toBe('dispatch');
+        const result = await service.advance('u1', 'g1');
+        expect(result).toMatchObject({ action: 'wait', reasonCode: 'work-unreadable' });
+        expect(goals._rows[0].loopStatus).toBe('running');
+        expect(tasksService.create).not.toHaveBeenCalled();
+    });
+
+    it('a loop is not started on a Work that is gone (422 workUnavailable)', async () => {
+        const { service, goals } = build({
+            goal: running({ loopStatus: 'paused' }),
+            works: worksWith(null),
+        });
+        await expect(service.startLoop('u1', 'g1')).rejects.toMatchObject({
+            response: expect.objectContaining({ code: 'workUnavailable' }),
+        });
+        expect(goals._rows[0].loopStatus).toBe('paused');
     });
 });

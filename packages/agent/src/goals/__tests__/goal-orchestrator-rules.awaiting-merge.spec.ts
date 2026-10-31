@@ -127,6 +127,14 @@ describe('decideGoalLoop — the Work is gone (FR-48, S26)', () => {
         ).toBe('work-unavailable');
     });
 
+    it('an unreadable Work waits: no pause, no dispatch (review of #3058)', () => {
+        expect(decideGoalLoop(input({ workUnreadable: true }))).toEqual({
+            action: 'wait',
+            reasonCode: 'work-unreadable',
+            reasoning: "The Goal's Work could not be read — trying again on the next tick.",
+        });
+    });
+
     it('a loop that is not running is left alone', () => {
         expect(decideGoalLoop(input({ loopStatus: 'paused', workUnavailable: true })).action).toBe(
             'noop',
