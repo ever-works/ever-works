@@ -7256,6 +7256,7 @@
                     "other": "Une erreur s'est produite lors de la configuration du dépôt."
                 },
                 "overview": {
+                    "changesPaused": "Les modifications des applications sont suspendues par l’opérateur.",
                     "title": "App",
                     "repository": "Dépôt du Travail",
                     "upstream": "Amont",

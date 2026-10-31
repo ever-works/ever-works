@@ -20,6 +20,7 @@ import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import { AppRuntimePortsModule } from './app-runtime-ports.module';
 import { AppWorkDeletionController } from './app-work-deletion.controller';
+import { AppWorkSwitchesController } from './app-work-switches.controller';
 
 /**
  * APW-02 T27 — the API-side App Works module: the three upstream routes of plan §4.1
@@ -172,6 +173,8 @@ import { AppWorkDeletionController } from './app-work-deletion.controller';
         AppUpstreamController,
         // APW-06 T59 — `GET /api/works/:id/app-deletion-preview` (owner only).
         AppWorkDeletionController,
+        // APW-08 T49 — `GET /api/app-works/switches`, so the web can show R-30's read-only banner.
+        AppWorkSwitchesController,
     ],
     providers: [
         AppForkReadinessService,

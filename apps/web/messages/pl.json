@@ -7187,6 +7187,7 @@
                     "other": "Coś poszło nie tak podczas konfigurowania repozytorium."
                 },
                 "overview": {
+                    "changesPaused": "Zmiany w aplikacjach zostały wstrzymane przez operatora.",
                     "title": "Aplikacja",
                     "repository": "Repozytorium Work",
                     "upstream": "Upstream",

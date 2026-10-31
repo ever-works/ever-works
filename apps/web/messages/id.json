@@ -7187,6 +7187,7 @@
                     "other": "Terjadi kesalahan saat menyiapkan repositori."
                 },
                 "overview": {
+                    "changesPaused": "Perubahan pada aplikasi dijeda oleh operator.",
                     "title": "App",
                     "repository": "Repositori Karya",
                     "upstream": "Upstream",
