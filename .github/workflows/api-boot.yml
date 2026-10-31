@@ -1,0 +1,103 @@
+name: API boot
+
+# D-4 (Gauzy Ever Works #41) — a Nest DI failure is invisible to unit specs and to
+# type-check: the API has broken at boot twice, and the DI reachability spec is
+# structural only. This job builds the API and its workspace dependencies, starts
+# `node dist/main.js` on an in-memory SQLite database (no Postgres, Redis or
+# credentials: the bare env below is enough to boot), and asserts that
+# `GET /api/health` answers 200. A provider the container cannot resolve makes the
+# process exit during bootstrap, which fails the job with the log tail.
+on:
+  pull_request:
+    branches: [develop, stage, main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+      - '.github/workflows/api-boot.yml'
+  push:
+    branches: [develop, stage, main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+      - '.github/workflows/api-boot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot:
+    name: API boots on SQLite (/api/health 200)
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26.x
+          cache: 'pnpm'
+
+      # Same registry posture as ci.yml: the internal Verdaccio cache on the ARC pool,
+      # npmjs otherwise (a fork PR has no secrets and lands on ubuntu-latest).
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the API and its workspace dependencies
+        run: pnpm turbo run build --filter=ever-works-api...
+
+      - name: Boot the API and wait for /api/health
+        working-directory: apps/api
+        env:
+          DATABASE_TYPE: sqlite
+          DATABASE_IN_MEMORY: 'true'
+          DATABASE_AUTOMIGRATE: 'true'
+          PORT: '3999'
+        run: |
+          node dist/main.js > "$RUNNER_TEMP/api-boot.log" 2>&1 &
+          PID=$!
+          for i in $(seq 1 90); do
+            if curl -sf -o /dev/null http://127.0.0.1:3999/api/health; then
+              echo "API healthy after $((i * 2)) s"
+              kill "$PID" || true
+              exit 0
+            fi
+            if ! kill -0 "$PID" 2>/dev/null; then
+              echo "::error::the API exited during boot (a DI or configuration failure); log tail below"
+              tail -n 150 "$RUNNER_TEMP/api-boot.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::error::no 200 from /api/health within 180 s; log tail below"
+          tail -n 150 "$RUNNER_TEMP/api-boot.log"
+          kill "$PID" || true
+          exit 1
