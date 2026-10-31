@@ -401,6 +401,7 @@ describe('buildNodeCheckEnv — the host\'s own credentials are not self-grantab
 		PROXMOX_TOKEN_SECRET: 'pve-secret',
 		PVE_TOKEN: 'pve-token',
 		GITHUB_ACTIONS: 'true',
+		GITHUB_PATH: '/home/runner/work/_temp/_runner_file_commands/add_path',
 		DOCKER_HOST: 'npipe:////./pipe/docker_engine',
 		CUSTOM_BUILD_FLAG: 'yes'
 	};
@@ -433,9 +434,11 @@ describe('buildNodeCheckEnv — the host\'s own credentials are not self-grantab
 		expect(env.NODE_AUTH_TOKEN).toBeUndefined();
 	});
 
-	it('leaves harmless neighbours alone (GITHUB_ACTIONS, DOCKER_HOST stay passable)', () => {
-		const env = buildNodeCheckEnv(['GITHUB_ACTIONS', 'DOCKER_HOST', 'CUSTOM_BUILD_FLAG'], host);
+	it('leaves harmless neighbours alone (GITHUB_ACTIONS, GITHUB_PATH, DOCKER_HOST stay passable)', () => {
+		const env = buildNodeCheckEnv(['GITHUB_ACTIONS', 'GITHUB_PATH', 'DOCKER_HOST', 'CUSTOM_BUILD_FLAG'], host);
 		expect(env.GITHUB_ACTIONS).toBe('true');
+		// An exact credential name is anchored at its end: GITHUB_PAT must not also swallow GITHUB_PATH.
+		expect(env.GITHUB_PATH).toBe('/home/runner/work/_temp/_runner_file_commands/add_path');
 		expect(env.DOCKER_HOST).toBe('npipe:////./pipe/docker_engine');
 		expect(env.CUSTOM_BUILD_FLAG).toBe('yes');
 	});

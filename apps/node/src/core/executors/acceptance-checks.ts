@@ -924,12 +924,14 @@ export const NODE_SECRETISH_ENV_KEY_PATTERN =
  * registry auth blob. `envPassthrough` bypasses the secret-NAME sweep
  * above, so without these entries a check could grant itself any of
  * them. Exact credential names only where a broad prefix would also
- * catch harmless context (`GITHUB_ACTIONS`, `DOCKER_HOST`). An operator
+ * catch harmless context (`GITHUB_ACTIONS`, `DOCKER_HOST`) — and those are
+ * anchored at the END, so `GITHUB_PAT` does not also refuse Actions'
+ * `GITHUB_PATH`, and `NPM_TOKEN` stays a name, not a namespace. An operator
  * can still grant one per repository (an `NPM_TOKEN` for a private
  * registry, say) — these are not in {@link NODE_UNGRANTABLE_ENV_PATTERN}.
  */
 export const NODE_PLATFORM_OWNED_ENV_PATTERN =
-	/^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_|KUBECONFIG|GITHUB_TOKEN|GITHUB_PAT|GITHUB_APP_|NPM_TOKEN|NODE_AUTH_TOKEN|CLOUDFLARE_|CF_API_|VAULT_|BAO_|DIGITALOCEAN_|DOCKER_AUTH_CONFIG|PROXMOX_|PVE_)/i;
+	/^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_|GITHUB_APP_|CLOUDFLARE_|CF_API_|VAULT_|BAO_|DIGITALOCEAN_|PROXMOX_|PVE_|(?:KUBECONFIG|GITHUB_TOKEN|GITHUB_PAT|NPM_TOKEN|NODE_AUTH_TOKEN|DOCKER_AUTH_CONFIG)$)/i;
 
 /**
  * The subset of the above that stays refused even WITH an explicit
