@@ -6,6 +6,7 @@ import {
     makeEverIdUser,
     setEverIdUser,
 } from './helpers/ever-id';
+import { describeViolations, runAxe, seriousViolations } from './helpers/axe';
 
 /**
  * APW-12 (Ever ID) — the Ever ID screens are usable with a keyboard and a screen
@@ -16,60 +17,16 @@ import {
  *  - On the create-account screen the consent checkbox has a name, Enter on it does
  *    not submit, and a refusal is announced (`role="alert"`).
  *  - axe finds no serious or critical issue in the Ever ID button or the
- *    create-account form. axe is loaded from a CDN like the other axe specs; when
- *    the CDN is unreachable that check is noted on the test rather than failed.
+ *    create-account form. axe-core is injected from the installed package
+ *    (`helpers/axe.ts`); a load failure fails the test.
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-interface AxeViolation {
-    id: string;
-    impact: string | null;
-    nodes: Array<{ target?: string[] }>;
-}
-
-/** Serious / critical axe violations inside `selector`, or `null` when axe could not load. */
-async function seriousViolationsIn(page: Page, selector: string): Promise<AxeViolation[] | null> {
-    const loaded = await page.evaluate(async () => {
-        const w = window as unknown as { axe?: unknown };
-        if (w.axe) return true;
-        return new Promise<boolean>((resolve) => {
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/axe-core@4.10/axe.min.js';
-            script.onload = () => resolve(true);
-            script.onerror = () => resolve(false);
-            document.head.appendChild(script);
-        });
-    });
-    if (!loaded) return null;
-    const violations = await page.evaluate(async (include) => {
-        const w = window as unknown as {
-            axe: {
-                run: (
-                    context: unknown,
-                    options: unknown,
-                ) => Promise<{ violations: AxeViolation[] }>;
-            };
-        };
-        const result = await w.axe.run({ include: [include] }, { resultTypes: ['violations'] });
-        return result.violations;
-    }, selector);
-    return violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-    );
-}
-
-/** Assert no serious axe violation inside `selector`; notes it when axe could not load. */
+/** Assert no serious or critical axe violation inside `selector`. */
 async function expectNoSeriousViolations(page: Page, selector: string): Promise<void> {
-    const violations = await seriousViolationsIn(page, selector);
-    if (violations === null) {
-        test.info().annotations.push({
-            type: 'axe',
-            description: 'axe-core could not be loaded from the CDN',
-        });
-        return;
-    }
-    expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
+    const serious = seriousViolations(await runAxe(page, { include: [selector] }));
+    expect(serious, describeViolations(serious)).toEqual([]);
 }
 
 test.describe('Ever ID accessibility', () => {
