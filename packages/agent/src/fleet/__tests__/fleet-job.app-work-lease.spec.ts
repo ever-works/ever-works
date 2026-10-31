@@ -102,6 +102,8 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
             nodeId: NODE,
             workId: 'work-app',
             jobId: JOB,
+            // APW-08 T51 — the job's Task, so a node that reported a missing tool is passed over.
+            taskId: 'task-1',
         });
         expect(jobs.claim).toHaveBeenCalledTimes(1);
     });

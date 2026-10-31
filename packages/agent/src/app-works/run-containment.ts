@@ -87,6 +87,11 @@ export function toAppWorkRunContainment(raw: unknown): AppWorkRunContainment | n
 export interface AgentRunContainmentRecord extends AppWorkRunContainment {
     nodeId: string | null;
     reportedAt: string;
+    /**
+     * APW-08 T51 (FR-61, S36) — a check on this run reported its tool missing on `nodeId`
+     * (exit 127 / 9009). The lease passes that node over for this Task for a day. Absent = no.
+     */
+    missingTool?: boolean;
 }
 
 /** Read a stored run record back without trusting it (the column is `simple-json`). */
@@ -103,7 +108,7 @@ export function readAgentRunContainmentRecord(raw: unknown): AgentRunContainment
         typeof input.reportedAt === 'string' && Number.isFinite(Date.parse(input.reportedAt))
             ? new Date(input.reportedAt).toISOString()
             : new Date(0).toISOString();
-    return { ...containment, nodeId, reportedAt };
+    return { ...containment, nodeId, reportedAt, ...(input.missingTool === true ? { missingTool: true } : {}) };
 }
 
 // ── The allowance store (EW-807 pattern) ─────────────────────────────────────
