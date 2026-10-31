@@ -43,12 +43,14 @@
     --color-danger: #ef4444;
     --color-info: #3b82f6;
 
-    /* Text tones of the status colours. As text, the fills above are 1.6:1 (success) and
-       3.3:1 (danger) on their own tints; these are 6.4:1 and 5.5:1 (WCAG AA, #533).
+    /* Text tones of the status colours. As text, the fills above are 1.6:1 (success),
+       3.3:1 (danger) and 2.0:1 (warning) on their own tints; these are 6.4:1, 5.5:1 and
+       4.7:1 (WCAG AA, #533).
        `text-*` reads `--text-color-*` before `--color-*`, so `bg-` and `border-` keep
        the fills. */
     --text-color-success: #166534;
     --text-color-danger: #b91c1c;
+    --text-color-warning: #b45309;
 
     /* Dark mode colors */
     --color-background-dark: #0f1419;
@@ -119,6 +121,7 @@
     --color-text-muted: #94a3b8;
     --text-color-success: var(--color-success);
     --text-color-danger: var(--color-danger);
+    --text-color-warning: var(--color-warning);
 }
 
 /* Decorative card top-border accent — horizontal fade from transparent → white → transparent */
