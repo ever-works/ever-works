@@ -31,6 +31,22 @@ import {
 import { TerminalRelayRegistry } from './terminal-relay.registry';
 
 /**
+ * Terminal sessions are OFF unless an operator opts in with
+ * `TERMINAL_SESSIONS_ENABLED=true`.
+ *
+ * A session runs an interactive shell inside the Trigger worker process, and
+ * that process carries the worker's whole environment — platform credentials
+ * included — so every signed-in user who owns a run would get a shell next to
+ * them. Until the run environment is scrubbed, starting one is an explicit
+ * operator decision. The `terminal-session` task enforces the same flag in the
+ * worker (every producer goes through it); this check makes the refusal
+ * immediate, as the same 503 the pane already shows for "unavailable".
+ */
+export function terminalSessionsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+    return (env.TERMINAL_SESSIONS_ENABLED ?? '').trim().toLowerCase() === 'true';
+}
+
+/**
  * Terminal attach + status endpoints (streaming-terminal M3).
  *
  * Nested under the agent-run resource, mirroring the existing
@@ -130,6 +146,9 @@ export class TerminalAttachController {
      * 202 → dispatched. 409 → a session is already live for this run, or
      * the run itself is finished (nothing left to attach a shell to). 404 →
      * the same no-existence-leak answer every other run-scoped route gives.
+     * 503 → terminal sessions are disabled on this install (see
+     * `terminalSessionsEnabled`; checked AFTER ownership, so a stranger still
+     * gets the 404) or no job runtime is wired.
      */
     @Post('start')
     @ApiOperation({
@@ -145,6 +164,11 @@ export class TerminalAttachController {
         @Param('runId', ParseUUIDPipe) runId: string,
     ): Promise<{ started: true; runId: string; state: 'starting' }> {
         await this.authorizeRun(auth.userId, agentId, runId);
+        if (!terminalSessionsEnabled()) {
+            throw new ServiceUnavailableException(
+                'Terminal sessions are disabled on this install (TERMINAL_SESSIONS_ENABLED is not true).',
+            );
+        }
         if (!this.launcher) {
             throw new ServiceUnavailableException(
                 'Terminal sessions are unavailable on this install — no background job runtime is wired.',
