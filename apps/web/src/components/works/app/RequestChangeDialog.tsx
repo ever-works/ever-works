@@ -169,7 +169,9 @@ export function RequestChangeDialog({ workId }: { workId: string }) {
                                         disabled={pending}
                                         data-testid="app-change-text"
                                     />
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {/* APW-08 T52 — secondary, not muted: the muted token is 2.45:1 on
+                                        the dialog surface (WCAG AA wants 4.5:1 for 12px text). */}
+                                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
                                         {t('counter', {
                                             count: trimmed.length,
                                             max: APP_CHANGE_REQUEST_MAX,

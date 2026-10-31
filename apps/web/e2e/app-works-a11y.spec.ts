@@ -37,6 +37,11 @@ import {
 
 test.describe.configure({ mode: 'serial' });
 
+// axe-core is injected from the CDN, which the app's own Content-Security-Policy (`script-src`
+// lists no CDN) refuses: without this the script never loads and every axe check would skip
+// itself. Test-only: the browser ignores the page's CSP for this file, nothing in the app changes.
+test.use({ bypassCSP: true });
+
 const LIVE_URL = 'https://a11y-e2e.example.com';
 
 const DELIVERY = '[data-testid="task-delivery-section"]';
@@ -142,7 +147,9 @@ async function openByKeyboard(page: Page, opener: Locator, dialog: Locator): Pro
         }
         await expect(dialog).toBeVisible({ timeout: 3_000 });
     }).toPass({ timeout: 30_000 });
-    await expect(page.getByRole('dialog')).toBeVisible();
+    // (Headless UI's `role="dialog"` element is a zero-size positioning wrapper, so visibility
+    // is asserted on the panel's own content above, not on the role.)
+    await expect(page.locator('[role="dialog"]')).toHaveCount(1);
 }
 
 async function expectFocusInsideDialog(page: Page): Promise<void> {
@@ -201,8 +208,18 @@ async function ensureFixture(request: Parameters<typeof seededToken>[0]): Promis
     return fixture;
 }
 
-async function openTask(page: Page, locale: string, taskId: string): Promise<Locator> {
-    await gotoDashboard(page, `/${locale}/tasks/${taskId}`);
+/**
+ * The locale is user state, not a path segment (`localePrefix: 'never'`: a prefixed path redirects
+ * to the cookie's locale), so it is set through the `NEXT_LOCALE` cookie, as
+ * `internationalization-rtl.spec.ts` does.
+ */
+async function useLocale(page: Page, locale: string, baseURL: string | undefined): Promise<void> {
+    const origin = new URL(baseURL || 'http://localhost:3000').origin;
+    await page.context().addCookies([{ name: 'NEXT_LOCALE', value: locale, url: origin }]);
+}
+
+async function openTask(page: Page, taskId: string): Promise<Locator> {
+    await gotoDashboard(page, `/tasks/${taskId}`);
     const section = page.locator(DELIVERY);
     await expect(section.getByTestId('task-delivery-timeline')).toBeVisible({ timeout: 45_000 });
     await expect(page.locator(`${COST}:not([data-state="loading"])`)).toBeVisible({
@@ -236,7 +253,7 @@ test.describe('APW-08 T52 — App Works accessibility', () => {
         request,
     }) => {
         const { failed } = await ensureFixture(request);
-        const section = await openTask(page, 'en', failed.id);
+        const section = await openTask(page, failed.id);
         await expect(section.getByTestId('task-delivery-chip')).toHaveText(/^Build failed/);
 
         // FR-71 — the polite live region carries the chip's state.
@@ -261,7 +278,7 @@ test.describe('APW-08 T52 — App Works accessibility', () => {
         request,
     }) => {
         const { failed } = await ensureFixture(request);
-        const section = await openTask(page, 'en', failed.id);
+        const section = await openTask(page, failed.id);
         const opener = section.getByTestId('task-delivery-close');
         await openByKeyboard(page, opener, page.getByTestId('task-delivery-confirm-close'));
         await expectFocusInsideDialog(page);
@@ -279,7 +296,7 @@ test.describe('APW-08 T52 — App Works accessibility', () => {
         request,
     }) => {
         const { live } = await ensureFixture(request);
-        const section = await openTask(page, 'en', live.id);
+        const section = await openTask(page, live.id);
         await expect(section.getByTestId('task-delivery-live-url')).toHaveAttribute(
             'href',
             LIVE_URL,
@@ -326,9 +343,11 @@ test.describe('APW-08 T52 — App Works accessibility', () => {
         test(`${locale}: the page mirrors, no chip is clipped, no serious violation`, async ({
             page,
             request,
+            baseURL,
         }) => {
             const { failed } = await ensureFixture(request);
-            const section = await openTask(page, locale, failed.id);
+            await useLocale(page, locale, baseURL);
+            const section = await openTask(page, failed.id);
             await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
             expect(
                 await section.evaluate((el) => getComputedStyle(el).direction),
