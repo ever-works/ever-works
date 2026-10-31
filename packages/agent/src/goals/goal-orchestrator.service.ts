@@ -8,7 +8,7 @@ import {
     Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { type FindOptionsWhere, In, IsNull, Not, Repository } from 'typeorm';
 import {
     GOAL_EXECUTION_TARGETS,
     Goal,
@@ -138,8 +138,28 @@ const MAX_SCOPE_CANDIDATES = 50;
 
 const ACTIVE_RUN_STATUSES = ['queued', 'running'];
 
-/** APW-08 T32 — at most this many unfinished Tasks of a Goal's Work are read for open PRs. */
+/** APW-08 T32 — at most this many open pull requests of a Goal's Work are read per tick. */
 const GOAL_AWAITING_MERGE_SCAN = 200;
+
+/**
+ * APW-08 T32 — the SQL half of `hasOpenPullRequest`, applied BEFORE the scan's limit so Tasks
+ * that cannot count (no PR, a merged or closed one, a gone branch) never fill the window and hide
+ * an open one (review of #3060). `prState` and `branchState` are nullable and `NOT IN` drops
+ * NULLs, so each is "NULL or not one of these": four OR-ed branches.
+ */
+function openPullRequestWhere(base: FindOptionsWhere<Task>): FindOptionsWhere<Task>[] {
+    const prStates = [IsNull(), Not(In(['merged', 'closed']))];
+    const branchStates = [IsNull(), Not(In(['merged', 'cleaned', 'discarded']))];
+    return prStates.flatMap((prState) =>
+        branchStates.map((branchState) => ({
+            ...base,
+            prNumber: Not(IsNull()),
+            prUrl: Not(IsNull()),
+            prState,
+            branchState,
+        })),
+    );
+}
 
 /**
  * APW-08 T32 — the workspace's own "this Task's pull request is open" rule
@@ -578,7 +598,7 @@ export class GoalOrchestratorService {
         // APW-08 T32 (FR-48, review of #3058) — a loop is not started on a Work that is gone: it
         // would only pause again on the next tick, and notify each time.
         if (goal.workId && this.works) {
-            const state = await this.goalWorkState(goal, []);
+            const state = await this.goalWorkState(goal);
             if (state.unavailable) {
                 throw new UnprocessableEntityException({
                     code: 'workUnavailable',
@@ -926,12 +946,12 @@ export class GoalOrchestratorService {
             await saveGoalColumns(this.goals, goal, ['spentCents']);
         }
 
-        // One read of the Goal's Tasks and runs serves both the in-flight count and the
-        // awaiting-merge count (it is what `findActiveRuns` reads).
+        // The in-flight count is what `findActiveRuns` reads; the awaiting-merge count reads its
+        // own runs for the Tasks with an open pull request (`goalWorkState`).
         const { runs: goalRuns } = await this.loadGoalWork(goal.id);
         const activeRuns = goalRuns.filter((run) => ACTIVE_RUN_STATUSES.includes(run.status));
         const activeRun = activeRuns[0] ?? null;
-        const workState = await this.goalWorkState(goal, activeRuns);
+        const workState = await this.goalWorkState(goal);
         const candidates = await this.resolveCandidates(goal);
         const decision = decideGoalLoop({
             loopStatus: opts.force ? 'running' : (goal.loopStatus ?? null),
@@ -1610,12 +1630,11 @@ export class GoalOrchestratorService {
      *   before the PR sweep first runs, and a draft both count as open), and a branch that is
      *   still live. Status is not narrowed to `in_review`: a change the CI budget moved to
      *   BLOCKED still has its pull request open (review of #3058). Read by its own query, so the
-     *   Goal's 500-Task window can never hide one.
+     *   Goal's 500-Task window can never hide one; the open-PR rule is applied in SQL before the
+     *   scan's limit, and the runs in flight are read for exactly those Tasks, not taken from the
+     *   500-Task window (review of #3060).
      */
-    private async goalWorkState(
-        goal: Goal,
-        activeRuns: AgentRun[],
-    ): Promise<{
+    private async goalWorkState(goal: Goal): Promise<{
         unavailable: boolean;
         unreadable: boolean;
         awaitingMergeIterations: Array<number | null>;
@@ -1641,26 +1660,37 @@ export class GoalOrchestratorService {
         }
         if (!isAppWorkKind(work.kind)) return fine;
         let candidates: Task[];
+        let running: Set<string>;
         try {
-            candidates = await this.tasks.find({
-                where: {
-                    goalId: goal.id,
-                    workId: goal.workId,
-                    status: Not(In([TaskStatus.DONE, TaskStatus.CANCELLED])),
-                },
-                order: { createdAt: 'ASC' },
-                take: GOAL_AWAITING_MERGE_SCAN,
-            });
+            candidates = (
+                await this.tasks.find({
+                    where: openPullRequestWhere({
+                        goalId: goal.id,
+                        workId: goal.workId,
+                        status: Not(In([TaskStatus.DONE, TaskStatus.CANCELLED])),
+                    }),
+                    order: { createdAt: 'ASC' },
+                    take: GOAL_AWAITING_MERGE_SCAN,
+                })
+            ).filter(hasOpenPullRequest);
+            const inFlight = candidates.length
+                ? await this.runs.find({
+                      where: {
+                          taskId: In(candidates.map((task) => task.id)),
+                          status: In(ACTIVE_RUN_STATUSES),
+                      },
+                  })
+                : [];
+            running = new Set(
+                inFlight.map((run) => run.taskId).filter((id): id is string => Boolean(id)),
+            );
         } catch (err) {
             this.logger.warn(
                 `Goal ${goal.id}: its open pull requests could not be read this tick (${err}); the loop waits.`,
             );
             return { ...fine, unreadable: true };
         }
-        const running = new Set(activeRuns.map((run) => run.taskId).filter(Boolean));
-        const awaiting = candidates.filter(
-            (task) => !running.has(task.id) && hasOpenPullRequest(task),
-        );
+        const awaiting = candidates.filter((task) => !running.has(task.id));
         return {
             ...fine,
             awaitingMergeIterations: awaiting.map((task) => this.iterationFromTitle(task.title)),
