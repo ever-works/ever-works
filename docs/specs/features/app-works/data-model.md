@@ -69,7 +69,7 @@ as well as the line, so a moved line is re-findable: search the heading, then re
 | `work_deployments`                                | APW-06 | `1792060000000` | 5 nullable columns: `buildId`, `componentStatuses`, `smokeResult`, `appTarget`, `appRender`                                        | rides the existing `deployments.jsonl`        | [`APW-06/plan.md`](./APW-06-app-runtime/plan.md) §7.1 · §7.3  |
 | `tasks`                                           | APW-08 | `1792080000000` | 6 columns: `mergeCommitSha`, `deliveryState`, `deliveryBuildId`, `deliveryDeploymentId`, `deliveryUpdatedAt`, `deliveryClosedById` | rides the existing `data/tasks/tasks.jsonl`   | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.1         |
 | `tasks`                                           | APW-08 | `1792110100000` | 1 column: `branchGuardRefusal` text NULL (added 2026-09-25; stamped outside the APW-08 block, see §4)                              | rides the existing `data/tasks/tasks.jsonl`   | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.5         |
-| `goals`                                           | APW-08 | `1792080100000` | 1 column: `workId uuid NULL`                                                                                                       | rides `data/missions/goals.jsonl`             | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.2         |
+| `goals`                                           | APW-08 | `1792350000000` | 1 column: `workId uuid NULL`                                                                                                       | rides `data/missions/goals.jsonl`             | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.2         |
 | `missions`                                        | APW-08 | `1792080200000` | 3 columns: `outputMode`, `taskOutput`, `taskOutputNoticeAt`                                                                        | rides `data/missions/missions.jsonl`          | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.3         |
 | `organizations`                                   | APW-04 | `1792040100000` | 1 column: `appProvisionCaps` (simple-json, nullable)                                                                               | rides `data/organizations/organization.jsonl` | [`APW-04/tasks.md`](./APW-04-app-provisioner/tasks.md) T41    |
 | `works`                                           | APW-10 | `1792100200000` | 1 column: `appsTierQuotaProfile` varchar(32) NULL (`NULL` = `starter`)                                                             | rides `works/works.jsonl`                     | [`APW-10/plan.md`](./APW-10-apps-hosting-tier/plan.md) §4     |
@@ -507,7 +507,7 @@ nullable columns and the index on `buildId`; `down()` drops only them.
 Indexes: `idx_tasks_delivery_due (deliveryState, deliveryUpdatedAt)` and `uq_tasks_work_merge_commit
 (workId, mergeCommitSha)` UNIQUE **partial** `WHERE "mergeCommitSha" IS NOT NULL` — makes "merge recorded
 once" (S29) a database guarantee. Migrations `1792080000000-AddTaskDeliveryState.ts`,
-`1792080100000-AddGoalWorkScope.ts`, `1792080200000-AddMissionTaskOutput.ts`; `branchGuardRefusal` is added by
+`1792350000000-AddGoalWorkScope.ts`, `1792080200000-AddMissionTaskOutput.ts`; `branchGuardRefusal` is added by
 `1792110100000-AddTaskBranchGuardRefusal.ts` (added 2026-09-25, see §4).
 
 ### 3.3 `goals` — APW-08
@@ -570,7 +570,7 @@ newest migration on `develop` when the programme was authored was
 | 8     | `1792060100000-CreateWorkAppRuntimeStates.ts`                                                      | APW-06 | 01              |
 | 9     | `1792070000000-CreateAppEnvAndDependencies.ts` (**two** tables)                                    | APW-07 | 00              |
 | 10    | `1792080000000-AddTaskDeliveryState.ts`                                                            | APW-08 | 00              |
-| 11    | `1792080100000-AddGoalWorkScope.ts`                                                                | APW-08 | 01              |
+| 11    | `1792350000000-AddGoalWorkScope.ts`                                                                | APW-08 | 01              |
 | 12    | `1792080200000-AddMissionTaskOutput.ts`                                                            | APW-08 | 02              |
 | 13    | `1792090000000-CreateUpstreamPullRequests.ts`                                                      | APW-09 | 00              |
 | 14    | `1792100000000-CreateAppsTierGate.ts`                                                              | APW-10 | 00              |
