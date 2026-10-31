@@ -48,6 +48,8 @@ import {
 // real class reference. No cycle: run-dispatch-gate.service imports only
 // task-dispatcher (leaf), the run repository, and config.
 import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
+// APW-08 T49 — the park reason the change switch stamps (a constant from the same leaf family).
+import { QUEUED_REASON_APP_CHANGES_PAUSED } from '../agents/run-admission-chain';
 // Value import for the same @Optional() class-injection reason as the
 // gate above. No cycle: task-agent-review.service imports repositories,
 // the git facade and two leaf modules — never this file.
@@ -1615,12 +1617,16 @@ export class TaskTransitionService {
         }
         // APW-08 T49 (R-30) — the operator's change switch, read HERE, at the one dispatch
         // choke point, so it bites for every surface (board, chat, Goal, recurrence, fan-out)
-        // and for Tasks created before it was flipped. Off, an App Work Task gets no new run
-        // and no run row; the Task stays where it is, to be run again once changes resume.
-        // A review run is not a change (it reads the PR and records a verdict), so it passes.
+        // and for Tasks created before it was flipped. Off, an App Work Task's run is PARKED
+        // `app-changes-paused` (below, in place of the gate): its row exists, nothing starts, and
+        // the sweeper releases it once changes resume (R-30: "turning it back on resumes"). A
+        // review run is not a change (it reads the PR and records a verdict), so it passes.
+        // Without a run repository there is no row to park in, and the run is refused as before.
         // Review of #3040 (minor 8) — the Task's Work is read at most ONCE for this dispatch.
         const readWork = this.dispatchWorkRead(task);
-        if (!opts.reviewId && (await this.appChangesPausedFor(task, readWork))) {
+        const appChangesPaused =
+            !opts.reviewId && (await this.appChangesPausedFor(task, readWork));
+        if (appChangesPaused && !this.runs) {
             const error = describeAppChangesPaused();
             this.logger.warn(`Task ${task.id}: no run dispatched — ${error}`);
             return { runId: null, dispatched: false, parked: false, error };
@@ -1711,7 +1717,14 @@ export class TaskTransitionService {
                           })
                         : null;
                 };
-                if (this.dispatchGate) {
+                if (appChangesPaused) {
+                    // APW-08 T49 — parked by the operator's change switch, not by the gate: the
+                    // gate's chain does not know the switch, so it is never asked to admit this
+                    // run. Released by `AgentRunSweeperService.releaseAppChangesWaits` once
+                    // `EVER_WORKS_APP_CHANGES_ENABLED` is on again.
+                    admission = { admitted: false, queuedReason: QUEUED_REASON_APP_CHANGES_PAUSED };
+                    await reserve(admission);
+                } else if (this.dispatchGate) {
                     try {
                         admission = await this.dispatchGate.admit(
                             {

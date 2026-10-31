@@ -12,7 +12,8 @@ import {
     QUEUED_REASON_KILL_SWITCH,
     RunDispatchGateService,
 } from './run-dispatch-gate.service';
-import { QUEUED_REASON_WORK_BUDGET } from './run-admission-chain';
+import { QUEUED_REASON_APP_CHANGES_PAUSED, QUEUED_REASON_WORK_BUDGET } from './run-admission-chain';
+import { readAppWorkSwitches } from '../app-works/app-work-switches';
 import { AgentEscalationService } from './agent-escalation.service';
 import { NotificationService } from '../notifications/notification.service';
 import type { AgentRun } from '../entities/agent-run.entity';
@@ -140,6 +141,9 @@ export class AgentRunSweeperService {
         // APW-08 T56 (FR-66, FR-73) — release App Work runs parked on a spent
         // budget, every tick, before the stuck scan. Best-effort and bounded.
         await this.releaseWorkBudgetWaits();
+        // APW-08 T49 (R-30) — and App Work runs parked while the operator had changes off, once
+        // the switch is on again ("turning it back on resumes").
+        await this.releaseAppChangesWaits();
 
         const limit = config.agents.getRunStuckSweepBatch();
         const now = Date.now();
@@ -165,6 +169,8 @@ export class AgentRunSweeperService {
             QUEUED_REASON_AGENT_PAUSED,
             FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
             QUEUED_REASON_WORK_BUDGET,
+            // APW-08 T49 — an App Work run parked by the operator's change switch waits for it.
+            QUEUED_REASON_APP_CHANGES_PAUSED,
         ]);
         // Run steering (Wave 4 M5) — THE hard rule of this plan: a run parked
         // on a human question must NEVER be reaped by a TTL sweep. It is not
@@ -188,7 +194,8 @@ export class AgentRunSweeperService {
                     (row.queuedReason === QUEUED_REASON_KILL_SWITCH ||
                         row.queuedReason === QUEUED_REASON_AGENT_PAUSED ||
                         row.queuedReason === FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON ||
-                        row.queuedReason === QUEUED_REASON_WORK_BUDGET)
+                        row.queuedReason === QUEUED_REASON_WORK_BUDGET ||
+                        row.queuedReason === QUEUED_REASON_APP_CHANGES_PAUSED)
                 ),
         );
         const skippedHeld = notAwaiting.length - stuck.length;
@@ -312,6 +319,31 @@ export class AgentRunSweeperService {
      * and never fails the tick. A gate without `promoteParked` (a partial
      * double in a unit spec) is skipped.
      */
+    /**
+     * APW-08 T49 (XC-10, FR-74, R-30) — release App Work runs parked `app-changes-paused` once
+     * `EVER_WORKS_APP_CHANGES_ENABLED` is on again. While it is off this reads and releases
+     * NOTHING (the switch is checked first): a released run would only start a change the
+     * operator stopped. Once on, the gate re-admits each through its ordinary chain — which does
+     * not know the switch, hence the check here — and the run goes out through the same claim /
+     * dispatch / rollback path every release uses (and, if the switch flips off again in between,
+     * the worker's own `switch_off` check still refuses it before any model call).
+     *
+     * Best-effort like every sweeper step: never throws, never fails the tick.
+     */
+    async releaseAppChangesWaits(): Promise<void> {
+        if (!readAppWorkSwitches().changesEnabled) return;
+        if (!this.dispatchGate || typeof this.dispatchGate.promoteParked !== 'function') return;
+        try {
+            await this.dispatchGate.promoteParked(QUEUED_REASON_APP_CHANGES_PAUSED);
+        } catch (error) {
+            this.logger.warn(
+                `AgentRun sweep: releasing runs parked by the App changes switch failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
     async releaseWorkBudgetWaits(): Promise<void> {
         if (!this.dispatchGate || typeof this.dispatchGate.promoteParked !== 'function') return;
         try {

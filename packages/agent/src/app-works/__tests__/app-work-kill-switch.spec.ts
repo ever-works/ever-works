@@ -212,7 +212,7 @@ describe('APW-08 T49 — TaskTransitionService.dispatchAgentRun (board, Goal, re
     let dispatcher: { enqueue: jest.Mock };
     let works: { findById: jest.Mock };
 
-    function makeSvc(): TaskTransitionService {
+    function makeSvc(opts: { noRuns?: boolean } = {}): TaskTransitionService {
         runs = {
             createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
@@ -232,7 +232,7 @@ describe('APW-08 T49 — TaskTransitionService.dispatchAgentRun (board, Goal, re
             { findByTaskId: jest.fn().mockResolvedValue([]) },
             { allApproved: jest.fn().mockResolvedValue(true) },
             { findAgentAssignees: jest.fn().mockResolvedValue([]) },
-            runs,
+            opts.noRuns ? undefined : runs,
             dispatcher,
             undefined, // notifications
             undefined, // runDenorm
@@ -243,10 +243,25 @@ describe('APW-08 T49 — TaskTransitionService.dispatchAgentRun (board, Goal, re
         );
     }
 
+    // Updated with park-with-auto-resume (R-30: "jobs pause … turning it back on resumes"): the
+    // run is no longer refused — it is PARKED, and nothing starts. Just as strict: no enqueue.
     it(
-        'switch OFF: an App Work Task gets no run row and no enqueue, and says why',
+        'switch OFF: the run of an App Work Task is PARKED app-changes-paused — a row, nothing started, no enqueue',
         withEnv({ [CHANGES]: 'false' }, async () => {
             const result = await makeSvc().dispatchAgentRun(makeTask(), 'agent-a');
+            expect(result).toMatchObject({ runId: 'r1', dispatched: false, parked: true });
+            expect(runs.createQueued).toHaveBeenCalledTimes(1);
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ queuedReason: 'app-changes-paused' }),
+            );
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+        }),
+    );
+
+    it(
+        'switch OFF without a run repository (no row to park in): refused as before, and says why',
+        withEnv({ [CHANGES]: 'false' }, async () => {
+            const result = await makeSvc({ noRuns: true }).dispatchAgentRun(makeTask(), 'agent-a');
             expect(result).toMatchObject({ runId: null, dispatched: false, parked: false });
             expect(result.error).toMatch(
                 new RegExp(`^${APP_WORK_SWITCH_OFF_CODE}: ${CHANGES} is off`),
