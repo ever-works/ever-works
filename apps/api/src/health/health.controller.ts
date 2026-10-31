@@ -41,10 +41,15 @@ const API_JSON_CSP =
  * call them) and JSON-only, so the response is safe to expose publicly: it
  * carries up/down + configured flags, never any secret values.
  */
+/** TEMPORARY (PR #3057 proof): provided by no module, so Nest cannot build the controller. */
+export class DiBreakProbe {}
+
 @ApiTags('Health')
 @Controller()
 export class HealthController {
     constructor(
+        // TEMPORARY (PR #3057 proof, reverted in the next commit): an unprovided dependency.
+        private readonly diBreakProbe: DiBreakProbe,
         private readonly health: HealthCheckService,
         private readonly db: TypeOrmHealthIndicator,
         private readonly redis: RedisHealthIndicator,
