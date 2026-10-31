@@ -1055,6 +1055,22 @@ _Delivers FR-45…FR-55._
       **Test**: `pnpm --filter ever-works-web test app-works-evolve-messages` and
       `cd apps/web && pnpm exec playwright test goals-work-scope missions-task-output flow-goal-lifecycle flow-goals-lifecycle-deep flow-mission-crud-schedule flow-mission-guardrails`.
       **Done when**: all pass (the four pre-existing flows unchanged) and ACC-08-25/26 are walked.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-p2-i18n-e2e`, stacked on T36):
+      written; the local Playwright run is pending.**
+      - **Copy.** `dashboard.goalNew.work`, `dashboard.goalDetail.work` and `dashboard.missionDetail.output` are in
+        all 21 locales (T33 / T36). The Run-now toasts `tasks-filed` / `no-tasks` are in 21 locales (T35).
+      - **Messages spec.** `app-works-evolve-messages` now covers the three sub-trees (every leaf in 21 bundles,
+        camelCase, valid ICU, the plan's copy verbatim): 7/7 with the P2 case.
+      - **e2e specs:**
+        - `goals-work-scope.spec.ts`: a Goal names a reachable Work, the Goal page links it, an unreachable Work
+          is `404 workNotFound`, and `null` clears it;
+        - `missions-task-output.spec.ts`: `noAppWorkRelation` until an App Work is attached, the API's bounds,
+          and the Output card plus the "Tasks on attached Works" panel on the Mission page.
+      - **Not exercised in the e2e lane** (no agent or AI provider there): the loop's iterations and awaiting-merge
+        wait, and the tick's planning. Both are unit-covered (`goal-orchestrator.service.spec`,
+        `mission-tick.task-output.spec`).
+      - **Pending:** the local Playwright run of the two new files plus the four pre-existing flows. It was
+        deferred because a parallel session held this PC's ports and memory for its own e2e stack.
 
 ---
 

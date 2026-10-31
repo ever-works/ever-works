@@ -52,6 +52,10 @@ const SUBTREES = [
     'dashboard.aiChat.changeCard',
     'dashboard.tasksPage.appRules.containmentDowngrade',
     'dashboard.tasksPage.appRules.allowOnThisMachine',
+    // APW-08 P2 T37 — the Goal's Work (T33) and the Mission's Output (T36).
+    'dashboard.goalNew.work',
+    'dashboard.goalDetail.work',
+    'dashboard.missionDetail.output',
 ] as const;
 
 type Tree = { [key: string]: string | Tree };
@@ -148,6 +152,28 @@ describe('APW-08 evolve copy (T28)', () => {
             '{agent} will work on it. An agent run will start; runs are billed to your workspace.',
         );
         expect(at(en, 'dashboard.tasksPage.deliveryPosts.live')).toBe('Live at {url}.');
+    });
+
+    it('carries the APW-08 P2 copy: the Goal’s Work and the Mission’s Output (T37)', () => {
+        for (const path of [
+            'dashboard.goalNew.work.label',
+            'dashboard.goalDetail.work.lockedWhileRunning',
+            'dashboard.missionDetail.output.tasksPerTick',
+            'dashboard.missionDetail.output.openCap',
+            'dashboard.missionDetail.output.noAppWork',
+            'dashboard.missionDetail.output.tasksOnWorks',
+        ]) {
+            expect(enLeaves).toContain(path);
+        }
+        const en = bundle('en');
+        // Plan §6 copy, verbatim.
+        expect(at(en, 'dashboard.missionDetail.output.tasks')).toBe('Tasks on attached App Works');
+        expect(at(en, 'dashboard.missionDetail.output.nothingToFile')).toBe(
+            'No attached App Work to file Tasks on.',
+        );
+        expect(at(en, 'dashboard.missionDetail.output.appliesTo')).toBe(
+            'Applies to Works attached as Improves or Operates.',
+        );
     });
 
     it('every leaf exists, non-empty, in all 21 bundles', () => {
