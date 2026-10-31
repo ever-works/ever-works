@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { isAppWorkKind } from '@ever-works/contracts';
 import {
@@ -74,10 +74,11 @@ import {
  *     finalize path's post-push judgement does (`TaskWorkspaceService.guardAppChange` →
  *     `refuseChange`), so the copy a spec asserts is the guard's own sentence. An allowed verdict
  *     writes nothing and is answered, note included.
- *   - **run** (APW-08 T52) — one finished `agent_runs` row of the Task carrying the containment
- *     record the Fleet reconciler writes (`IsolatedRunAdmissionService.recordRunContainment`):
- *     the node's report goes through the same `toAppWorkRunContainment` normalizer, with no node
- *     named. That is what the Cost section's containment notice reads.
+ *   - **run** (APW-08 T52) — one finished `agent_runs` row of the Task, by the Task's own Agent
+ *     (`422 noAgent` without one), carrying the containment record the Fleet reconciler writes
+ *     (`IsolatedRunAdmissionService.recordRunContainment`): the node's report goes through the
+ *     same `toAppWorkRunContainment` normalizer, with no node named. That is what the Cost
+ *     section's containment notice reads.
  *
  * No Build row is written (a `building` / `build_failed` chip reads the state alone), no Activity,
  * no event, no queue, no network. Nothing is deleted or overwritten beyond the named columns.
@@ -245,6 +246,14 @@ export class E2eTaskSeedController {
 
     /** One finished Fleet run of the Task with the containment its node reported. */
     private async seedRun(task: Task, userId: string, run: E2eTaskSeedRunDto): Promise<string> {
+        // `agent_runs.agentId` references `agents.id` (`fk_agent_runs_agent`): the run is the
+        // Task's own Agent's, so a Task with none is refused rather than given an invented id.
+        if (!task.agentId) {
+            throw new UnprocessableEntityException({
+                code: 'noAgent',
+                message: 'A seeded run belongs to the Task’s Agent; assign one to the Task first.',
+            });
+        }
         const containment = toAppWorkRunContainment(run.containment);
         if (!containment) {
             throw new UnprocessableEntityException({
@@ -255,10 +264,7 @@ export class E2eTaskSeedController {
         const now = new Date();
         const row = await this.runRows.save(
             this.runRows.create({
-                // The Task's assigned Agent when it has one; a fixture-only id otherwise (the
-                // column has no foreign key; an unknown Agent has no Fleet placement, so the
-                // Cost view lists no hold for it).
-                agentId: task.agentId ?? randomUUID(),
+                agentId: task.agentId,
                 userId,
                 taskId: task.id,
                 triggerKind: 'task',

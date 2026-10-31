@@ -150,7 +150,8 @@ describe('E2eTaskSeedController', () => {
     });
 
     it('writes one finished run carrying the NORMALIZED containment record, naming no node (T52)', async () => {
-        const { controller, runRows, taskRows } = build();
+        const { controller, runRows, taskRows, task } = build();
+        task.agentId = '00000000-0000-4000-8000-0000000000aa';
         const answer = await controller.seed(USER, {
             taskId: TASK_ID,
             run: {
@@ -171,7 +172,8 @@ describe('E2eTaskSeedController', () => {
             triggerKind: 'task',
             status: 'completed',
         });
-        expect(typeof row.agentId).toBe('string');
+        // `fk_agent_runs_agent` — the Task's own Agent, never an invented id.
+        expect(row.agentId).toBe('00000000-0000-4000-8000-0000000000aa');
         const record = row.containment as Record<string, unknown>;
         expect(record).toMatchObject({ executionPath: 'ordinary', nodeId: null });
         expect(record.downgrades).toEqual([
@@ -184,15 +186,14 @@ describe('E2eTaskSeedController', () => {
         expect(taskRows.update).not.toHaveBeenCalled();
     });
 
-    it('stamps the run with the Task’s own Agent when it has one', async () => {
+    it('refuses a run for a Task with no Agent (422 noAgent): agent_runs.agentId is a foreign key', async () => {
         const built = build();
-        built.task.agentId = '00000000-0000-4000-8000-0000000000aa';
-        await built.controller.seed(USER, {
-            taskId: TASK_ID,
-            run: { containment: { executionPath: 'hardened', isolatedHome: true } },
-        } as never);
-        expect(built.runRows.save.mock.calls[0][0]).toMatchObject({
-            agentId: '00000000-0000-4000-8000-0000000000aa',
-        });
+        await expect(
+            built.controller.seed(USER, {
+                taskId: TASK_ID,
+                run: { containment: { executionPath: 'hardened', isolatedHome: true } },
+            } as never),
+        ).rejects.toBeInstanceOf(UnprocessableEntityException);
+        expect(built.runRows.save).not.toHaveBeenCalled();
     });
 });

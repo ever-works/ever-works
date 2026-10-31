@@ -164,8 +164,9 @@ export interface TaskSeedBody {
         totalFiles?: number;
     };
     /**
-     * APW-08 T52 — one finished Fleet run carrying the containment its node reported (no node
-     * named), so the Cost section's containment notice renders.
+     * APW-08 T52 — one finished Fleet run of the Task's own Agent (the Task needs one: `422
+     * noAgent`) carrying the containment its node reported (no node named), so the Cost
+     * section's containment notice renders.
      */
     run?: {
         containment: {

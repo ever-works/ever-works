@@ -25,6 +25,7 @@
  * `E2E_APP_LAUNCHER_SEED=true`); nothing here needs GitHub, a Build or a Fleet node.
  */
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { API_BASE, authedHeaders } from './helpers/api';
 import {
     createWorkTask,
     gotoDashboard,
@@ -174,7 +175,17 @@ async function ensureFixture(request: Parameters<typeof seededToken>[0]): Promis
     const token = await seededToken(request);
     const { workId } = await seedAppWork(request, token, `A11y e2e ${Date.now().toString(36)}`);
 
-    const failed = await createWorkTask(request, token, workId, { title: 'a11y failed change' });
+    // The seeded run is the Task's own Agent's (`agent_runs.agentId` is a foreign key).
+    const agent = await request.post(`${API_BASE}/api/agents`, {
+        headers: authedHeaders(token),
+        data: { scope: 'work', workId, name: `A11y ${Date.now().toString(36)}` },
+    });
+    expect(agent.status(), 'the fixture Agent is created').toBe(201);
+    const agentId = ((await agent.json()) as { id: string }).id;
+    const failed = await createWorkTask(request, token, workId, {
+        title: 'a11y failed change',
+        agentId,
+    });
     await transitionTask(request, token, failed.id, 'in_review');
     await seedTaskState(request, token, {
         taskId: failed.id,
@@ -213,7 +224,11 @@ async function ensureFixture(request: Parameters<typeof seededToken>[0]): Promis
  * to the cookie's locale), so it is set through the `NEXT_LOCALE` cookie, as
  * `internationalization-rtl.spec.ts` does.
  */
-async function useLocale(page: Page, locale: string, baseURL: string | undefined): Promise<void> {
+async function setLocaleCookie(
+    page: Page,
+    locale: string,
+    baseURL: string | undefined,
+): Promise<void> {
     const origin = new URL(baseURL || 'http://localhost:3000').origin;
     await page.context().addCookies([{ name: 'NEXT_LOCALE', value: locale, url: origin }]);
 }
@@ -346,7 +361,7 @@ test.describe('APW-08 T52 — App Works accessibility', () => {
             baseURL,
         }) => {
             const { failed } = await ensureFixture(request);
-            await useLocale(page, locale, baseURL);
+            await setLocaleCookie(page, locale, baseURL);
             const section = await openTask(page, failed.id);
             await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
             expect(
