@@ -9,6 +9,7 @@ import { MissionGoal } from '../entities/mission-goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { Task } from '../entities/task.entity';
 import { AgentRun } from '../entities/agent-run.entity';
+import { Work } from '../entities/work.entity';
 import { FacadesModule } from '../facades/facades.module';
 import { AgentsModule } from '../agents/agents.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -58,6 +59,12 @@ import { GoalsService } from './goals.service';
             GoalEvent,
             Task,
             AgentRun,
+            // APW-08 T31/T32 (FR-45, FR-47, FR-48) — the Goal's Work: reachability on write, its
+            // name on read, and the orchestrator's "is it still there / is it an App Work". The
+            // services inject it `@Optional()`, so WITHOUT this line it silently resolves to
+            // undefined: every `workId` would be refused and the loop would never check its Work
+            // (review of #3058; pinned by `goals.module.work-repository.spec.ts`).
+            Work,
         ]),
         FacadesModule,
         // Judgment layer G1/G3 - escalate-on-hard. GoalEvaluationService

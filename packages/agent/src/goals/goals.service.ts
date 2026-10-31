@@ -169,13 +169,17 @@ export class GoalsService {
         return work.id;
     }
 
-    /** APW-08 T31 — the single-Goal read names its Work (`null` when it has none or it is gone). */
-    private async withWorkName(dto: GoalDto): Promise<GoalDto> {
+    /**
+     * APW-08 T31 — the single-Goal read names its Work: `null` when it has none, it is gone, or
+     * the VIEWER is not its owner (a teammate reading a shared Goal never learns the name of the
+     * owner's own Work — review of #3058).
+     */
+    private async withWorkName(dto: GoalDto, viewerUserId: string): Promise<GoalDto> {
         if (!dto.workId || !this.works) return { ...dto, workName: null };
         const work = await this.works
-            .findOne({ where: { id: dto.workId }, select: ['id', 'name'] })
+            .findOne({ where: { id: dto.workId }, select: ['id', 'name', 'userId'] })
             .catch(() => null);
-        return { ...dto, workName: work?.name ?? null };
+        return { ...dto, workName: work && work.userId === viewerUserId ? work.name : null };
     }
 
     // ─── CRUD ───────────────────────────────────────────────────────
@@ -230,7 +234,7 @@ export class GoalsService {
     }
 
     async getForUser(userId: string, goalId: string, scope?: OwnershipScope): Promise<GoalDto> {
-        return this.withWorkName(toGoalDto(await this.findOrThrow(userId, goalId, scope)));
+        return this.withWorkName(toGoalDto(await this.findOrThrow(userId, goalId, scope)), userId);
     }
 
     /**
@@ -251,7 +255,7 @@ export class GoalsService {
                 scope,
             });
             if (!shared) throw error;
-            return this.withWorkName(toGoalDto(shared));
+            return this.withWorkName(toGoalDto(shared), userId);
         }
     }
 
