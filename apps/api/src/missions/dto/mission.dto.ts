@@ -9,6 +9,7 @@ import {
     IsString,
     Matches,
     MaxLength,
+    Max,
     Min,
     MinLength,
     Validate,
@@ -73,6 +74,31 @@ class IsMissionTemplateRepo implements ValidatorConstraintInterface {
     defaultMessage(): string {
         return 'missionTemplateRepo must be a GitHub-style "owner/repo" slug, a bare catalog id, or an HTTPS git URL on a public host';
     }
+}
+
+/**
+ * APW-08 T34 (FR-51…FR-53) — the bounds of a Mission's Task output. Each field is optional: an
+ * omitted one keeps its default (tasks per tick 1, open Tasks cap 3).
+ */
+export class MissionTaskOutputDto {
+    @ApiProperty({ required: false, minimum: 1, maximum: 3, default: 1 })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(3)
+    tasksPerTick?: number;
+
+    @ApiProperty({ required: false, minimum: 1, maximum: 10, default: 3 })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(10)
+    openTasksCap?: number;
+
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
 }
 
 /**
@@ -160,6 +186,22 @@ export class CreateMissionDto {
     // MissionsService.normalizeTemplateRepo so SSRF payloads are rejected up front.
     @Validate(IsMissionTemplateRepo)
     missionTemplateRepo?: string | null;
+
+    @ApiProperty({
+        required: false,
+        enum: ['ideas', 'tasks', 'both'],
+        description:
+            'APW-08 T34 (FR-51) — what the tick files: Ideas, Tasks on attached App Works, or both.',
+    })
+    @IsOptional()
+    @IsIn(['ideas', 'tasks', 'both'])
+    outputMode?: 'ideas' | 'tasks' | 'both';
+
+    @ApiProperty({ required: false, nullable: true, type: () => MissionTaskOutputDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => MissionTaskOutputDto)
+    taskOutput?: MissionTaskOutputDto | null;
 }
 
 /**
@@ -248,6 +290,22 @@ export class UpdateMissionDto {
     // MissionsService.normalizeTemplateRepo so SSRF payloads are rejected up front.
     @Validate(IsMissionTemplateRepo)
     missionTemplateRepo?: string | null;
+
+    @ApiProperty({
+        required: false,
+        enum: ['ideas', 'tasks', 'both'],
+        description:
+            'APW-08 T34 (FR-51) — what the tick files: Ideas, Tasks on attached App Works, or both.',
+    })
+    @IsOptional()
+    @IsIn(['ideas', 'tasks', 'both'])
+    outputMode?: 'ideas' | 'tasks' | 'both';
+
+    @ApiProperty({ required: false, nullable: true, type: () => MissionTaskOutputDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => MissionTaskOutputDto)
+    taskOutput?: MissionTaskOutputDto | null;
 }
 
 /**

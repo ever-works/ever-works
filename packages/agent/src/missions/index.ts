@@ -4,6 +4,7 @@
 export * from './missions.service';
 export * from './missions.module';
 export * from './types';
+export * from './mission-task-output';
 // Phase 3 PR J — Mission tick worker. Exported so the Trigger.dev
 // task at packages/tasks/src/tasks/trigger/mission-tick.task.ts
 // can resolve it from the application context.

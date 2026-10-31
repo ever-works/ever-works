@@ -140,6 +140,9 @@ export class MissionsController {
                     (body.guardrailsOverride as MissionGuardrailsOverride | null | undefined) ??
                     null,
                 missionTemplateRepo: body.missionTemplateRepo ?? null,
+                // APW-08 T34 (FR-51) — validated and normalized by the service.
+                outputMode: body.outputMode,
+                taskOutput: body.taskOutput as Record<string, unknown> | null | undefined,
             },
             this.scopeContext?.getScope(),
         );
@@ -203,6 +206,9 @@ export class MissionsController {
                     | null
                     | undefined,
                 missionTemplateRepo: body.missionTemplateRepo,
+                // APW-08 T34 (FR-51) — validated and normalized by the service.
+                outputMode: body.outputMode,
+                taskOutput: body.taskOutput as Record<string, unknown> | null | undefined,
             },
             this.scopeContext?.getScope(),
         );

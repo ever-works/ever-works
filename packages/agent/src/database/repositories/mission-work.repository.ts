@@ -15,6 +15,8 @@ export interface MissionWorkWithWork {
     createdAt: Date;
     workName: string | null;
     workSlug: string | null;
+    /** APW-08 T34 — the Work's kind (`app` decides whether a Mission can file Tasks on it). */
+    workKind?: string | null;
 }
 
 /** A mission_works row hydrated with the Mission's display fields
@@ -124,6 +126,7 @@ export class MissionWorkRepository {
                 'rel.createdAt AS "createdAt"',
                 'work.name AS "workName"',
                 'work.slug AS "workSlug"',
+                'work.kind AS "workKind"',
             ])
             .where('rel.missionId = :missionId AND rel.userId = :userId', { missionId, userId })
             .orderBy('rel.createdAt', 'DESC');

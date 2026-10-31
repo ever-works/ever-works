@@ -656,3 +656,91 @@ describe('MissionsService', () => {
         });
     });
 });
+
+/**
+ * APW-08 T34 (FR-51, plan §5 / S27) — the output mode is validated and stored, the Task output is
+ * stored normalized, and a Mission that files Tasks with no App Work attached as Improves or
+ * Operates is ACCEPTED with the `noAppWorkRelation` warning.
+ */
+describe('MissionsService — output mode (APW-08 T34)', () => {
+    let repo: ReturnType<typeof makeRepoMock>;
+    const relationsOf = (rows: Array<{ relation: string; workKind: string | null }>) => ({
+        listForMissionWithWork: jest.fn(async () => rows),
+    });
+    const build = (missionWorks?: unknown) =>
+        new MissionsService(
+            repo as unknown as Repository<Mission>,
+            new TitlerService(),
+            undefined, // tickService
+            undefined, // missionAttachments
+            undefined, // uploadsRepo
+            missionWorks as never,
+        );
+    const base = { title: 'Grow Bookings', description: 'd', type: MissionType.ONE_SHOT };
+
+    beforeEach(() => {
+        repo = makeRepoMock();
+    });
+
+    it('a Mission without the field is ideas with default Task output, and warns nothing', async () => {
+        const dto = await build(relationsOf([])).create('u1', base);
+        expect(dto).toMatchObject({
+            outputMode: 'ideas',
+            taskOutput: { tasksPerTick: 1, openTasksCap: 3 },
+            taskOutputNoticeAt: null,
+        });
+        expect(dto.warnings).toBeUndefined();
+    });
+
+    it('files Tasks with no App Work attached: accepted, with noAppWorkRelation', async () => {
+        const dto = await build(relationsOf([{ relation: 'markets', workKind: 'app' }])).create(
+            'u1',
+            { ...base, outputMode: 'tasks' },
+        );
+        expect(dto.outputMode).toBe('tasks');
+        expect(dto.warnings).toEqual(['noAppWorkRelation']);
+        expect(repo._rows).toHaveLength(1);
+    });
+
+    it('no warning once an App Work is attached as Improves or Operates', async () => {
+        for (const relation of ['improves', 'operates']) {
+            const dto = await build(relationsOf([{ relation, workKind: 'app' }])).create('u1', {
+                ...base,
+                outputMode: 'both',
+            });
+            expect(dto.warnings).toBeUndefined();
+        }
+        // A directory Work attached as Improves is not an App Work.
+        const site = await build(
+            relationsOf([{ relation: 'improves', workKind: 'directory' }]),
+        ).create('u1', { ...base, outputMode: 'tasks' });
+        expect(site.warnings).toEqual(['noAppWorkRelation']);
+    });
+
+    it('refuses an unknown mode (400) and stores Task output normalized', async () => {
+        await expect(
+            build(relationsOf([])).create('u1', { ...base, outputMode: 'all' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        const dto = await build(relationsOf([])).create('u1', {
+            ...base,
+            taskOutput: { tasksPerTick: 9, openTasksCap: 5, junk: true },
+        });
+        expect(dto.taskOutput).toEqual({ tasksPerTick: 1, openTasksCap: 5 });
+        expect(repo._rows[0].taskOutput).toEqual({ tasksPerTick: 1, openTasksCap: 5 });
+    });
+
+    it('update sets the mode and output, and null resets the output to its defaults', async () => {
+        const service = build(relationsOf([{ relation: 'improves', workKind: 'app' }]));
+        const created = await service.create('u1', base);
+        const updated = await service.update('u1', created.id, {
+            outputMode: 'tasks',
+            taskOutput: { tasksPerTick: 2, openTasksCap: 4 },
+        });
+        expect(updated).toMatchObject({
+            outputMode: 'tasks',
+            taskOutput: { tasksPerTick: 2, openTasksCap: 4 },
+        });
+        const reset = await service.update('u1', created.id, { taskOutput: null });
+        expect(reset.taskOutput).toEqual({ tasksPerTick: 1, openTasksCap: 3 });
+    });
+});

@@ -923,6 +923,26 @@ _Delivers FR-45…FR-55._
       Run: `cd apps/api && pnpm test AddMissionTaskOutput mission` and
       `pnpm --filter @ever-works/agent test mission-task-output`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-task-output`, stacked on T33):
+      built.**
+      - **Columns.** `missions.outputMode` (varchar(8), NOT NULL, default `'ideas'`), `taskOutput` (simple-json) and
+        `taskOutputNoticeAt`, via migration `1792360000000-AddMissionTaskOutput`. That is the next free slot after
+        T31's; the plan's `1792080200000` predates the block's later stamps.
+      - **Normalizer.** `mission-task-output.ts` holds `normalizeMissionTaskOutput` (`tasksPerTick` 1..3, default 1;
+        `openTasksCap` 1..10, default 3; `agentId` kept only as a uuid; garbage gives the defaults) and
+        `normalizeMissionOutputMode`, where anything unknown is `ideas`.
+      - **Service.** `MissionsService` refuses an unknown mode with `400` and stores Task output normalized
+        (`null` resets it). A Mission that files Tasks with no App Work attached as Improves or Operates is
+        accepted, with `warnings: ['noAppWorkRelation']`.
+      - **Supporting changes.** `MissionWorkRepository.listForMissionWithWork` now also selects the Work's kind.
+        The API DTOs validate the mode and the bounds.
+
+      Specs:
+      - `mission-task-output` 13/13;
+      - `missions.service` 51/51 (5 new; the warning is bite-proven);
+      - migration 3/3;
+      - `mission.dto` 22/22;
+      - `missions.controller` 2/2 (new).
 
 - [ ] **T35. Planner and tick branch.**
       **Create** `packages/agent/src/missions/mission-task-planner.service.ts` (new) — `AiFacadeService.askJson` with
