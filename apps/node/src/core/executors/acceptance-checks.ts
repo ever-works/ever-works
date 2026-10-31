@@ -1096,8 +1096,10 @@ export function buildNodeCheckEnv(
 		}
 	}
 
-	// Explicit per-check grants bypass the secret-name sweep (a listed
-	// name IS the grant) but never the platform-owned refusal.
+	// A name in the check's own passthrough bypasses the secret-name sweep (a
+	// listed name IS the grant) but never the platform-owned refusal. Only an
+	// exact per-repository grant (`platformOwnedGrants`, below) opens a
+	// platform-owned name, and never one in NODE_UNGRANTABLE_ENV_PATTERN.
 	//
 	// Within one CLI these names are prioritised, not interchangeable, and
 	// the CLI's own order does not match the operator's intent: Claude Code
