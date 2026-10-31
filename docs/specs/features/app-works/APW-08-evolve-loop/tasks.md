@@ -1028,6 +1028,13 @@ _Delivers FR-56…FR-60._
       (list the new page), `docs/specs/features/app-works/TRACKER.md`.
       **Test**: `pnpm --filter ever-works-docs build`.
       **Done when**: the docs build has no broken-link warning for the new page.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `docs/apw08-evolve`): the page and the edits that apply
+      today are written, not merged.** `docs/features/app-works-evolve.md` (asking for a change, where runs may
+      execute, isolation, checks, merge → live, cost and budget, the operator switches, and a "Not yet" list naming
+      P2 / P3 and the safety-rail holds), listed under App Works in `apps/docs/sidebarsPlatform.ts`;
+      `docs/features/app-works.md` corrected for G06 / G22 (no refusal on a truncated patch alone; the file-count
+      guidance) and linked to the new page; the APW-08 TRACKER row updated. **Waits on P2 / P3:** the `missions.md`
+      (Output), `goals.md` (Work) and `mission-templates.md` edits — they describe surfaces that do not exist yet.
 
 - [ ] **T45. Statuses.**
       **Modify** `spec.md`, `plan.md` and this file — status `Implemented`.
