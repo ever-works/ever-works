@@ -7,6 +7,16 @@ import type { ManifestRenderInputs } from './types.js';
  */
 export const FIELD_MANAGER = 'ever-works-k8s-plugin';
 
+/**
+ * The numeric uid / gid a Directory Work's site runs as: the `node` user of the official Node image
+ * that `ever-works/directory-web-template` builds from (`USER node`, 1000:1000). Every live Work site
+ * already runs as exactly this (checked 2026-10-31); pinning it makes non-root enforceable. It has to
+ * be NUMERIC: with `runAsNonRoot` the kubelet refuses an image that switches user by name ("image has
+ * non-numeric user"). Override per deploy with `runAsUser` / `runAsGroup`.
+ */
+export const DIRECTORY_WORK_RUN_AS_UID = 1000;
+export const DIRECTORY_WORK_RUN_AS_GID = 1000;
+
 const COMMON_LABELS = (workId: string, slug: string): Record<string, string> => ({
 	'ever-works.io/managed': 'true',
 	'ever-works.io/work-id': workId,
@@ -38,6 +48,14 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				labelSelector: { matchLabels: selector }
 			}
 		],
+		// A Work site never calls the Kubernetes API, so it gets no ServiceAccount token.
+		automountServiceAccountToken: false,
+		securityContext: {
+			runAsNonRoot: true,
+			runAsUser: input.runAsUser ?? DIRECTORY_WORK_RUN_AS_UID,
+			runAsGroup: input.runAsGroup ?? DIRECTORY_WORK_RUN_AS_GID,
+			seccompProfile: { type: 'RuntimeDefault' }
+		},
 		containers: [
 			{
 				name: 'app',
@@ -48,6 +66,13 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				// side-load an image (the kind-based e2e runbook) opt back out.
 				imagePullPolicy: input.imagePullPolicy ?? 'Always',
 				ports: [{ containerPort: input.containerPort, name: 'http' }],
+				// No capability and no privilege escalation (the site listens on an unprivileged port). The
+				// root filesystem stays WRITABLE on purpose: the Next.js server writes its cache under `.next/`
+				// at runtime (the image declares `.next/cache` a VOLUME); read-only needs those paths mapped first.
+				securityContext: {
+					allowPrivilegeEscalation: false,
+					capabilities: { drop: ['ALL'] }
+				},
 				// A directory Work renders its whole catalogue on first request, so
 				// the default 1s probe timeout could never pass on a large one — the
 				// pod stayed 0/1 forever while the app was healthy. Readiness stays

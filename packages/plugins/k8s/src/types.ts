@@ -202,6 +202,13 @@ export interface ManifestRenderInputs {
 	startupFailureThreshold?: number;
 	/** Defaults to 'Always'; only side-loaded (kind) images should use 'IfNotPresent'. */
 	imagePullPolicy?: 'Always' | 'IfNotPresent' | 'Never';
+	/**
+	 * Numeric uid / gid the site container runs as. Defaults to `DIRECTORY_WORK_RUN_AS_UID` /
+	 * `DIRECTORY_WORK_RUN_AS_GID` (1000, the `node` user of the template image). Pass the image's own
+	 * numeric ids when deploying a different image: `runAsNonRoot` cannot verify a named user.
+	 */
+	runAsUser?: number;
+	runAsGroup?: number;
 	hosts: string[];
 	ingressClass?: string;
 	tlsIssuer?: string;

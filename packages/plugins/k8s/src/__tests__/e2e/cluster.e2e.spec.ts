@@ -96,7 +96,11 @@ describeE2E('k8s plugin e2e — against real cluster', () => {
 			// MUTABLE branch alias, so a cached layer would pin a stale build).
 			// This suite side-loads its image with `kind load docker-image` and
 			// there is no registry to pull from, so it opts back out explicitly.
-			imagePullPolicy: 'IfNotPresent'
+			imagePullPolicy: 'IfNotPresent',
+			// nginx-unprivileged runs as uid / gid 101 (a numeric USER in its image). Pin that, so
+			// runAsNonRoot verifies this image's own user rather than the template's 1000.
+			runAsUser: 101,
+			runAsGroup: 101
 		});
 		const service = buildService({
 			workId: WORK_ID,

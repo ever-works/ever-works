@@ -5,7 +5,9 @@ import {
 	buildImagePullSecret,
 	buildService,
 	pullSecretNameFor,
-	FIELD_MANAGER
+	FIELD_MANAGER,
+	DIRECTORY_WORK_RUN_AS_GID,
+	DIRECTORY_WORK_RUN_AS_UID
 } from '../manifest.renderer';
 import { GenericIngressStrategy } from '../ingress/generic.strategy';
 import { NginxIngressStrategy } from '../ingress/nginx.strategy';
@@ -90,6 +92,31 @@ describe('buildDeployment', () => {
 
 		expect(container.readinessProbe.httpGet.path).toBe('/api/health');
 		expect(container.livenessProbe.httpGet.path).toBe('/api/health');
+	});
+
+	it('runs the site non-root as the template numeric node user, with no SA token, capabilities or escalation', () => {
+		const pod = (buildDeployment(baseInput) as Record<string, any>).spec.template.spec;
+		expect(pod.automountServiceAccountToken).toBe(false);
+		expect(DIRECTORY_WORK_RUN_AS_UID).toBe(1000);
+		expect(DIRECTORY_WORK_RUN_AS_GID).toBe(1000);
+		expect(pod.securityContext).toEqual({
+			runAsNonRoot: true,
+			runAsUser: 1000,
+			runAsGroup: 1000,
+			seccompProfile: { type: 'RuntimeDefault' }
+		});
+		expect(pod.containers[0].securityContext).toEqual({
+			allowPrivilegeEscalation: false,
+			capabilities: { drop: ['ALL'] }
+		});
+	});
+
+	it('uses a caller-supplied numeric uid / gid for a different image', () => {
+		const pod = (buildDeployment({ ...baseInput, runAsUser: 101, runAsGroup: 101 }) as Record<string, any>).spec
+			.template.spec;
+		expect(pod.securityContext.runAsNonRoot).toBe(true);
+		expect(pod.securityContext.runAsUser).toBe(101);
+		expect(pod.securityContext.runAsGroup).toBe(101);
 	});
 });
 
