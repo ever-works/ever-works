@@ -162,4 +162,18 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
         });
         expect(await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 })).toHaveLength(1);
     });
+
+    it('a report still pending never delays the lease (CodeRabbit on #3047)', async () => {
+        let release!: () => void;
+        const pending = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const onLeased = jest.fn(() => pending);
+        // `lease()` resolves while the report is still pending: it is never awaited.
+        const leased = await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 });
+        expect(leased).toHaveLength(1);
+        expect(onLeased).toHaveBeenCalledTimes(1);
+        release();
+        await pending;
+    });
 });
