@@ -821,7 +821,7 @@ _Delivers FR-45…FR-55._
 - [ ] **T31. Goal Work scope — schema and API.**
       **Modify** `packages/agent/src/entities/goal.entity.ts` — append `workId` (uuid, nullable, no relation) and
       `@Index('idx_goals_work', ['workId'])`.
-      **Create** `apps/api/src/migrations/1792080100000-AddGoalWorkScope.ts` (new).
+      **Create** `apps/api/src/migrations/1792350000000-AddGoalWorkScope.ts` (new).
       **Modify** `apps/api/src/goals/dto/goal.dto.ts` (`workId?: string | null`, `@IsUUID`),
       `apps/api/src/goals/goals.controller.ts`, `packages/agent/src/goals/goals.service.ts` — validate reachability in
       the Goal's scope; `409 loopRunning` on change while running.
@@ -866,10 +866,25 @@ _Delivers FR-45…FR-55._
       - The rules take optional `pullRequestsAwaitingMerge`, `awaitingMergeIterations` and `workUnavailable`; the
         existing decision table is unchanged.
 
+      **Independent review (2026-10-31), fixed:**
+      - **High:** `GoalsModule` did not register `Work`, so the `@Optional()` repository was `undefined` in
+        production. Every `workId` was refused and the loop never checked its Work. Now registered, and pinned by
+        `goals.module.work-repository.spec`.
+      - "Open pull request" now uses the workspace's own rule (`openPullRequestOf`) instead of
+        `in_review` + `prState = 'open'`. An unknown state (before the PR sweep first runs) and a draft count as
+        open, and so does a BLOCKED change whose PR is still open.
+      - It counts only this Work's unfinished Tasks, through their own query, so the Goal's 500-Task window can
+        never hide one.
+      - The S10 wait line is logged once, when the wait begins.
+      - A Work read failure waits (`work-unreadable`) rather than dispatching.
+      - `startLoop` refuses a Work that is gone (`422 workUnavailable`).
+      - A teammate reading a shared Goal never sees the owner's Work name.
+
       Specs:
-      - `goal-orchestrator-rules.awaiting-merge` 8/8 (new);
+      - `goal-orchestrator-rules.awaiting-merge` 9/9 (new);
       - `goal-orchestrator-rules` 43/43, unchanged;
-      - `goal-orchestrator.service` 88/88 (6 new, bite-proven);
+      - `goal-orchestrator.service` 91/91 (the T32 cases live there rather than in a separate
+        `work-scope` spec; the new rules are bite-proven);
       - the run-order integration spec 8/8.
 
 - [ ] **T33 (parallel with T32). Goal form.**

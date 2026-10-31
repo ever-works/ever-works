@@ -4,10 +4,11 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    UnprocessableEntityException,
     Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import {
     GOAL_EXECUTION_TARGETS,
     Goal,
@@ -136,6 +137,20 @@ const MAX_GOAL_TASKS = 500;
 const MAX_SCOPE_CANDIDATES = 50;
 
 const ACTIVE_RUN_STATUSES = ['queued', 'running'];
+
+/** APW-08 T32 — at most this many unfinished Tasks of a Goal's Work are read for open PRs. */
+const GOAL_AWAITING_MERGE_SCAN = 200;
+
+/**
+ * APW-08 T32 — the workspace's own "this Task's pull request is open" rule
+ * (`openPullRequestOf` in `task-workspace.service.ts`): a PR number and URL, a state that is not
+ * merged or closed (unknown and draft count as open), and a branch that is still live.
+ */
+function hasOpenPullRequest(task: Task): boolean {
+    if (!task.prNumber || !task.prUrl) return false;
+    if (task.prState === 'merged' || task.prState === 'closed') return false;
+    return !['merged', 'cleaned', 'discarded'].includes(task.branchState ?? '');
+}
 
 /** Epoch millis of a timestamp, or `fallback` when it is missing or unparseable. */
 function timeOf(value: Date | string | null | undefined, fallback: number): number {
@@ -560,6 +575,18 @@ export class GoalOrchestratorService {
                 'A delivery Goal needs at least one approved Definition-of-Done criterion before its loop can start.',
             );
         }
+        // APW-08 T32 (FR-48, review of #3058) — a loop is not started on a Work that is gone: it
+        // would only pause again on the next tick, and notify each time.
+        if (goal.workId && this.works) {
+            const state = await this.goalWorkState(goal, []);
+            if (state.unavailable) {
+                throw new UnprocessableEntityException({
+                    code: 'workUnavailable',
+                    message:
+                        'The Work this Goal was scoped to no longer exists. Pick another Work or clear it, then start the loop.',
+                });
+            }
+        }
         const resuming = goal.loopStatus === 'paused' || goal.loopStatus === 'stuck';
         goal.loopStatus = 'running';
         // The wall-clock anchor is set on the FIRST start and preserved
@@ -901,10 +928,10 @@ export class GoalOrchestratorService {
 
         // One read of the Goal's Tasks and runs serves both the in-flight count and the
         // awaiting-merge count (it is what `findActiveRuns` reads).
-        const { tasks: goalTasks, runs: goalRuns } = await this.loadGoalWork(goal.id);
+        const { runs: goalRuns } = await this.loadGoalWork(goal.id);
         const activeRuns = goalRuns.filter((run) => ACTIVE_RUN_STATUSES.includes(run.status));
         const activeRun = activeRuns[0] ?? null;
-        const workState = await this.goalWorkState(goal, goalTasks, activeRuns);
+        const workState = await this.goalWorkState(goal, activeRuns);
         const candidates = await this.resolveCandidates(goal);
         const decision = decideGoalLoop({
             loopStatus: opts.force ? 'running' : (goal.loopStatus ?? null),
@@ -938,6 +965,7 @@ export class GoalOrchestratorService {
                 (iteration): iteration is number => iteration !== null,
             ),
             workUnavailable: workState.unavailable,
+            workUnreadable: workState.unreadable,
             candidates,
             now: new Date(),
         });
@@ -956,6 +984,12 @@ export class GoalOrchestratorService {
                 // orchestrator log must stay readable, and a per-minute
                 // cron that writes "still running" every tick would bury
                 // the decisions that matter under thousands of non-events.
+                // APW-08 T32 (S10, review of #3058) — the one exception: "Waiting for iteration
+                // N's pull request..." is what the owner needs to see, so it is logged ONCE,
+                // when the wait begins (not again while the newest line already says it).
+                if (decision.reasonCode === 'awaiting-merge') {
+                    await this.recordWaitOnce(goal, decision.reasoning);
+                }
                 return {
                     goalId: goal.id,
                     action: decision.action,
@@ -1567,27 +1601,35 @@ export class GoalOrchestratorService {
      * APW-08 T32 — what the Goal's Work means for this tick.
      *
      * - **FR-48 / S26:** a Work that is gone, or no longer the Goal owner's in the Goal's scope,
-     *   is `unavailable` (the loop pauses). A failed READ is not proof of absence: it leaves the
-     *   loop alone this tick rather than pausing it on a blip.
-     * - **FR-47 / S10:** for an App Work, the iteration Tasks in review whose pull request is
-     *   still open and that have no run in flight (a running one is already counted) await a
-     *   merge, oldest first. Any other kind of Work counts nothing here.
+     *   is `unavailable` (the loop pauses). A failed READ is `unreadable`: neither proof that it
+     *   is gone nor that nothing awaits a merge, so the loop waits (review of #3058).
+     * - **FR-47 / S10:** for an App Work, this Goal's Tasks ON THAT WORK that are not finished,
+     *   have no run in flight (a running one is already counted) and still have an open pull
+     *   request await a merge, oldest first. "Open" is the workspace's own rule
+     *   (`openPullRequestOf`): a PR number and URL, not merged or closed (an unknown state, as
+     *   before the PR sweep first runs, and a draft both count as open), and a branch that is
+     *   still live. Status is not narrowed to `in_review`: a change the CI budget moved to
+     *   BLOCKED still has its pull request open (review of #3058). Read by its own query, so the
+     *   Goal's 500-Task window can never hide one.
      */
     private async goalWorkState(
         goal: Goal,
-        tasks: Task[],
         activeRuns: AgentRun[],
-    ): Promise<{ unavailable: boolean; awaitingMergeIterations: Array<number | null> }> {
-        const fine = { unavailable: false, awaitingMergeIterations: [] };
+    ): Promise<{
+        unavailable: boolean;
+        unreadable: boolean;
+        awaitingMergeIterations: Array<number | null>;
+    }> {
+        const fine = { unavailable: false, unreadable: false, awaitingMergeIterations: [] };
         if (!goal.workId || !this.works) return fine;
         let work: Work | null;
         try {
             work = await this.works.findOne({ where: { id: goal.workId } });
         } catch (err) {
             this.logger.warn(
-                `Goal ${goal.id}: its Work ${goal.workId} could not be read this tick (${err}); not paused on a read failure.`,
+                `Goal ${goal.id}: its Work ${goal.workId} could not be read this tick (${err}); the loop waits.`,
             );
-            return fine;
+            return { ...fine, unreadable: true };
         }
         const scope = ownershipRelationScopeOf(goal);
         if (
@@ -1595,22 +1637,37 @@ export class GoalOrchestratorService {
             work.userId !== goal.userId ||
             (scope ? !ownershipScopeMatches(work, scope) : false)
         ) {
-            return { unavailable: true, awaitingMergeIterations: [] };
+            return { ...fine, unavailable: true };
         }
         if (!isAppWorkKind(work.kind)) return fine;
+        let candidates: Task[];
+        try {
+            candidates = await this.tasks.find({
+                where: {
+                    goalId: goal.id,
+                    workId: goal.workId,
+                    status: Not(In([TaskStatus.DONE, TaskStatus.CANCELLED])),
+                },
+                order: { createdAt: 'ASC' },
+                take: GOAL_AWAITING_MERGE_SCAN,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Goal ${goal.id}: its open pull requests could not be read this tick (${err}); the loop waits.`,
+            );
+            return { ...fine, unreadable: true };
+        }
         const running = new Set(activeRuns.map((run) => run.taskId).filter(Boolean));
-        const awaiting = tasks.filter(
-            (task) =>
-                task.status === TaskStatus.IN_REVIEW &&
-                task.prState === 'open' &&
-                !running.has(task.id),
+        const awaiting = candidates.filter(
+            (task) => !running.has(task.id) && hasOpenPullRequest(task),
         );
         return {
-            unavailable: false,
+            ...fine,
             awaitingMergeIterations: awaiting.map((task) => this.iterationFromTitle(task.title)),
         };
     }
 
+    /** The iteration number a `[Goal] ... — iteration N` title carries, or `null`. */
     private iterationFromTitle(title: string): number | null {
         const match = /iteration\s+(\d+)\s*$/i.exec(title);
         return match ? Number(match[1]) : null;
@@ -1721,6 +1778,21 @@ export class GoalOrchestratorService {
     }
 
     /** Best-effort append to the orchestrator log — never fails the op. */
+    /** APW-08 T32 — log a wait line unless the Goal's newest line already says exactly it. */
+    private async recordWaitOnce(goal: Goal, message: string): Promise<void> {
+        try {
+            const latest = await this.events.findOne({
+                where: { goalId: goal.id },
+                order: { createdAt: 'DESC' },
+            });
+            if (latest?.message === message) return;
+        } catch {
+            // Unreadable log: skip the line rather than risk one per tick.
+            return;
+        }
+        await this.recordEvent(goal, { kind: 'limit', message });
+    }
+
     private async recordEvent(
         goal: Goal,
         entry: {

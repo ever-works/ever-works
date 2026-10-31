@@ -59,6 +59,8 @@ export type GoalLoopReasonCode =
     | 'awaiting-merge'
     /** APW-08 T32 (FR-48) — the Goal's Work is gone or unreachable. */
     | 'work-unavailable'
+    /** APW-08 T32 — the Goal's Work could not be READ this tick: hold, never guess. */
+    | 'work-unreadable'
     | 'grace-period'
     | 'no-candidate-agent'
     | 'routed-assigned-agent'
@@ -128,6 +130,11 @@ export interface GoalLoopInput {
      * reachable: the loop pauses and no iteration is dispatched. Absent / false = fine.
      */
     workUnavailable?: boolean;
+    /**
+     * APW-08 T32 (review of #3058) — the Work could not be read this tick. Not proof that it is
+     * gone (no pause), and not proof that nothing awaits a merge (no dispatch): the loop waits.
+     */
+    workUnreadable?: boolean;
     candidates: GoalRoutingCandidate[];
     now: Date;
 }
@@ -200,6 +207,13 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
             action: 'pause',
             reasonCode: 'work-unavailable',
             reasoning: 'The Work this Goal was scoped to no longer exists.',
+        };
+    }
+    if (input.workUnreadable === true) {
+        return {
+            action: 'wait',
+            reasonCode: 'work-unreadable',
+            reasoning: "The Goal's Work could not be read — trying again on the next tick.",
         };
     }
 
