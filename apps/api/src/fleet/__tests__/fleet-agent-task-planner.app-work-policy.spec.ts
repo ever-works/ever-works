@@ -177,6 +177,16 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
             expect(telemetry.track.mock.calls[0][2]).toMatchObject({ workId: 'work-app' });
         });
 
+        it('is not sent when the bridge is withheld only because the Agent’s Work is unreadable', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            agents.findByIdAndUser.mockResolvedValue(agent({ workId: 'work-gone' }));
+            const telemetry = sink();
+            const plan = await build(undefined, telemetry).plan(payload);
+            // Still fail closed: no bridge. But no Work is named as the denied App Work.
+            expect(plan!.mcp).toBeUndefined();
+            expect(telemetry.track).not.toHaveBeenCalled();
+        });
+
         it('is not sent for an ordinary Work (the bridge is stamped)', async () => {
             tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
             const telemetry = sink();

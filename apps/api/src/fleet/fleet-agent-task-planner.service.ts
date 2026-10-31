@@ -909,8 +909,14 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 `Task ${task.slug ?? task.id}: App Work run — the platform-MCP bridge is withheld (${APP_WORK_TOOL_POLICY_REFUSAL_CODE}).`,
             );
             // APW-08 T43 (plan §8.1, XC-05) — the group only, never a tool name or argument. The
-            // App Work is the Task's when that is one, else the Agent's own (an App-scoped Agent).
-            const workId = work && isAppWorkKind(work.kind) ? work.id : (agent.workId ?? null);
+            // App Work is the Task's when that is one, else the Agent's own once it is READ as one:
+            // a bridge withheld because the Agent's Work was unreadable (fail closed) names no
+            // Work (review of #3055).
+            let workId: string | null = work && isAppWorkKind(work.kind) ? work.id : null;
+            if (!workId && agent.workId) {
+                const agentWork = await this.works.findById(agent.workId).catch(() => null);
+                if (agentWork && isAppWorkKind(agentWork.kind)) workId = agent.workId;
+            }
             if (workId) {
                 this.appChangeTelemetry.track(
                     'app.change.tool_denied',
