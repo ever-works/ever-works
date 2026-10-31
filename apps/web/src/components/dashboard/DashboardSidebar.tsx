@@ -318,7 +318,14 @@ export function DashboardSidebar({
                                         position="right"
                                     >
                                         <button
+                                            type="button"
                                             onClick={() => handleCollapsedChange(!isCollapsed)}
+                                            aria-label={
+                                                isCollapsed
+                                                    ? t('tooltips.expandSidebar')
+                                                    : t('tooltips.collapseSidebar')
+                                            }
+                                            aria-expanded={!isCollapsed}
                                             className={cn(
                                                 'flex items-center justify-center w-5 h-5 rounded-md transition-colors cursor-pointer',
                                                 'text-text-muted dark:text-text-muted-dark',
@@ -376,7 +383,9 @@ export function DashboardSidebar({
                                 className="w-8 h-8 shadow-sm rounded-xl"
                                 onClick={() => onInteraction?.()}
                             >
-                                <Plus className="w-5 h-5" strokeWidth={1.3} />
+                                <Plus className="w-5 h-5" strokeWidth={1.3} aria-hidden="true" />
+                                {/* Icon-only when collapsed: the tooltip is not an accessible name. */}
+                                <span className="sr-only">{t('new')}</span>
                             </Button>
                         </ConditionalTooltip>
                     ) : (
@@ -419,6 +428,9 @@ export function DashboardSidebar({
                                         <Link
                                             href={item.href}
                                             onClick={() => onInteraction?.()}
+                                            // Collapsed, the link is icon-only and the tooltip is
+                                            // not an accessible name.
+                                            aria-label={isCollapsed ? item.name : undefined}
                                             className={cn(
                                                 'flex items-center relative rounded-sm transition-colors border border-transparent',
                                                 isCollapsed
