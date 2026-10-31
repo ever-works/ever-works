@@ -34,6 +34,8 @@ import { TASK_LIFECYCLE_POSTER } from './task-lifecycle-poster.port';
 import { TaskLifecyclePostsService } from './task-lifecycle-posts.service';
 import { TASK_APP_CHECKS } from './task-app-checks.port';
 import { TaskAppChecksService } from '../app-works/task-app-checks.service';
+import { APP_WORK_RUN_STOP_HANDLER } from './task-run-stop.port';
+import { AppWorkRunHoldsService } from '../app-works/app-work-run-holds.service';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
@@ -335,6 +337,10 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // the internal RPC channel (exported below for the API's `TriggerInternalController`).
         AppWorkIsolationBackfillRunner,
         { provide: TASK_APP_CHECKS, useClass: TaskAppChecksService }, // APW-08 T16 (lane L9)
+        // APW-08 T46 (R-17, FR-67) — an App Work run a safety rail refused ends as `needs_input`
+        // (Task BLOCKED + one `guardrail-refusal` escalation), asked by `TaskRunDenormService`.
+        AppWorkRunHoldsService,
+        { provide: APP_WORK_RUN_STOP_HANDLER, useExisting: AppWorkRunHoldsService },
     ],
     exports: [
         // Exported as well as provided: the dispatch brief, the Fleet

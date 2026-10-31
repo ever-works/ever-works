@@ -1068,6 +1068,36 @@ _Delivers FR-56…FR-60._
       `pnpm --filter @ever-works/agent test app-work-run-holds`.
       **Done when**: the spec is green and `packages/agent/src/tasks-domain/__tests__/task-ci-auto-resume.spec.ts`
       passes unchanged.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-run-holds`): built, specs green locally,
+      not merged.** `app-work-run-holds.ts` — `classifyAppWorkRunStop` (park reasons `kill-switch` / `agent-paused`
+      and the stop / pause rails → `wait`; any other `refused` / `held` → `needs_input` with the FIRST such rail and
+      its category; a wait wins over a refusal in the same run). **The producer is the safety gate's own record,
+      not a new run column:** `SafetyGateService.evaluate` already writes a `rail_refusals` row (with `runId`,
+      `railId`, `category`) for every non-allow verdict, so nothing in `AgentRunService` changes and nothing depends
+      on the model reporting. **One hook for both paths:** `TaskRunDenormService.recordTerminal` — the write the
+      cloud worker (over its RPC proxy) and the Fleet reconciler both make when a run ends — asks
+      `APP_WORK_RUN_STOP_HANDLER` (`AppWorkRunHoldsService`, fire-and-forget, the Task's current run only). On
+      `needs_input` for an App Work Task: `in_progress` / `in_review` → `BLOCKED`, and ONE `guardrail-refusal`
+      escalation (`dedupKey` per run) whose summary names the rail and category only. A `wait` moves nothing.
+      `TaskTransitionService` is resolved lazily (it depends on the denorm service). Spec `app-work-run-holds`
+      21/21 (every rail id and park reason, wait wins, first refusal decides; block + one escalation; wait and
+      non-App untouched; never throws; end to end through `recordTerminal`; a stale run touches nothing) —
+      bite-proven (the hook; the needs_input rule). **Known limit:** the CI fix loop has no explicit stop for a
+      BLOCKED Task (a guardrail block usually lands before any pull request, so it has nothing to resume);
+      `appRules.runHeld` copy and pausing the run's deadline clock while it waits are not built.
+      **Independent review (2026-10-31), fixed on the branch:** the escalation is filed only when the Task IS
+      blocked (already, by this move, or by a concurrent move that won the compare-and-set) — a Task that is done,
+      cancelled or back in todo is left alone and nothing is filed; a stop / pause rail is found wherever it falls in
+      the run (its own query, not the oldest 50); the window opens a minute before the run ROW was created (a
+      re-claimed run re-stamps `startedAt`). The cloud worker's `dispatched` success path now mirrors the run's end
+      (`recordTerminal('completed')`) after finalize and on the no-workspace return: before, it mirrored nothing
+      (the Task kept `latestRunStatus: running`) and never asked the hook. Spec `app-work-run-holds` 26/26,
+      `agent-task-execute.task` 57/57 (both bite-proven). **ACC-08-31 stays OPEN — no live producer on the Fleet
+      path:** a Fleet node runs its coding agent locally, so the platform's `SafetyGateService` never sees its tool
+      calls and no `rail_refusals` row carries a Fleet run's id; cloud App Work runs are refused today
+      (`noIsolatedRuntime`). The hook is ready for either producer: a node-side verdict report on the `agent-task`
+      result (the reconciler writes `rail_refusals` from it), or the plan's `runSafetyStop`. Owner call: a `held`
+      ladder verdict also files an approval, so a held run can raise two Inbox items.
 
 ---
 
