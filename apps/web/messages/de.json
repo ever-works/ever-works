@@ -1796,7 +1796,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7255,6 +7256,7 @@
                     "other": "Beim Einrichten des Repositorys ist ein Fehler aufgetreten."
                 },
                 "overview": {
+                    "changesPaused": "Änderungen an Apps wurden vom Betreiber pausiert.",
                     "title": "App",
                     "repository": "Werk-Repository",
                     "upstream": "Upstream",

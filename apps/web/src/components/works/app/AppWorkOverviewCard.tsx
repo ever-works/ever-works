@@ -44,6 +44,11 @@ export interface AppWorkOverviewCardProps {
     upstreamState: AppUpstreamStateResponse | null;
     /** `null` when the App spec read failed or there is none yet. */
     appSpec: WorkAppSpecStateDto | null;
+    /**
+     * APW-08 T49 (FR-74, R-30, S34) — the operator has switched new App Work changes off. The card
+     * says so and offers no change request (the UI is read-only); everything else stays readable.
+     */
+    changesPaused?: boolean;
 }
 
 const row = 'flex flex-wrap items-baseline justify-between gap-2 py-1.5 text-sm';
@@ -62,6 +67,7 @@ export function AppWorkOverviewCard({
     workName,
     upstreamState,
     appSpec,
+    changesPaused = false,
 }: AppWorkOverviewCardProps) {
     const t = useTranslations('dashboard.workDetail.appSource.overview');
     const tChat = useTranslations('dashboard.workDetail.appSource.chat');
@@ -89,6 +95,17 @@ export function AppWorkOverviewCard({
                     {t('title')}
                 </h2>
             </div>
+
+            {/* APW-08 T49 (R-30, S34) — new changes are off; boards and history stay readable. */}
+            {changesPaused && (
+                <p
+                    role="status"
+                    data-testid="app-work-changes-paused"
+                    className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+                >
+                    {t('changesPaused')}
+                </p>
+            )}
 
             {!upstreamState && (
                 <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
@@ -218,8 +235,9 @@ export function AppWorkOverviewCard({
                     Renders nothing outside the dashboard chat shell. */}
                 <div className="flex flex-wrap items-center gap-2">
                     <ChatAboutButton contextType="work" contextId={workId} label={workName} />
-                    {/* APW-08 T27 — the same change request, without a chat: one field, a Task. */}
-                    <RequestChangeDialog workId={workId} />
+                    {/* APW-08 T27 — the same change request, without a chat: one field, a Task.
+                        Not offered while the operator has changes off (T49): the banner says why. */}
+                    {!changesPaused && <RequestChangeDialog workId={workId} />}
                 </div>
             </div>
 

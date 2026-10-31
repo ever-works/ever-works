@@ -1765,7 +1765,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7186,6 +7187,7 @@
                     "other": "Під час налаштування репозиторію сталася помилка."
                 },
                 "overview": {
+                    "changesPaused": "Зміни в застосунках призупинено оператором.",
                     "title": "App",
                     "repository": "Репозиторій Work",
                     "upstream": "Вихідний репозиторій",

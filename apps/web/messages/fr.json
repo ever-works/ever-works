@@ -1796,7 +1796,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7255,6 +7256,7 @@
                     "other": "Une erreur s'est produite lors de la configuration du dépôt."
                 },
                 "overview": {
+                    "changesPaused": "Les modifications des applications sont suspendues par l’opérateur.",
                     "title": "App",
                     "repository": "Dépôt du Travail",
                     "upstream": "Amont",

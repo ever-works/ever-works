@@ -7,6 +7,7 @@ import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/con
 import { FLEET_JOB_MAX_RESULT_BYTES, resolveExclusiveAgentCredentials } from '@ever-works/contracts';
 import { enforceAcceptanceChecksExecutionPolicy } from '../execution-policy';
 import type { NodeExecutionPolicy } from '../types';
+import { isMissingToolExit, MISSING_TOOL_REASON, type MissingToolReason } from './acceptance-checks.missing-tool';
 
 /**
  * The `acceptance-checks` executor — the node's v1 job kind.
@@ -98,6 +99,11 @@ export interface NodeCheckResult {
 	exitCode: number | null;
 	durationMs: number;
 	logTail?: string;
+	/**
+	 * APW-08 T51 (FR-61) — why an `error` is one: `missingTool` when the shell answered "command
+	 * not found" (exit 127 / 9009, `acceptance-checks.missing-tool.ts`). Absent otherwise.
+	 */
+	reason?: MissingToolReason;
 }
 
 export interface AcceptanceChecksOutcome extends Record<string, unknown> {
@@ -347,7 +353,7 @@ async function executeCheck(
 			if (signal && abortListener) signal.removeEventListener('abort', abortListener);
 		};
 
-		const finish = (status: NodeCheckStatus, exitCode: number | null): void => {
+		const finish = (status: NodeCheckStatus, exitCode: number | null, reason?: MissingToolReason): void => {
 			if (settled) return;
 			settled = true;
 			cleanup();
@@ -356,7 +362,8 @@ async function executeCheck(
 				exitCode,
 				status,
 				durationMs: now() - startedAt,
-				...(tail.length > 0 ? { logTail: tail } : {})
+				...(tail.length > 0 ? { logTail: tail } : {}),
+				...(reason ? { reason } : {})
 			});
 		};
 		const fail = (error: Error): void => {
@@ -456,6 +463,9 @@ async function executeCheck(
 			if (cancelled || timedOut) return;
 			if (code === 0) {
 				finish('green', 0);
+			} else if (isMissingToolExit(code)) {
+				// APW-08 T51 (FR-61) — the shell could not find the program: not a code failure.
+				finish('error', code, MISSING_TOOL_REASON);
 			} else {
 				// Killed by an external signal (code null) is still not a pass.
 				finish('red', code);

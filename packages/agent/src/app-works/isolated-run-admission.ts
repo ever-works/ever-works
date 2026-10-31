@@ -464,6 +464,8 @@ export interface AppWorkRunContainmentRecorder {
         workId: string;
         nodeId: string | null;
         rawContainment: unknown;
+        /** APW-08 T51 — a check on this run reported its tool missing on `nodeId`. */
+        missingTool?: boolean;
     }): Promise<boolean>;
 }
 

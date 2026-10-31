@@ -102,6 +102,8 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
             nodeId: NODE,
             workId: 'work-app',
             jobId: JOB,
+            // APW-08 T51 — the job's Task, so a node that reported a missing tool is passed over.
+            taskId: 'task-1',
         });
         expect(jobs.claim).toHaveBeenCalledTimes(1);
     });
@@ -128,5 +130,50 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
 
         job = makeJob({ kind: 'acceptance-checks' as FleetJob['kind'], status: 'queued' });
         expect(await build(undefined).lease({ nodeId: NODE, secret, max: 1 })).toHaveLength(1);
+    });
+
+    // APW-08 T43 — `app.change.run_admitted` is reported for the node that WON the claim.
+    it('reports a WON App Work lease once, with the node, the Work and the Task', async () => {
+        const onLeased = jest.fn(async () => undefined);
+        const leased = await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 });
+        expect(leased).toHaveLength(1);
+        expect(onLeased).toHaveBeenCalledTimes(1);
+        expect(onLeased).toHaveBeenCalledWith({
+            userId: USER,
+            nodeId: NODE,
+            workId: 'work-app',
+            jobId: JOB,
+            taskId: 'task-1',
+        });
+    });
+
+    it('reports nothing for a claim lost to another node, or for a job without the marker', async () => {
+        const onLeased = jest.fn(async () => undefined);
+        jobs.claim.mockResolvedValueOnce(false);
+        expect(await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 })).toEqual([]);
+        job = makeJob({ payload: { taskId: 'task-1', runId: 'run-1', agentId: 'agent-1' } });
+        expect(await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 })).toHaveLength(1);
+        expect(onLeased).not.toHaveBeenCalled();
+    });
+
+    it('a report that throws never costs the lease anything', async () => {
+        const onLeased = jest.fn(async () => {
+            throw new Error('sink down');
+        });
+        expect(await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 })).toHaveLength(1);
+    });
+
+    it('a report still pending never delays the lease (CodeRabbit on #3047)', async () => {
+        let release!: () => void;
+        const pending = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const onLeased = jest.fn(() => pending);
+        // `lease()` resolves while the report is still pending: it is never awaited.
+        const leased = await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 });
+        expect(leased).toHaveLength(1);
+        expect(onLeased).toHaveBeenCalledTimes(1);
+        release();
+        await pending;
     });
 });

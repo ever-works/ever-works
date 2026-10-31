@@ -1765,7 +1765,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7186,6 +7187,7 @@
                     "other": "Si è verificato un problema durante la configurazione del repository."
                 },
                 "overview": {
+                    "changesPaused": "Le modifiche alle app sono sospese dall’operatore.",
                     "title": "App",
                     "repository": "Repository del Work",
                     "upstream": "Upstream",

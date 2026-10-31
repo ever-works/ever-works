@@ -1796,7 +1796,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7255,6 +7256,7 @@
                     "other": "Algo salió mal al configurar el repositorio."
                 },
                 "overview": {
+                    "changesPaused": "El operador ha pausado los cambios en las aplicaciones.",
                     "title": "App",
                     "repository": "Repositorio del Trabajo",
                     "upstream": "Upstream",

@@ -1796,7 +1796,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7255,6 +7256,7 @@
                     "other": "حدث خطأ أثناء إعداد المستودع."
                 },
                 "overview": {
+                    "changesPaused": "أوقف المشغّل التغييرات على التطبيقات مؤقتًا.",
                     "title": "التطبيق",
                     "repository": "مستودع العمل",
                     "upstream": "المصدر الأصلي (upstream)",

@@ -1796,7 +1796,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7255,6 +7256,7 @@
                     "other": "Нещо се обърка при настройването на хранилището."
                 },
                 "overview": {
+                    "changesPaused": "Операторът временно спря промените в приложенията.",
                     "title": "Приложение",
                     "repository": "Хранилище на Работата",
                     "upstream": "Upstream",

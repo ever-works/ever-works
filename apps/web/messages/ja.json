@@ -1765,7 +1765,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7186,6 +7187,7 @@
                     "other": "リポジトリのセットアップ中に問題が発生しました。"
                 },
                 "overview": {
+                    "changesPaused": "アプリへの変更はオペレーターによって一時停止されています。",
                     "title": "App",
                     "repository": "Work リポジトリ",
                     "upstream": "アップストリーム",

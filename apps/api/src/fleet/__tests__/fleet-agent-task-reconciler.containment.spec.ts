@@ -164,6 +164,38 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
         expect(order).toEqual(['receipt', 'containment']);
     });
 
+    it('APW-08 T51: a check that reported its tool missing marks the record (missingTool), and only then', async () => {
+        await complete(
+            build(),
+            result({
+                containment: CONTAINMENT as never,
+                checks: [
+                    { id: 'repo/check-1', status: 'green', exitCode: 0, durationMs: 1 },
+                    {
+                        id: 'repo/check-2',
+                        status: 'error',
+                        exitCode: 127,
+                        durationMs: 1,
+                        reason: 'missingTool',
+                    },
+                ] as never,
+            }) as never,
+        );
+        expect(recorder.recordRunContainment).toHaveBeenCalledWith(
+            expect.objectContaining({ nodeId: NODE, missingTool: true }),
+        );
+
+        recorder.recordRunContainment.mockClear();
+        await complete(
+            build(),
+            result({
+                containment: CONTAINMENT as never,
+                checks: [{ id: 'repo/check-1', status: 'red', exitCode: 1, durationMs: 1 }] as never,
+            }) as never,
+        );
+        expect(recorder.recordRunContainment.mock.calls[0][0]).not.toHaveProperty('missingTool');
+    });
+
     it('records for a question too (taken before the three-way split)', async () => {
         await complete(
             build(),

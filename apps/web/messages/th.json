@@ -1765,7 +1765,8 @@
                     "red": "Failed",
                     "timeout": "Timeout",
                     "error": "Error",
-                    "notAdmitted": "Not admitted"
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -7186,6 +7187,7 @@
                     "other": "เกิดข้อผิดพลาดระหว่างตั้งค่ารีโพสิทอรี"
                 },
                 "overview": {
+                    "changesPaused": "ผู้ดูแลระบบหยุดการเปลี่ยนแปลงแอปไว้ชั่วคราว",
                     "title": "แอป",
                     "repository": "รีโพสิทอรีของ Work",
                     "upstream": "อัปสตรีม",

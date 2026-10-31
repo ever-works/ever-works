@@ -28,5 +28,23 @@ export interface FleetAppWorkLeaseAdmission {
         nodeId: string;
         workId: string;
         jobId: string;
+        /**
+         * APW-08 T51 (FR-61, S36) — the Task the job runs, from its platform-written payload, so a
+         * node whose last run of THIS Task reported a missing tool is not offered it again.
+         * Absent = no such check.
+         */
+        taskId?: string | null;
     }): Promise<boolean>;
+    /**
+     * APW-08 T43 — the node WON the claim of an App Work job (called once, after the CAS, never
+     * for a claim lost to another node). The binding emits `app.change.run_admitted` with the
+     * containment that node runs it under. Best-effort: never throws, never delays the lease.
+     */
+    onLeased?(input: {
+        userId: string;
+        nodeId: string;
+        workId: string;
+        jobId: string;
+        taskId: string | null;
+    }): Promise<void>;
 }
