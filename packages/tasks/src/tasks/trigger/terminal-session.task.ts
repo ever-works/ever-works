@@ -11,6 +11,7 @@ import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
 import { TerminalTransportClient } from '../../trigger/worker/services/terminal-transport.client';
 import { TerminalSessionHost } from '../../trigger/worker/services/terminal-session-host';
 import { resolveTerminalSessionSpawner } from '../../trigger/worker/services/terminal-provider.resolver';
+import { terminalSessionsEnabled } from '../../trigger/worker/services/terminal-sessions-gate';
 
 export interface TerminalSessionPayload {
     /** The AgentRun whose id doubles as the relay channel id. */
@@ -63,6 +64,11 @@ export const terminalSessionTask = task<'terminal-session', TerminalSessionPaylo
     id: 'terminal-session',
     maxDuration: 3600,
     run: async (payload: TerminalSessionPayload) => {
+        // Opt-in gate, checked before anything boots: the shell this task hosts
+        // would inherit this worker's environment (see terminal-sessions-gate.ts).
+        if (!terminalSessionsEnabled()) {
+            return { status: 'skipped' as const, reason: 'terminal-sessions-disabled' };
+        }
         assertUuid(payload.runId, 'payload.runId');
         assertUuid(payload.userId, 'payload.userId');
         assertUuid(payload.agentId, 'payload.agentId');
