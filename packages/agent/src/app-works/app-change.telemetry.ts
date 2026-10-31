@@ -26,12 +26,12 @@ import {
  * | `app.change.started` | `AppChangeRequestService.request`, when the change Task is filed |
  * | `app.change.blocked_by_switch` | `AppChangeRequestService.request`, when `EVER_WORKS_APP_CHANGES_ENABLED` is off |
  * | `app.change.guard_refused` | `AppWorkChangeGateService.evaluate`, when the change guard refuses a branch that is not a provisioning Task's |
+ * | `app.change.merged`, `delivered`, `delivery_failed`, `closed_without_deploy`, `delivery.sweep` | `TaskDeliveryService` (the delivery chain) |
+ * | `app.change.run_admitted` | the isolated-run admission at the won lease (`IsolatedRunAdmissionService` via the api's lease provider) |
+ * | `app.change.tool_denied` | the App Work Task tool policy: the Fleet planner when it withholds the platform-MCP bridge (group `mcp`), and `AgentRunService` per group it withholds or refuses (T43) |
  *
- * The delivery-tracking events (`merged`, `delivered`, `delivery_failed`,
- * `closed_without_deploy`, `delivery.sweep`), the Mission task-output events and
- * `run_admitted` / `tool_denied` are declared for the plan's catalog; the moments they
- * describe (the delivery reconciler, the Mission fan-out, the XC-05/06 admission) are not in
- * this tree yet, so nothing emits them.
+ * The Mission task-output events are declared for the plan's catalog; the Mission fan-out they
+ * describe (APW-08 P2, T35) is not in this tree yet, so nothing emits them.
  */
 
 /** Plan §8.1's events, by the names the analytics backend receives. */

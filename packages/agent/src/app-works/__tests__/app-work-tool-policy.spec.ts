@@ -414,6 +414,7 @@ describe('APW-08 T47 — AgentRunService classifies the run and re-checks at dis
         toolService: unknown,
         classifier: unknown,
         agent: Agent = makeAgent(),
+        appWorksSink?: unknown,
     ): AgentRunService {
         const positional: unknown[] = [
             { findById: jest.fn().mockResolvedValue(agent) },
@@ -432,6 +433,8 @@ describe('APW-08 T47 — AgentRunService classifies the run and re-checks at dis
         // safety gate, fleet held-call filer) stay unbound; the classifier is the 21st.
         while (positional.length < 20) positional.push(undefined);
         positional.push(classifier);
+        // T18's brief source (22nd) stays unbound; T43's telemetry sink is the 23rd.
+        positional.push(undefined, appWorksSink);
         return new (AgentRunService as unknown as new (...args: unknown[]) => AgentRunService)(
             ...positional,
         );
@@ -535,6 +538,89 @@ describe('APW-08 T47 — AgentRunService classifies the run and re-checks at dis
         expect(dispatchedToolNames()).toEqual(expect.arrayContaining(['sendEmail', 'searchWeb']));
     });
 
+    // APW-08 T43 (plan §8.1, XC-05) — one `app.change.tool_denied` per denied group: the group
+    // only, never a tool name, attributed to the run's App Work.
+    describe('app.change.tool_denied (T43)', () => {
+        const flush = () => new Promise((resolve) => setImmediate(resolve));
+        const sink = () => ({ track: jest.fn() });
+        const appClassifier = (workId: string | null = 'w-app') => ({
+            appliesTo: jest.fn().mockResolvedValue(true),
+            appWorkIdOf: jest.fn().mockResolvedValue(workId),
+        });
+        const sent = (telemetry: { track: jest.Mock }) =>
+            telemetry.track.mock.calls.filter(([, event]) => event === 'app.change.tool_denied');
+
+        it('reports each group the policy withheld, with the App Work and the Task only', async () => {
+            const telemetry = sink();
+            const classifier = appClassifier();
+            await makeRunService(makeToolService(), classifier, makeAgent(), telemetry).execute(
+                ctx,
+            );
+            await flush();
+
+            const calls = sent(telemetry);
+            expect(calls.length).toBeGreaterThan(0);
+            for (const [distinctId, , properties] of calls) {
+                expect(distinctId).toBe('u1');
+                expect(Object.keys(properties).sort()).toEqual(['group', 'taskId', 'workId']);
+                expect(properties).toMatchObject({ workId: 'w-app', taskId: 't1' });
+            }
+            const groups = calls.map(([, , properties]) => properties.group);
+            expect(groups).toContain('outbound-messaging');
+            expect(new Set(groups).size).toBe(groups.length);
+            expect(classifier.appWorkIdOf).toHaveBeenCalledWith({
+                taskId: 't1',
+                agentWorkId: 'w-app',
+            });
+        });
+
+        it('reports the groups of a run REFUSED at the dispatch re-check', async () => {
+            const telemetry = sink();
+            const legacyToolService = {
+                resolveGrantedTools: jest.fn().mockResolvedValue({
+                    tools: [descriptor('sendEmail'), descriptor('mcp__srv__x')],
+                    refused: [],
+                }),
+                releaseMcpRun: jest.fn().mockResolvedValue(undefined),
+            };
+            await makeRunService(
+                legacyToolService,
+                appClassifier(),
+                makeAgent(),
+                telemetry,
+            ).execute(ctx);
+            await flush();
+            expect(sent(telemetry).map(([, , properties]) => properties.group)).toEqual([
+                'outbound-messaging',
+                'mcp',
+            ]);
+        });
+
+        it('sends nothing with no sink, for a run that is not on an App Work, or without a Task', async () => {
+            const telemetry = sink();
+            await makeRunService(
+                makeToolService(),
+                appClassifier(null),
+                makeAgent(),
+                telemetry,
+            ).execute(ctx);
+            await makeRunService(
+                makeToolService(),
+                appClassifier(),
+                makeAgent(),
+                telemetry,
+            ).execute({
+                ...ctx,
+                taskId: null as never,
+            });
+            await expect(
+                makeRunService(makeToolService(), appClassifier()).execute(ctx),
+            ).resolves.toBeDefined();
+            await flush();
+            expect(sent(telemetry)).toEqual([]);
+        });
+    });
+
     it('a classifier that throws applies the policy (fail closed)', async () => {
         const classifier = { appliesTo: jest.fn().mockRejectedValue(new Error('db down')) };
         const svc = makeRunService(makeToolService(), classifier);
@@ -585,6 +671,16 @@ describe('APW-08 T47 — AppWorkRunClassifierService reads platform rows and fai
         await expect(
             make().appliesTo({ agentWorkId: 'w-app', ownerConversationTurn: true }),
         ).resolves.toBe(false);
+    });
+
+    it('names the App Work for telemetry (T43): the Task’s, else the Agent’s, else none', async () => {
+        await expect(make().appWorkIdOf({ taskId: 't-app' })).resolves.toBe('w-app');
+        await expect(make().appWorkIdOf({ taskId: 't-site', agentWorkId: 'w-app' })).resolves.toBe(
+            'w-app',
+        );
+        await expect(make().appWorkIdOf({ taskId: 't-site' })).resolves.toBeNull();
+        await expect(make().appWorkIdOf({ taskId: 't-orphan' })).resolves.toBeNull();
+        await expect(make({ throws: true }).appWorkIdOf({ taskId: 't-app' })).resolves.toBeNull();
     });
 
     it('a missing Task, a missing Work and a throwing read all fail closed', async () => {

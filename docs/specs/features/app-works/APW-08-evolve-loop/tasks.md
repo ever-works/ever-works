@@ -1020,6 +1020,20 @@ _Delivers FR-56…FR-60._
       telemetry half); **a dependency assertion that `packages/agent/package.json` still does not list
       `@ever-works/monitoring`** (APW08-G16). Run: `pnpm --filter @ever-works/monitoring test app-change-events`.
       **Done when**: the spec is green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-tool-denied`): every P1 event has an
+      emitter.** Built differently from the text above, as recorded in `app-change.telemetry.ts`: the agent package
+      keeps no `@ever-works/monitoring` dependency and uses APW-01's one sanitizer (`AppWorksTelemetryService`, rule 3
+      drops any free text) over the API's `@Global()` `APP_WORKS_TELEMETRY_SINK`. The emitters:
+      - `started` / `blocked_by_switch` / `guard_refused`: #3027;
+      - the delivery events: the chain (#3030);
+      - `run_admitted`: #3047;
+      - **`tool_denied` (this branch):** the Fleet planner sends group `mcp` when it withholds an App Work run's
+        platform-MCP bridge (the live path), and `AgentRunService` sends one event per group the policy withholds or
+        refuses (cloud loop). The properties are `{ workId, taskId, group }`, attributed to the App Work through the
+        new `AppWorkRunClassifier.appWorkIdOf`.
+
+      Specs: planner `app-work-policy` 12/12, `app-work-tool-policy` 25/25, both emitters bite-proven. Still
+      missing: `mission.task_output.*` (comes with P2 T35).
 
 - [ ] **T44. Docs.**
       **Create** `docs/features/app-works-evolve.md` (behaviour: delivery states, rules, follow-ups, Goals/Missions
