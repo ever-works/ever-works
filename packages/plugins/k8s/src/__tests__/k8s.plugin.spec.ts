@@ -1554,6 +1554,7 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			          },
 			        },
 			        "spec": {
+			          "automountServiceAccountToken": false,
 			          "containers": [
 			            {
 			              "image": "ghcr.io/acme/work-1:abc1234",
@@ -1593,6 +1594,14 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			                  "memory": "256Mi",
 			                },
 			              },
+			              "securityContext": {
+			                "allowPrivilegeEscalation": false,
+			                "capabilities": {
+			                  "drop": [
+			                    "ALL",
+			                  ],
+			                },
+			              },
 			              "startupProbe": {
 			                "failureThreshold": 30,
 			                "httpGet": {
@@ -1604,6 +1613,14 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			              },
 			            },
 			          ],
+			          "securityContext": {
+			            "runAsGroup": 1000,
+			            "runAsNonRoot": true,
+			            "runAsUser": 1000,
+			            "seccompProfile": {
+			              "type": "RuntimeDefault",
+			            },
+			          },
 			          "topologySpreadConstraints": [
 			            {
 			              "labelSelector": {
