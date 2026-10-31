@@ -809,6 +809,29 @@ describe('GoalsService — the Goal’s Work (APW-08 T31)', () => {
         expect(read).toMatchObject({ workId: WORK, workName: 'Bookings' });
     });
 
+    it('a teammate reading a shared Goal sees the Work id, never the owner’s Work name', async () => {
+        const accessPolicy = {
+            findVisibleNotOwned: jest.fn(async () => goalsRepo._rows[0]),
+        };
+        const service = new GoalsService(
+            goalsRepo as unknown as Repository<Goal>,
+            makeRepo('s') as unknown as Repository<GoalMetricSample>,
+            makeRepo('mg') as unknown as Repository<MissionGoal>,
+            makeRepo('m') as unknown as Repository<Mission>,
+            { evaluateOne: jest.fn() } as unknown as GoalEvaluationService,
+            accessPolicy as never,
+            undefined,
+            undefined,
+            worksRepo as never,
+        );
+        const created = await service.create('u1', deliveryInput({ workId: WORK }));
+        expect(await service.getReadable('u2', created.id)).toMatchObject({
+            workId: WORK,
+            workName: null,
+        });
+        expect(await service.getReadable('u1', created.id)).toMatchObject({ workName: 'Bookings' });
+    });
+
     it('a Goal with no Work reads as workId null, workName null (every Goal before P2)', async () => {
         const service = build();
         const created = await service.create('u1', deliveryInput());
