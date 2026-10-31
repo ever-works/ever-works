@@ -242,7 +242,8 @@ export class MissionTickService {
                 ...outcome,
             };
             summary.entries.push(entry);
-            if (outcome.outcome === 'spawned' || outcome.outcome === 'tasks-filed') summary.ran += 1;
+            if (outcome.outcome === 'spawned' || outcome.outcome === 'tasks-filed')
+                summary.ran += 1;
             else if (outcome.outcome === 'failed') summary.failed += 1;
             else summary.skipped += 1;
 
@@ -645,10 +646,15 @@ export class MissionTickService {
             this.logger.warn(`Mission ${mission.id}: its Works could not be read (${err}).`);
             return { outcome: 'no-tasks', tasksFiled: 0, message: 'works-unreadable' };
         }
-        const eligible: Array<{ workId: string; workName: string; relation: 'improves' | 'operates' }> = [];
+        const eligible: Array<{
+            workId: string;
+            workName: string;
+            relation: 'improves' | 'operates';
+        }> = [];
         for (const row of relations) {
             if (eligible.length >= MISSION_TASK_OUTPUT_MAX_WORKS) break;
-            if (!(MISSION_TASK_OUTPUT_RELATIONS as readonly string[]).includes(row.relation)) continue;
+            if (!(MISSION_TASK_OUTPUT_RELATIONS as readonly string[]).includes(row.relation))
+                continue;
             if (!isAppWorkKind(row.workKind ?? null)) continue;
             if (eligible.some((entry) => entry.workId === row.workId)) continue;
             eligible.push({
@@ -669,7 +675,13 @@ export class MissionTickService {
         let skippedDuplicate = 0;
         for (const target of eligible) {
             try {
-                const result = await this.fileOnWork(mission, target, output, requireApproval, scope);
+                const result = await this.fileOnWork(
+                    mission,
+                    target,
+                    output,
+                    requireApproval,
+                    scope,
+                );
                 tasksFiled += result.filed;
                 skippedCap += result.cappedOut ? 1 : 0;
                 skippedDuplicate += result.duplicates;
@@ -773,10 +785,17 @@ export class MissionTickService {
                 // FR-52 — started with the Mission's Agent (its own, else the Work's default).
                 // A Task with no Agent to run it stays in To do: filed, not lost.
                 try {
+                    // FR-53 (APW08-G15) — the run is capped by the Mission's per-run budget.
+                    const maxBudgetCents = mission.guardrailsOverride?.maxBudgetCentsPerRun;
                     await tasksService.runTask(
                         mission.userId,
                         task.id,
-                        { agentId: output.agentId ?? null },
+                        {
+                            agentId: output.agentId ?? null,
+                            ...(typeof maxBudgetCents === 'number' && maxBudgetCents > 0
+                                ? { maxBudgetCents: Math.trunc(maxBudgetCents) }
+                                : {}),
+                        },
                         scope,
                     );
                 } catch (err) {
@@ -809,13 +828,18 @@ export class MissionTickService {
             this.logger.warn(`Mission ${mission.id}: the notice stamp failed (${err}).`);
             return;
         }
-        await this.recordActivity(mission, ActivityActionType.MISSION_NOTHING_TO_FILE, 'nothing-to-file', {
-            reason,
-            message:
-                reason === 'no-app-work'
-                    ? 'No attached App Work to file Tasks on.'
-                    : 'Nothing new to file on the attached App Works.',
-        });
+        await this.recordActivity(
+            mission,
+            ActivityActionType.MISSION_NOTHING_TO_FILE,
+            'nothing-to-file',
+            {
+                reason,
+                message:
+                    reason === 'no-app-work'
+                        ? 'No attached App Work to file Tasks on.'
+                        : 'Nothing new to file on the attached App Works.',
+            },
+        );
         this.telemetry().track(
             'mission.task_output.nothing_to_file',
             { missionId: mission.id },

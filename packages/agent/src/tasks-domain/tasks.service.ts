@@ -1844,7 +1844,11 @@ export class TasksService {
     async runTask(
         userId: string,
         taskId: string,
-        opts: { agentId?: string | null } = {},
+        opts: {
+            agentId?: string | null;
+            /** APW-08 T35 (APW08-G15) — the run's own spend cap in cents. */
+            maxBudgetCents?: number;
+        } = {},
         ownershipScope?: OwnershipScope,
     ): Promise<RunTaskResult> {
         const task = await this.getOne(userId, taskId, ownershipScope);
@@ -1883,6 +1887,7 @@ export class TasksService {
         // key a status transition would use for the same pair.
         const dispatch = await this.transitions.dispatchAgentRun(task, agentId, {
             dedupKey: `${taskId}:${agentId}:manual:${Date.now()}`,
+            ...(opts.maxBudgetCents !== undefined ? { maxBudgetCents: opts.maxBudgetCents } : {}),
         });
 
         await this.logActivity({

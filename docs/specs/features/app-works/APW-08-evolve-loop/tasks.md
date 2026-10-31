@@ -1004,6 +1004,23 @@ _Delivers FR-45…FR-55._
       - `mission-task-planner` 4/4;
       - module wiring 2/2;
       - `mission-tick.service` 28/28 and `missions.service` 51/51, unchanged.
+      **Part 2, the per-run budget (APW08-G15), branch `feat/apw08-run-budget-cap`: built.**
+      - `agent_runs.budgetCapCents` (int, NULL = no cap), via migration `1792370000000-AddAgentRunBudgetCap`.
+      - `dispatchAgentRun` / `runTask` take `maxBudgetCents` (a positive whole number, otherwise no cap) and store
+        it on the run row, so a parked, drained or resumed run keeps it.
+      - The Mission tick passes `guardrailsOverride.maxBudgetCentsPerRun`.
+      - The Fleet planner maps the cap to `execution.maxBudgetUsd` as `floor(cents) / 100`, never above the
+        Agent's own cap.
+
+      **Known limit:** the cloud loop has no per-run cost accounting (it counts tokens only), so on the cloud path
+      the cap is recorded but not enforced. Cloud App Work runs are refused today (T12, `noIsolatedRuntime`), so
+      every Mission-filed App Work Task runs on a Fleet node, where the cap applies.
+
+      Specs:
+      - `task-transition` 34/34;
+      - `mission-tick.task-output` 10/10;
+      - planner `app-work-policy` 16/16 (the mapping is bite-proven);
+      - `AddAgentRunBudgetCap` 2/2.
 
 - [ ] **T36. Mission web.**
       **Create** `apps/web/src/components/missions/MissionOutputCard.tsx`,

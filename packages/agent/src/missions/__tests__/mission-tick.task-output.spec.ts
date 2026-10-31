@@ -179,6 +179,17 @@ describe('MissionTickService — Task output (APW-08 T35)', () => {
         );
     });
 
+    it('starts each Task capped by the Mission’s per-run budget (FR-53)', async () => {
+        const t = build({ guardrailsOverride: { maxBudgetCentsPerRun: 1500 } } as Partial<Mission>);
+        await t.service.runOnce('m1', 'u1');
+        expect(t.tasksService.runTask).toHaveBeenCalledWith(
+            'u1',
+            't-1',
+            { agentId: null, maxBudgetCents: 1500 },
+            undefined,
+        );
+    });
+
     it('requires approval before creating: filed in Backlog, never started (ACC-08-26)', async () => {
         const t = build({
             guardrailsOverride: { requireApprovalBeforeCreate: true },

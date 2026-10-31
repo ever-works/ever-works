@@ -469,6 +469,15 @@ export { FleetAgentTaskPlanError, FleetDelegationScopeRefusedError };
  *     written. Jobs already in `fleet_jobs` before this rule shipped are
  *     not re-checked at lease time.
  */
+/**
+ * APW-08 T35 (APW08-G15) — a run's own cap in USD for the node: whole cents only, rounded DOWN
+ * (`floor(cents) / 100`), so a conversion can never raise the cap; no cap = `null`.
+ */
+export function runBudgetCapUsd(cents: unknown): number | null {
+    if (typeof cents !== 'number' || !Number.isFinite(cents) || cents <= 0) return null;
+    return Math.floor(cents) / 100;
+}
+
 @Injectable()
 export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
     private readonly logger = new Logger(FleetAgentTaskPlannerService.name);
@@ -973,6 +982,15 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         if (settings.model) execution.model = settings.model;
         if (settings.effort) execution.effort = settings.effort;
         if (settings.maxBudgetUsd !== undefined) execution.maxBudgetUsd = settings.maxBudgetUsd;
+        // APW-08 T35 (FR-53, APW08-G15) — the run's own cap (a Mission-filed Task's per-run
+        // budget): cents to USD rounded DOWN, and never above the Agent's own cap.
+        const runCapUsd = runBudgetCapUsd(plannedRun?.budgetCapCents);
+        if (runCapUsd !== null) {
+            execution.maxBudgetUsd =
+                execution.maxBudgetUsd === undefined
+                    ? runCapUsd
+                    : Math.min(execution.maxBudgetUsd, runCapUsd);
+        }
         if (settings.skipPermissions) execution.skipPermissions = true;
         // Self-build slice AU — offer the session the source run left on its
         // node. Conditional key: a job with nothing to resume is the exact
