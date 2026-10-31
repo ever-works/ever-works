@@ -22,6 +22,7 @@ import {
     composeRunAdmission,
     DEFAULT_RUN_ADMISSION_CHAIN,
     QUEUED_REASON_AGENT_PAUSED,
+    QUEUED_REASON_APP_CHANGES_PAUSED,
     QUEUED_REASON_CONCURRENCY,
     QUEUED_REASON_INSUFFICIENT_CREDITS,
     QUEUED_REASON_KILL_SWITCH,
@@ -73,8 +74,9 @@ export const PROMOTE_PARKED_MAX_PROMOTIONS = 200;
  * Park reasons whose drain RELABELS a run the chain now refuses for a
  * different reason.
  *
- * Both are "a stop was lifted" drains: the global stop flag was cleared,
- * or an agent was resumed. In either case a run the chain still refuses —
+ * All are "a stop was lifted" drains: the global stop flag was cleared,
+ * an agent was resumed, or (APW-08 T49) the operator switched App changes
+ * back on. In each case a run the chain still refuses —
  * because its Work is saturated, or credits ran out — must be handed to
  * the reason that will actually drain it, or it stays parked under a
  * label nothing is looking for. `concurrency-limit` is deliberately
@@ -84,6 +86,7 @@ export const PROMOTE_PARKED_MAX_PROMOTIONS = 200;
 const RELABELLABLE_PARK_REASONS: ReadonlySet<string> = new Set<string>([
     QUEUED_REASON_KILL_SWITCH,
     QUEUED_REASON_AGENT_PAUSED,
+    QUEUED_REASON_APP_CHANGES_PAUSED,
 ]);
 
 export interface RunDispatchAdmitInput {
