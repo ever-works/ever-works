@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { runAxe, seriousViolations, WCAG_A_AA, withoutPendingTokenContrast } from './helpers/axe';
+import { runAxe, seriousViolations, WCAG_A_AA } from './helpers/axe';
 
 /**
  * Accessibility — axe-core deep run. Deepens accessibility.spec.ts.
@@ -50,9 +50,7 @@ test.describe('axe-core — color contrast spot-check', () => {
             waitUntil: 'networkidle',
         });
         await page.waitForTimeout(1_500);
-        // Contrast owed to a pending colour-token decision is annotated, not
-        // counted (helpers/axe.ts, PENDING_TOKEN_FOREGROUNDS).
-        const violations = withoutPendingTokenContrast(await runAxe(page, { tags: WCAG_A_AA }));
+        const violations = await runAxe(page, { tags: WCAG_A_AA });
         // axe reports one `color-contrast` violation per page, listing every
         // failing element as a node, so the count is of nodes.
         const contrast = violations

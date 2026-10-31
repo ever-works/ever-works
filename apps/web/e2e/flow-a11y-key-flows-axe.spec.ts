@@ -85,6 +85,9 @@ test.describe('a11y — axe + keyboard + focus on authenticated key flows', () =
     test('flow 1: axe-core bounds serious+ violations across works/tasks/agents/settings/profile, and each renders the main + nav landmarks', async ({
         page,
     }) => {
+        // Seven full pages, each now really scanned by axe: under a cold `next dev` the
+        // sweep alone reached the 90s local timeout.
+        test.slow();
         // One sweep across the core authenticated surfaces. We assert (a) the
         // landmark contract (single main + a nav) holds on every page, and (b)
         // axe reports a bounded number of serious/critical violations — catching

@@ -14,47 +14,19 @@
  * A load failure throws: an axe check that cannot run fails its test rather than
  * skipping it.
  */
-import { test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 const AXE_SCRIPT_PATH = require.resolve('axe-core/axe.min.js');
 
 /** The WCAG 2.0 A and AA rule tags most of the specs run. */
 export const WCAG_A_AA = ['wcag2a', 'wcag2aa'] as const;
 
-export interface AxeNode {
-    html?: string;
-    target?: string[];
-    failureSummary?: string;
-    /** The checks that failed; `color-contrast` carries the colours it measured. */
-    any?: Array<{
-        id: string;
-        data?: { fgColor?: string; bgColor?: string; contrastRatio?: number } | null;
-    }>;
-}
-
 export interface AxeViolation {
     id: string;
     impact: string | null;
     help?: string;
-    nodes: AxeNode[];
+    nodes: Array<{ html?: string; target?: string[]; failureSummary?: string }>;
 }
-
-/**
- * `color-contrast` failures caused by an app-wide colour token, not by the component under
- * test. Each is an owner decision (Gauzy Ever Works #533): until its token changes, a node
- * that fails only because of it is recorded on the test as an `axe-pending-token`
- * annotation instead of failing the spec. Keyed on the colour axe measured; delete an
- * entry once its token is fixed and the specs fail again on anything it hid.
- */
-const PENDING_TOKEN_FOREGROUNDS: Record<string, string> = {
-    '#94a3b8': '--color-text-muted',
-    '#3079fb': '--primary (text-primary)',
-    '#ef4444': '--color-danger (text-danger)',
-    '#05df72': '--color-success (text-success)',
-};
-const PENDING_TOKEN_BACKGROUNDS: Record<string, string> = {
-    '#3079fb': '--primary (bg-primary)',
-};
 
 export interface RunAxeOptions {
     /** CSS selectors to scan; the whole document when omitted. Each must match. */
@@ -104,43 +76,9 @@ export async function runAxe(page: Page, options: RunAxeOptions = {}): Promise<A
     );
 }
 
-function pendingTokenOf(violation: AxeViolation, node: AxeNode): string | null {
-    if (violation.id !== 'color-contrast') return null;
-    const data = node.any?.find((check) => check.id === 'color-contrast')?.data;
-    const fg = data?.fgColor?.toLowerCase() ?? '';
-    const bg = data?.bgColor?.toLowerCase() ?? '';
-    return PENDING_TOKEN_FOREGROUNDS[fg] ?? PENDING_TOKEN_BACKGROUNDS[bg] ?? null;
-}
-
-/**
- * The violations without the nodes that fail only on a pending token (see
- * `PENDING_TOKEN_FOREGROUNDS`), which are counted per token on the running test instead.
- */
-export function withoutPendingTokenContrast(violations: AxeViolation[]): AxeViolation[] {
-    const pending = new Map<string, number>();
-    const kept: AxeViolation[] = [];
-    for (const violation of violations) {
-        const nodes = violation.nodes.filter((node) => {
-            const token = pendingTokenOf(violation, node);
-            if (token) pending.set(token, (pending.get(token) ?? 0) + 1);
-            return token === null;
-        });
-        if (nodes.length > 0) kept.push({ ...violation, nodes });
-    }
-    if (pending.size > 0) {
-        test.info().annotations.push({
-            type: 'axe-pending-token',
-            description: [...pending].map(([token, n]) => `${token}: ${n} node(s)`).join('; '),
-        });
-    }
-    return kept;
-}
-
-/** The serious and critical violations, less the pending-token contrast nodes. */
+/** The serious and critical violations. */
 export function seriousViolations(violations: AxeViolation[]): AxeViolation[] {
-    return withoutPendingTokenContrast(violations).filter(
-        (v) => v.impact === 'serious' || v.impact === 'critical',
-    );
+    return violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
 }
 
 /** One line per violation: rule, impact and the offending nodes, for assertion messages. */
