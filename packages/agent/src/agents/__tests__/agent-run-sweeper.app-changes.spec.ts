@@ -99,6 +99,20 @@ describe('AgentRunSweeperService — runs parked by the App changes switch (APW-
         expect(gate.promoteParked).not.toHaveBeenCalledWith(QUEUED_REASON_APP_CHANGES_PAUSED);
     });
 
+    // Review of #3053 (CodeRabbit) — a promoted run keeps its old `createdAt` and has no
+    // `startedAt` until its worker starts: released BEFORE the scan, the same tick would reap it.
+    it('releases AFTER the stuck scan, and even when the scan finds nothing or throws', async () => {
+        await makeSvc().sweepStuckRuns();
+        expect(runs.findStuckNonTerminal.mock.invocationCallOrder[0]).toBeLessThan(
+            gate.promoteParked.mock.invocationCallOrder[0],
+        );
+
+        gate.promoteParked.mockClear();
+        runs.findStuckNonTerminal.mockRejectedValueOnce(new Error('db down'));
+        await expect(makeSvc().sweepStuckRuns()).rejects.toThrow('db down');
+        expect(gate.promoteParked).toHaveBeenCalledWith(QUEUED_REASON_APP_CHANGES_PAUSED);
+    });
+
     it('a release that throws never fails the tick', async () => {
         gate.promoteParked.mockRejectedValue(new Error('gate down'));
         await expect(makeSvc().releaseAppChangesWaits()).resolves.toBeUndefined();

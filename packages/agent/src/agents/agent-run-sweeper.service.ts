@@ -138,13 +138,24 @@ export class AgentRunSweeperService {
             return { ...empty, enabled: false };
         }
 
-        // APW-08 T56 (FR-66, FR-73) — release App Work runs parked on a spent
-        // budget, every tick, before the stuck scan. Best-effort and bounded.
-        await this.releaseWorkBudgetWaits();
-        // APW-08 T49 (R-30) — and App Work runs parked while the operator had changes off, once
-        // the switch is on again ("turning it back on resumes").
-        await this.releaseAppChangesWaits();
+        // APW-08 T56 (FR-66, FR-73) — release App Work runs parked on a spent budget, every tick;
+        // T49 (R-30) — and App Work runs parked while the operator had changes off, once the
+        // switch is on again ("turning it back on resumes"). Best-effort and bounded. AFTER the
+        // stuck scan (review of #3053): a promoted run keeps its original `createdAt` and has no
+        // `startedAt` until its worker starts, so a scan in the same tick would reap it as stuck.
+        try {
+            return await this.reapStuck(cutoffMinutes, empty);
+        } finally {
+            await this.releaseWorkBudgetWaits();
+            await this.releaseAppChangesWaits();
+        }
+    }
 
+    /** The stuck scan and its bookkeeping (split out so the releases above run after it). */
+    private async reapStuck(
+        cutoffMinutes: number,
+        empty: AgentRunSweepSummary,
+    ): Promise<AgentRunSweepSummary> {
         const limit = config.agents.getRunStuckSweepBatch();
         const now = Date.now();
         const cutoff = new Date(now - cutoffMinutes * 60_000);
