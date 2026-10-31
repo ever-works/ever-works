@@ -1028,6 +1028,13 @@ _Delivers FR-56…FR-60._
       (list the new page), `docs/specs/features/app-works/TRACKER.md`.
       **Test**: `pnpm --filter ever-works-docs build`.
       **Done when**: the docs build has no broken-link warning for the new page.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `docs/apw08-evolve`): the page and the edits that apply
+      today are written, not merged.** `docs/features/app-works-evolve.md` (asking for a change, where runs may
+      execute, isolation, checks, merge → live, cost and budget, the operator switches, and a "Not yet" list naming
+      P2 / P3 and the safety-rail holds), listed under App Works in `apps/docs/sidebarsPlatform.ts`;
+      `docs/features/app-works.md` corrected for G06 / G22 (no refusal on a truncated patch alone; the file-count
+      guidance) and linked to the new page; the APW-08 TRACKER row updated. **Waits on P2 / P3:** the `missions.md`
+      (Output), `goals.md` (Work) and `mission-templates.md` edits — they describe surfaces that do not exist yet.
 
 - [ ] **T45. Statuses.**
       **Modify** `spec.md`, `plan.md` and this file — status `Implemented`.
@@ -1168,6 +1175,16 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test app-work-kill-switch`.
       **Done when**: the spec is green and every pre-existing dispatcher spec passes unchanged with the switches at
       their defaults.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-switch-park`): park-with-auto-resume
+      built, not merged.** With `EVER_WORKS_APP_CHANGES_ENABLED` off, `dispatchAgentRun` no longer refuses an App Work
+      Task's run: it PARKS it (`QUEUED_REASON_APP_CHANGES_PAUSED = 'app-changes-paused'`) — the run row exists,
+      nothing is enqueued (the gate is not asked: its chain does not know the switch). The FR-9 / T12 refusals still
+      come first, and an install with no run repository is refused as before. The stuck-run sweeper never reaps such
+      a run (SQL and service), and each tick `releaseAppChangesWaits` releases them through the gate's
+      `promoteParked` once the switch is ON again — reading nothing while it is off; a switch that flips off again in
+      between is still refused by the worker's own `switch_off` check. Specs: `app-work-kill-switch` 20/20 (the
+      switch-off dispatch case now asserts the parked row and no enqueue — just as strict — plus the no-repository
+      refusal), `agent-run-sweeper.app-changes` 4/4 (new); both bite-proven.
       **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-switch-banner`): the web read-only banner
       built, not merged.** `GET /api/app-works/switches` (`AppWorkSwitchesController`, any signed-in caller — two
       booleans of installation config, nothing per Work) answers `readAppWorkSwitches()` as the dispatchers read it.

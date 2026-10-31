@@ -34,6 +34,7 @@ export {
     createWorkBudgetAdmission,
     withWorkBudgetAdmission,
     QUEUED_REASON_WORK_BUDGET,
+    QUEUED_REASON_APP_CHANGES_PAUSED,
     DEFAULT_RUN_ADMISSION_CHAIN,
     RUN_ADMISSION_ADMITTED,
     type RunAdmissionContext,

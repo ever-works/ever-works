@@ -5,6 +5,7 @@ import {
     APP_WORK_RUN_ADMISSION,
     APP_WORK_RUN_CONTAINMENT_RECORDER,
     APP_WORK_TASK_CONTAINMENT_READER,
+    AppChangeTelemetry,
     IsolatedRunAdmissionService,
     type AdmissionWork,
     type AppWorkRunAdmissionGate,
@@ -207,12 +208,35 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
         provide: FLEET_APP_WORK_LEASE_ADMISSION,
         useFactory: (moduleRef: ModuleRef): FleetAppWorkLeaseAdmission => {
             let resolved: IsolatedRunAdmissionService | null = null;
+            const admission = () =>
+                (resolved ??= moduleRef.get<IsolatedRunAdmissionService>(APP_WORK_RUN_ADMISSION, {
+                    strict: false,
+                }));
+            // APW-08 T43 — `app.change.run_admitted` through the App Works sanitizer and sink.
+            // Resolved lazily, like the admission, and optional: a graph without it emits nothing.
+            let telemetry: AppChangeTelemetry | null | undefined;
+            const appChangeTelemetry = (): AppChangeTelemetry | null => {
+                if (telemetry === undefined) {
+                    try {
+                        telemetry = moduleRef.get(AppChangeTelemetry, { strict: false });
+                    } catch {
+                        telemetry = null;
+                    }
+                }
+                return telemetry;
+            };
             return {
-                admitsLease: (input) =>
-                    (resolved ??= moduleRef.get<IsolatedRunAdmissionService>(
-                        APP_WORK_RUN_ADMISSION,
-                        { strict: false },
-                    )).admitsLease(input),
+                admitsLease: (input) => admission().admitsLease(input),
+                onLeased: async (input) => {
+                    try {
+                        const sink = appChangeTelemetry();
+                        if (!sink) return;
+                        const payload = await admission().runAdmittedPayload(input);
+                        if (payload) sink.track('app.change.run_admitted', payload, input.userId);
+                    } catch {
+                        // Telemetry never costs a lease anything.
+                    }
+                },
             };
         },
         inject: [ModuleRef],
