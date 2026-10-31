@@ -201,15 +201,18 @@ describe('runAcceptanceChecksJob — verdict rules mirror the platform gate runn
 	});
 
 	// APW-08 T51 (FR-61, S36, ACC-08-44) — the shell's "command not found" is a missing TOOL.
-	it.each([127, 9009])('exit %i (a shell that could not find the program) is `error` with reason missingTool', async (code) => {
-		const outcome = await runAcceptanceChecksJob(
-			job({ workspacePath: ABSOLUTE, checks: [{ id: 'cargo', command: 'cargo test', required: true }] }),
-			{ ...alwaysExists, spawnFn: fakeSpawn({ 'cargo test': code }) }
-		);
-		expect(outcome.results[0]).toMatchObject({ status: 'error', exitCode: code, reason: 'missingTool' });
-		// The gate treats it like any other non-green required check.
-		expect(outcome.gateStatus).toBe('red');
-	});
+	it.each([127, 9009])(
+		'exit %i (a shell that could not find the program) is `error` with reason missingTool',
+		async (code) => {
+			const outcome = await runAcceptanceChecksJob(
+				job({ workspacePath: ABSOLUTE, checks: [{ id: 'cargo', command: 'cargo test', required: true }] }),
+				{ ...alwaysExists, spawnFn: fakeSpawn({ 'cargo test': code }) }
+			);
+			expect(outcome.results[0]).toMatchObject({ status: 'error', exitCode: code, reason: 'missingTool' });
+			// The gate treats it like any other non-green required check.
+			expect(outcome.gateStatus).toBe('red');
+		}
+	);
 
 	it.each([1, 2, 126, 128, 255, 9008, 9010])('exit %i stays an ordinary red, with no reason', async (code) => {
 		const outcome = await runAcceptanceChecksJob(
@@ -383,7 +386,7 @@ describe('buildNodeCheckEnv — a check never inherits this machine', () => {
  * over `DATABASE_PASSWORD`. Every adjacent-name case below exists because
  * getting this wrong is silent.
  */
-describe('buildNodeCheckEnv — the host\'s own credentials are not self-grantable', () => {
+describe("buildNodeCheckEnv — the host's own credentials are not self-grantable", () => {
 	const host: NodeJS.ProcessEnv = {
 		PATH: '/usr/bin',
 		KUBECONFIG: 'C:/Users/owner/.kube/cluster-admin.yaml',
