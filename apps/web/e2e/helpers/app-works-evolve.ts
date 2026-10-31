@@ -163,6 +163,17 @@ export interface TaskSeedBody {
         }>;
         totalFiles?: number;
     };
+    /**
+     * APW-08 T52 — one finished Fleet run carrying the containment its node reported (no node
+     * named), so the Cost section's containment notice renders.
+     */
+    run?: {
+        containment: {
+            executionPath: 'hardened' | 'ordinary';
+            isolatedHome: boolean;
+            downgrades?: Array<{ control: string; reason: string }>;
+        };
+    };
 }
 
 export interface TaskSeedResult {
@@ -172,6 +183,7 @@ export interface TaskSeedResult {
     mergeCommitSha: string | null;
     deliveryDeploymentId: string | null;
     prNumber: number | null;
+    runId: string | null;
     guard: {
         allowed: boolean;
         code: string | null;

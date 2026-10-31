@@ -23,6 +23,7 @@ describe('E2eTaskSeedController', () => {
             deliveryDeploymentId: null,
             tenantId: null,
             organizationId: null,
+            agentId: null as string | null,
         };
         let stored: Record<string, unknown> = { ...task };
         const tasksService = { getOne: jest.fn().mockResolvedValue(task) };
@@ -41,6 +42,10 @@ describe('E2eTaskSeedController', () => {
             create: jest.fn((row: Record<string, unknown>) => row),
             save: jest.fn(async (row: Record<string, unknown>) => ({ ...row, id: 'dep-1' })),
         };
+        const runRows = {
+            create: jest.fn((row: Record<string, unknown>) => row),
+            save: jest.fn(async (row: Record<string, unknown>) => ({ ...row, id: 'run-1' })),
+        };
         const scope = { getScope: jest.fn().mockReturnValue(undefined) };
         const controller = new E2eTaskSeedController(
             tasksService as never,
@@ -48,8 +53,9 @@ describe('E2eTaskSeedController', () => {
             workRows as never,
             deploymentRows as never,
             scope as never,
+            runRows as never,
         );
-        return { controller, tasksService, taskRows, deploymentRows };
+        return { controller, tasksService, taskRows, deploymentRows, runRows, task };
     }
 
     it('is guarded by the APW-11 seed gate (404 before the handler when it is closed)', () => {
@@ -141,5 +147,52 @@ describe('E2eTaskSeedController', () => {
         expect(ok.guard).toMatchObject({ allowed: true, changedLines: 612 });
         expect(ok.guard?.note).toContain('612');
         expect(allowed.taskRows.update).not.toHaveBeenCalled();
+    });
+
+    it('writes one finished run carrying the NORMALIZED containment record, naming no node (T52)', async () => {
+        const { controller, runRows, taskRows } = build();
+        const answer = await controller.seed(USER, {
+            taskId: TASK_ID,
+            run: {
+                containment: {
+                    executionPath: 'ordinary',
+                    // No isolated home and no downgrade saying so: the reconciler's normalizer
+                    // adds the missing one rather than trust the report, and so does the seed.
+                    isolatedHome: false,
+                    downgrades: [{ control: 'sandbox', reason: 'no OS sandbox on this machine' }],
+                },
+            },
+        } as never);
+        expect(answer.runId).toBe('run-1');
+        const row = runRows.save.mock.calls[0][0] as Record<string, unknown>;
+        expect(row).toMatchObject({
+            userId: 'user-1',
+            taskId: TASK_ID,
+            triggerKind: 'task',
+            status: 'completed',
+        });
+        expect(typeof row.agentId).toBe('string');
+        const record = row.containment as Record<string, unknown>;
+        expect(record).toMatchObject({ executionPath: 'ordinary', nodeId: null });
+        expect(record.downgrades).toEqual([
+            { control: 'sandbox', reason: 'no OS sandbox on this machine' },
+            expect.objectContaining({ control: 'isolated-home' }),
+        ]);
+        expect(record.needsOwnerAllowance).toBe(true);
+        expect(Number.isFinite(Date.parse(record.reportedAt as string))).toBe(true);
+        // A run body alone writes no Task column.
+        expect(taskRows.update).not.toHaveBeenCalled();
+    });
+
+    it('stamps the run with the Task’s own Agent when it has one', async () => {
+        const built = build();
+        built.task.agentId = '00000000-0000-4000-8000-0000000000aa';
+        await built.controller.seed(USER, {
+            taskId: TASK_ID,
+            run: { containment: { executionPath: 'hardened', isolatedHome: true } },
+        } as never);
+        expect(built.runRows.save.mock.calls[0][0]).toMatchObject({
+            agentId: '00000000-0000-4000-8000-0000000000aa',
+        });
     });
 });
