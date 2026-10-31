@@ -855,6 +855,37 @@ _Delivers FR-45…FR-55._
       existing `goal-orchestrator-rules.spec.ts` passes unchanged. Run:
       `pnpm --filter @ever-works/agent test goal-orchestrator`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-orchestrator-work`, stacked on T31):
+      built.**
+      - `applyDispatch` files every iteration on `goal.workId` (FR-46).
+      - `advanceOne` reads the Goal's Tasks and runs once. For an App Work, it counts the iteration Tasks in review
+        whose pull request is still open and that have no run in flight; those hold the concurrency ceiling
+        (`awaiting-merge`, with the S10 copy that names the iteration).
+      - A Work that is gone, or no longer the owner's in the Goal's scope, pauses the loop (`work-unavailable`, S26).
+        It is checked after "finished" and before the ceilings. A failed Work READ does not pause.
+      - The rules take optional `pullRequestsAwaitingMerge`, `awaitingMergeIterations` and `workUnavailable`; the
+        existing decision table is unchanged.
+
+      **Independent review (2026-10-31), fixed:**
+      - **High:** `GoalsModule` did not register `Work`, so the `@Optional()` repository was `undefined` in
+        production. Every `workId` was refused and the loop never checked its Work. Now registered, and pinned by
+        `goals.module.work-repository.spec`.
+      - "Open pull request" now uses the workspace's own rule (`openPullRequestOf`) instead of
+        `in_review` + `prState = 'open'`. An unknown state (before the PR sweep first runs) and a draft count as
+        open, and so does a BLOCKED change whose PR is still open.
+      - It counts only this Work's unfinished Tasks, through their own query, so the Goal's 500-Task window can
+        never hide one.
+      - The S10 wait line is logged once, when the wait begins.
+      - A Work read failure waits (`work-unreadable`) rather than dispatching.
+      - `startLoop` refuses a Work that is gone (`422 workUnavailable`).
+      - A teammate reading a shared Goal never sees the owner's Work name.
+
+      Specs:
+      - `goal-orchestrator-rules.awaiting-merge` 9/9 (new);
+      - `goal-orchestrator-rules` 43/43, unchanged;
+      - `goal-orchestrator.service` 91/91 (the T32 cases live there rather than in a separate
+        `work-scope` spec; the new rules are bite-proven);
+      - the run-order integration spec 8/8.
 
 - [ ] **T33 (parallel with T32). Goal form.**
       **Modify** `apps/web/src/components/goals/GoalForm.tsx`, `apps/web/src/components/goals/goal-form-payload.ts`,
