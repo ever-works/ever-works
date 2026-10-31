@@ -7187,6 +7187,7 @@
                     "other": "リポジトリのセットアップ中に問題が発生しました。"
                 },
                 "overview": {
+                    "changesPaused": "アプリへの変更はオペレーターによって一時停止されています。",
                     "title": "App",
                     "repository": "Work リポジトリ",
                     "upstream": "アップストリーム",
