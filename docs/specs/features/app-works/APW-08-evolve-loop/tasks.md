@@ -1028,6 +1028,13 @@ _Delivers FR-56…FR-60._
       (list the new page), `docs/specs/features/app-works/TRACKER.md`.
       **Test**: `pnpm --filter ever-works-docs build`.
       **Done when**: the docs build has no broken-link warning for the new page.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `docs/apw08-evolve`): the page and the edits that apply
+      today are written, not merged.** `docs/features/app-works-evolve.md` (asking for a change, where runs may
+      execute, isolation, checks, merge → live, cost and budget, the operator switches, and a "Not yet" list naming
+      P2 / P3 and the safety-rail holds), listed under App Works in `apps/docs/sidebarsPlatform.ts`;
+      `docs/features/app-works.md` corrected for G06 / G22 (no refusal on a truncated patch alone; the file-count
+      guidance) and linked to the new page; the APW-08 TRACKER row updated. **Waits on P2 / P3:** the `missions.md`
+      (Output), `goals.md` (Work) and `mission-templates.md` edits — they describe surfaces that do not exist yet.
 
 - [ ] **T45. Statuses.**
       **Modify** `spec.md`, `plan.md` and this file — status `Implemented`.
@@ -1061,6 +1068,36 @@ _Delivers FR-56…FR-60._
       `pnpm --filter @ever-works/agent test app-work-run-holds`.
       **Done when**: the spec is green and `packages/agent/src/tasks-domain/__tests__/task-ci-auto-resume.spec.ts`
       passes unchanged.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-run-holds`): built, specs green locally,
+      not merged.** `app-work-run-holds.ts` — `classifyAppWorkRunStop` (park reasons `kill-switch` / `agent-paused`
+      and the stop / pause rails → `wait`; any other `refused` / `held` → `needs_input` with the FIRST such rail and
+      its category; a wait wins over a refusal in the same run). **The producer is the safety gate's own record,
+      not a new run column:** `SafetyGateService.evaluate` already writes a `rail_refusals` row (with `runId`,
+      `railId`, `category`) for every non-allow verdict, so nothing in `AgentRunService` changes and nothing depends
+      on the model reporting. **One hook for both paths:** `TaskRunDenormService.recordTerminal` — the write the
+      cloud worker (over its RPC proxy) and the Fleet reconciler both make when a run ends — asks
+      `APP_WORK_RUN_STOP_HANDLER` (`AppWorkRunHoldsService`, fire-and-forget, the Task's current run only). On
+      `needs_input` for an App Work Task: `in_progress` / `in_review` → `BLOCKED`, and ONE `guardrail-refusal`
+      escalation (`dedupKey` per run) whose summary names the rail and category only. A `wait` moves nothing.
+      `TaskTransitionService` is resolved lazily (it depends on the denorm service). Spec `app-work-run-holds`
+      21/21 (every rail id and park reason, wait wins, first refusal decides; block + one escalation; wait and
+      non-App untouched; never throws; end to end through `recordTerminal`; a stale run touches nothing) —
+      bite-proven (the hook; the needs_input rule). **Known limit:** the CI fix loop has no explicit stop for a
+      BLOCKED Task (a guardrail block usually lands before any pull request, so it has nothing to resume);
+      `appRules.runHeld` copy and pausing the run's deadline clock while it waits are not built.
+      **Independent review (2026-10-31), fixed on the branch:** the escalation is filed only when the Task IS
+      blocked (already, by this move, or by a concurrent move that won the compare-and-set) — a Task that is done,
+      cancelled or back in todo is left alone and nothing is filed; a stop / pause rail is found wherever it falls in
+      the run (its own query, not the oldest 50); the window opens a minute before the run ROW was created (a
+      re-claimed run re-stamps `startedAt`). The cloud worker's `dispatched` success path now mirrors the run's end
+      (`recordTerminal('completed')`) after finalize and on the no-workspace return: before, it mirrored nothing
+      (the Task kept `latestRunStatus: running`) and never asked the hook. Spec `app-work-run-holds` 26/26,
+      `agent-task-execute.task` 57/57 (both bite-proven). **ACC-08-31 stays OPEN — no live producer on the Fleet
+      path:** a Fleet node runs its coding agent locally, so the platform's `SafetyGateService` never sees its tool
+      calls and no `rail_refusals` row carries a Fleet run's id; cloud App Work runs are refused today
+      (`noIsolatedRuntime`). The hook is ready for either producer: a node-side verdict report on the `agent-task`
+      result (the reconciler writes `rail_refusals` from it), or the plan's `runSafetyStop`. Owner call: a `held`
+      ladder verdict also files an approval, so a held run can raise two Inbox items.
 
 ---
 
@@ -1138,6 +1175,16 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test app-work-kill-switch`.
       **Done when**: the spec is green and every pre-existing dispatcher spec passes unchanged with the switches at
       their defaults.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-switch-park`): park-with-auto-resume
+      built, not merged.** With `EVER_WORKS_APP_CHANGES_ENABLED` off, `dispatchAgentRun` no longer refuses an App Work
+      Task's run: it PARKS it (`QUEUED_REASON_APP_CHANGES_PAUSED = 'app-changes-paused'`) — the run row exists,
+      nothing is enqueued (the gate is not asked: its chain does not know the switch). The FR-9 / T12 refusals still
+      come first, and an install with no run repository is refused as before. The stuck-run sweeper never reaps such
+      a run (SQL and service), and each tick `releaseAppChangesWaits` releases them through the gate's
+      `promoteParked` once the switch is ON again — reading nothing while it is off; a switch that flips off again in
+      between is still refused by the worker's own `switch_off` check. Specs: `app-work-kill-switch` 20/20 (the
+      switch-off dispatch case now asserts the parked row and no enqueue — just as strict — plus the no-repository
+      refusal), `agent-run-sweeper.app-changes` 4/4 (new); both bite-proven.
       **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-switch-banner`): the web read-only banner
       built, not merged.** `GET /api/app-works/switches` (`AppWorkSwitchesController`, any signed-in caller — two
       booleans of installation config, nothing per Work) answers `readAppWorkSwitches()` as the dispatchers read it.

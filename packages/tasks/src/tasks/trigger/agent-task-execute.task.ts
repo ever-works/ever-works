@@ -1244,6 +1244,16 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         // never ran, which a requireGreenGate policy refuses.
                         gateStatus: gateOutcome?.gateStatus ?? null,
                     });
+                    // Review of #3050 (APW-08 T46) — a `dispatched` run ends HERE, after its
+                    // pull request: mirror the end like every other terminal path (`assembled`
+                    // already did, above). That write is also what asks T46's stop handler
+                    // about the run's rail refusals, so an App Work Task whose run a rail
+                    // refused is blocked even with its pull request open.
+                    if (result.status === 'dispatched') {
+                        await bestEffort(() =>
+                            runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
+                        );
+                    }
                     return {
                         status: 'completed',
                         agentId: agent.id,
@@ -1279,6 +1289,12 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 }
             }
 
+            // Review of #3050 — the same end for a `dispatched` run with no workspace to finalize.
+            if (result.status === 'dispatched') {
+                await bestEffort(() =>
+                    runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
+                );
+            }
             return {
                 status:
                     result.status === 'assembled' || result.status === 'dispatched'

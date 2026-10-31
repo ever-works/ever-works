@@ -78,7 +78,12 @@ const sidebars: SidebarsConfig = {
 					type: 'category',
 					label: 'App Works',
 					link: { type: 'doc', id: 'features/app-works' },
-					items: ['features/app-runtime', 'features/app-blueprints', 'features/app-launcher']
+					items: [
+						'features/app-works-evolve',
+						'features/app-runtime',
+						'features/app-blueprints',
+						'features/app-launcher'
+					]
 				},
 				'features/onboarding',
 				'features/settings-map',
