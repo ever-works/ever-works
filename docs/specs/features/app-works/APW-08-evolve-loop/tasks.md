@@ -855,6 +855,22 @@ _Delivers FR-45…FR-55._
       existing `goal-orchestrator-rules.spec.ts` passes unchanged. Run:
       `pnpm --filter @ever-works/agent test goal-orchestrator`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-orchestrator-work`, stacked on T31):
+      built.**
+      - `applyDispatch` files every iteration on `goal.workId` (FR-46).
+      - `advanceOne` reads the Goal's Tasks and runs once. For an App Work, it counts the iteration Tasks in review
+        whose pull request is still open and that have no run in flight; those hold the concurrency ceiling
+        (`awaiting-merge`, with the S10 copy that names the iteration).
+      - A Work that is gone, or no longer the owner's in the Goal's scope, pauses the loop (`work-unavailable`, S26).
+        It is checked after "finished" and before the ceilings. A failed Work READ does not pause.
+      - The rules take optional `pullRequestsAwaitingMerge`, `awaitingMergeIterations` and `workUnavailable`; the
+        existing decision table is unchanged.
+
+      Specs:
+      - `goal-orchestrator-rules.awaiting-merge` 8/8 (new);
+      - `goal-orchestrator-rules` 43/43, unchanged;
+      - `goal-orchestrator.service` 88/88 (6 new, bite-proven);
+      - the run-order integration spec 8/8.
 
 - [ ] **T33 (parallel with T32). Goal form.**
       **Modify** `apps/web/src/components/goals/GoalForm.tsx`, `apps/web/src/components/goals/goal-form-payload.ts`,

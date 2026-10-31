@@ -55,6 +55,10 @@ export type GoalLoopReasonCode =
     | 'wall-clock-exceeded'
     | 'no-progress'
     | 'run-in-flight'
+    /** APW-08 T32 (FR-47) — an App Work Goal's open pull requests hold the ceiling. */
+    | 'awaiting-merge'
+    /** APW-08 T32 (FR-48) — the Goal's Work is gone or unreachable. */
+    | 'work-unavailable'
     | 'grace-period'
     | 'no-candidate-agent'
     | 'routed-assigned-agent'
@@ -110,6 +114,20 @@ export interface GoalLoopInput {
      * speeds up when someone raises it deliberately.
      */
     maxConcurrentIterations?: number | null;
+    /**
+     * APW-08 T32 (FR-47, S10) — for a Goal scoped to an App Work: iteration Tasks whose pull
+     * request is still open (in review, not running). Each holds a concurrency slot until it
+     * merges or closes, so iteration N+1 never starts on top of iteration N's open change.
+     * Absent / 0 = nothing awaits a merge (every Goal without an App Work).
+     */
+    pullRequestsAwaitingMerge?: number | null;
+    /** The iteration numbers of those pull requests, oldest first, for the log line. */
+    awaitingMergeIterations?: readonly number[] | null;
+    /**
+     * APW-08 T32 (FR-48, S26) — the Goal names a Work that no longer exists or is no longer
+     * reachable: the loop pauses and no iteration is dispatched. Absent / false = fine.
+     */
+    workUnavailable?: boolean;
     candidates: GoalRoutingCandidate[];
     now: Date;
 }
@@ -171,6 +189,17 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
             reasoning:
                 `Definition of Done satisfied — ${input.dod.done} done, ${input.dod.waived} waived, ` +
                 `0 open. Goal loop finished at iteration ${input.iteration}.`,
+        };
+    }
+
+    // APW-08 T32 (FR-48, S26) — after "finished" (finishing beats everything) and before the
+    // ceilings: a loop whose Work is gone has nowhere to file its next iteration, whatever its
+    // budget says, and the actionable fact for the owner is the Work.
+    if (input.workUnavailable === true) {
+        return {
+            action: 'pause',
+            reasonCode: 'work-unavailable',
+            reasoning: 'The Work this Goal was scoped to no longer exists.',
         };
     }
 
@@ -249,6 +278,16 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
     // pre-existing decision-table case byte-identical.
     const maxConcurrent = resolveMaxConcurrentIterations(input.maxConcurrentIterations);
     const runsInFlight = resolveRunsInFlight(input);
+    // APW-08 T32 (FR-47) — the open pull requests count into the same ceiling. Reported as
+    // their own reason only when the runs alone would have left a slot free.
+    const awaitingMerge = resolveAwaitingMerge(input.pullRequestsAwaitingMerge);
+    if (runsInFlight < maxConcurrent && runsInFlight + awaitingMerge >= maxConcurrent) {
+        return {
+            action: 'wait',
+            reasonCode: 'awaiting-merge',
+            reasoning: describeAwaitingMerge(awaitingMerge, input.awaitingMergeIterations),
+        };
+    }
     if (runsInFlight >= maxConcurrent) {
         return {
             action: 'wait',
@@ -273,7 +312,7 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
 
     // Free slots this tick: the ceiling minus what is already running, so
     // a Goal at 3 of 4 dispatches ONE more, never four.
-    const slots = maxConcurrent - runsInFlight;
+    const slots = maxConcurrent - runsInFlight - awaitingMerge;
     const nextIteration = input.iteration + 1;
     const iterations = Array.from({ length: slots }, (_, index) => nextIteration + index);
     const plural = slots > 1;
@@ -368,6 +407,24 @@ function resolveRunsInFlight(input: GoalLoopInput): number {
         return Math.max(0, Math.trunc(input.runsInFlight));
     }
     return input.hasRunInFlight ? 1 : 0;
+}
+
+/** APW-08 T32 — a count that is not a non-negative finite number is zero. */
+function resolveAwaitingMerge(raw: number | null | undefined): number {
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) return 0;
+    return Math.max(0, Math.trunc(raw));
+}
+
+/** S10 — "Waiting for iteration 3's pull request to be merged or closed." */
+function describeAwaitingMerge(count: number, iterations?: readonly number[] | null): string {
+    const known = (iterations ?? []).filter((n) => Number.isInteger(n) && n > 0);
+    if (known.length === 1 && count === 1) {
+        return `Waiting for iteration ${known[0]}'s pull request to be merged or closed.`;
+    }
+    if (known.length === count && count > 1) {
+        return `Waiting for the pull requests of iterations ${describeIterations(known)} to be merged or closed.`;
+    }
+    return `Waiting for ${count} pull request${count === 1 ? '' : 's'} from this Goal to be merged or closed.`;
 }
 
 /** `12` / `12 and 13` / `12, 13 and 14` for the multi-slot log line. */

@@ -38,10 +38,13 @@ import {
 import { saveGoalColumns } from './goal-column-save';
 import {
     ownershipRelationScopeOf,
+    ownershipScopeMatches,
     ownershipScopeOf,
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
+import { isAppWorkKind } from '@ever-works/contracts';
+import { Work } from '../entities/work.entity';
 import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../database/insertion-order';
 import {
     dodProgressSignature,
@@ -222,6 +225,10 @@ export class GoalOrchestratorService {
         // (start / pause / cancel / limits / spend) is runtime: no event, no version.
         // TRAILING + @Optional() per the arity rule above.
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // APW-08 T32 (FR-47, FR-48) — the Goal's Work: is it still there, and is it an App Work
+        // (whose open pull requests hold the concurrency ceiling)? TRAILING + @Optional():
+        // unbound, a Goal's Work is not checked and its iterations still carry it.
+        @Optional() @InjectRepository(Work) private readonly works?: Repository<Work>,
     ) {}
 
     // ─── limits ─────────────────────────────────────────────────────
@@ -892,8 +899,12 @@ export class GoalOrchestratorService {
             await saveGoalColumns(this.goals, goal, ['spentCents']);
         }
 
-        const activeRuns = await this.findActiveRuns(goal.id);
+        // One read of the Goal's Tasks and runs serves both the in-flight count and the
+        // awaiting-merge count (it is what `findActiveRuns` reads).
+        const { tasks: goalTasks, runs: goalRuns } = await this.loadGoalWork(goal.id);
+        const activeRuns = goalRuns.filter((run) => ACTIVE_RUN_STATUSES.includes(run.status));
         const activeRun = activeRuns[0] ?? null;
+        const workState = await this.goalWorkState(goal, goalTasks, activeRuns);
         const candidates = await this.resolveCandidates(goal);
         const decision = decideGoalLoop({
             loopStatus: opts.force ? 'running' : (goal.loopStatus ?? null),
@@ -921,6 +932,12 @@ export class GoalOrchestratorService {
                 typeof goal.maxConcurrentIterations === 'number'
                     ? Math.min(goal.maxConcurrentIterations, MAX_CONCURRENT_ITERATIONS)
                     : null,
+            // APW-08 T32 (FR-47, FR-48).
+            pullRequestsAwaitingMerge: workState.awaitingMergeIterations.length,
+            awaitingMergeIterations: workState.awaitingMergeIterations.filter(
+                (iteration): iteration is number => iteration !== null,
+            ),
+            workUnavailable: workState.unavailable,
             candidates,
             now: new Date(),
         });
@@ -1028,6 +1045,9 @@ export class GoalOrchestratorService {
                     priority: TaskPriority.P2,
                     labels: [GOAL_ITERATION_LABEL],
                     goalId: goal.id,
+                    // APW-08 T32 (FR-46) — a Goal scoped to a Work files every iteration on it,
+                    // so an App Work's iteration gets a branch and a pull request like any Task.
+                    ...(goal.workId ? { workId: goal.workId } : {}),
                     agentId: slotAgentId,
                     createdByType: 'user',
                     createdById: goal.userId,
@@ -1543,6 +1563,54 @@ export class GoalOrchestratorService {
     }
 
     /** `[Goal] … — iteration 4` → 4. Null for a hand-filed Task. */
+    /**
+     * APW-08 T32 — what the Goal's Work means for this tick.
+     *
+     * - **FR-48 / S26:** a Work that is gone, or no longer the Goal owner's in the Goal's scope,
+     *   is `unavailable` (the loop pauses). A failed READ is not proof of absence: it leaves the
+     *   loop alone this tick rather than pausing it on a blip.
+     * - **FR-47 / S10:** for an App Work, the iteration Tasks in review whose pull request is
+     *   still open and that have no run in flight (a running one is already counted) await a
+     *   merge, oldest first. Any other kind of Work counts nothing here.
+     */
+    private async goalWorkState(
+        goal: Goal,
+        tasks: Task[],
+        activeRuns: AgentRun[],
+    ): Promise<{ unavailable: boolean; awaitingMergeIterations: Array<number | null> }> {
+        const fine = { unavailable: false, awaitingMergeIterations: [] };
+        if (!goal.workId || !this.works) return fine;
+        let work: Work | null;
+        try {
+            work = await this.works.findOne({ where: { id: goal.workId } });
+        } catch (err) {
+            this.logger.warn(
+                `Goal ${goal.id}: its Work ${goal.workId} could not be read this tick (${err}); not paused on a read failure.`,
+            );
+            return fine;
+        }
+        const scope = ownershipRelationScopeOf(goal);
+        if (
+            !work ||
+            work.userId !== goal.userId ||
+            (scope ? !ownershipScopeMatches(work, scope) : false)
+        ) {
+            return { unavailable: true, awaitingMergeIterations: [] };
+        }
+        if (!isAppWorkKind(work.kind)) return fine;
+        const running = new Set(activeRuns.map((run) => run.taskId).filter(Boolean));
+        const awaiting = tasks.filter(
+            (task) =>
+                task.status === TaskStatus.IN_REVIEW &&
+                task.prState === 'open' &&
+                !running.has(task.id),
+        );
+        return {
+            unavailable: false,
+            awaitingMergeIterations: awaiting.map((task) => this.iterationFromTitle(task.title)),
+        };
+    }
+
     private iterationFromTitle(title: string): number | null {
         const match = /iteration\s+(\d+)\s*$/i.exec(title);
         return match ? Number(match[1]) : null;
