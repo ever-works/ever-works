@@ -246,6 +246,30 @@ describe('TaskDeliverySection — polling (APW-08 T27)', () => {
         expect(screen.queryByTestId('task-delivery-polling-stopped')).toBeNull();
     });
 
+    it('announces the new state politely as the poll moves the chain (T52, FR-71)', async () => {
+        vi.useFakeTimers();
+        getDelivery.mockResolvedValueOnce(ready(view('deploying'))).mockResolvedValue(
+            ready(
+                view('deploy_failed', {
+                    deployment: { id: 'd-1', number: 31, status: 'ERROR', outcome: 'failed' },
+                }),
+            ),
+        );
+        renderSection();
+        await flush();
+        const region = screen.getByTestId('task-delivery-announcer');
+        expect(region.getAttribute('role')).toBe('status');
+        expect(region.getAttribute('aria-live')).toBe('polite');
+        expect(region.textContent).toBe(copy.chipDeploying);
+
+        await flush(DELIVERY_POLL_INTERVAL_MS);
+        // The spoken form: the outcome in words, as the chip's own aria-label says it.
+        expect(screen.getByTestId('task-delivery-announcer').textContent).toBe(
+            screen.getByTestId('task-delivery-chip').getAttribute('aria-label'),
+        );
+        expect(screen.getByTestId('task-delivery-announcer').textContent).not.toBe('');
+    });
+
     it('never polls a Task that is already closed without deploying', async () => {
         vi.useFakeTimers();
         getDelivery.mockResolvedValue(ready(view('closed_without_deploy')));

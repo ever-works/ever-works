@@ -374,7 +374,7 @@ function ChangeChain({ answer, workId }: { answer: AnswerShape['data']; workId: 
             )}
             {chain?.title && (
                 <p className="text-[11px] font-medium text-text dark:text-text-dark truncate">
-                    <span className="font-mono text-text-muted dark:text-text-muted-dark mr-1">
+                    <span className="font-mono text-text-muted dark:text-text-muted-dark me-1">
                         {chain.slug}
                     </span>
                     {chain.title}

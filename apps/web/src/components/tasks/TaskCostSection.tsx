@@ -140,7 +140,7 @@ export function TaskCostSection({
                                             {t('runLabel', { id: run.runId.slice(0, 8) })}
                                         </span>
                                         <span
-                                            className="ml-auto tabular-nums"
+                                            className="ms-auto tabular-nums"
                                             data-testid="task-cost-run-amount"
                                         >
                                             {money(run.costCents, load.cost.currency)}

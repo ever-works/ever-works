@@ -31,13 +31,13 @@ import {
  * sentence and the banner is the product's `TaskBranchSection` reading that row through
  * `GET /api/tasks/:id`; nothing here is fixture text.
  *
- * ## Not built yet, and said so
+ * ## Not admitted
  *
- * The **not admitted** copy (spec §6.3 "No safe runtime" / "Check not admitted", ACC-08-08 and
- * ACC-08-10) belongs to isolated-run admission (T12) and App checks on Fleet nodes (T13/T14),
- * neither of which is on `develop` — there is no surface that renders it. That case is a
- * `test.fixme` naming those tasks, so it turns into a failure to fix rather than a silent pass
- * when they land.
+ * ACC-08-08 (spec §6.3 "No safe runtime", S15) runs for real since isolated-run admission (T12)
+ * landed: this lane has no Fleet node and no isolated environment, so pressing **Run** on an App
+ * Work Task is refused before any run row exists, and the Run button says why (never "Run
+ * started"). ACC-08-10 ("Check not admitted") needs an App spec check on a Fleet node (T13/T14),
+ * and this lane has no Fleet node: that half stays a `test.fixme` naming what it needs.
  */
 
 const BRAND = 'apps/web/public/brand/**';
@@ -305,11 +305,53 @@ test.describe('App Works — change-guard refusals on Task detail (APW-08 T29)',
         expect(body.message).toContain('may not commit to repositories');
     });
 
-    test.fixme('not admitted: with no Fleet node and no isolated environment no run starts and the S15 copy shows (ACC-08-08, ACC-08-10)', async () => {
-        // Unbuilt on develop: isolated-run admission (APW-08 T12) and App checks on Fleet nodes
-        // (T13/T14) have no surface yet — no Task-page copy reads "This app's code can only run
-        // on one of your machines or in an isolated sandbox, and none is set up." or "Not
-        // admitted — review this check before it runs on your machines." When they land, seed
-        // an App Work with no Fleet node, press Run on its Task and assert that copy here.
+    test('not admitted: with no Fleet node and no isolated environment no run starts and the S15 copy shows (ACC-08-08)', async ({
+        page,
+        request,
+    }) => {
+        const token = await seededToken(request);
+        const { workId } = await seedAppWork(request, token);
+        // An Agent that MAY commit, so FR-9 passes and the refusal is T12's own.
+        const agent = await request.post(`${API_BASE}/api/agents`, {
+            headers: authedHeaders(token),
+            data: {
+                scope: 'work',
+                workId,
+                name: `Admission ${Date.now().toString(36)}`,
+                permissions: { canCommitToRepo: true },
+            },
+        });
+        expect(agent.status()).toBe(201);
+        const agentId = ((await agent.json()) as { id: string }).id;
+        const task = await createWorkTask(request, token, workId, {
+            title: 'not admitted',
+            agentId,
+        });
+
+        await gotoDashboard(page, `/en/tasks/${task.id}`);
+        const run = page.getByTestId('task-run-button').first();
+        await expect(run).toBeVisible({ timeout: 45_000 });
+        const message = page.getByTestId('task-run-message').first();
+        // Under `next dev` the first click can land before hydration: click until it answers.
+        await expect(async () => {
+            if (!(await message.isVisible().catch(() => false))) await run.click();
+            await expect(message).toBeVisible({ timeout: 5_000 });
+        }).toPass({ timeout: 45_000 });
+
+        await expect(message).toHaveText(
+            "This app's code can only run on one of your machines or in an isolated sandbox, and none is set up.",
+        );
+        await expect(message).toHaveAttribute('data-tone', 'error');
+        await expect(page.getByText('Run started.')).toHaveCount(0);
+        // Refused before a run row exists: the Task has no run.
+        const row = await readTask(request, token, task.id);
+        expect(row.latestRunId ?? null).toBeNull();
+    });
+
+    test.fixme('check not admitted: an App spec check on a Fleet node that is not admitted shows the review copy (ACC-08-10)', async () => {
+        // Needs a Fleet node (T13/T14: App spec checks run on Fleet nodes, and a node the
+        // containment rules do not admit records the check as `not-admitted`, which the checks
+        // card shows as "Not admitted — review this check before it runs on your machines.").
+        // This lane starts no Fleet node; add one (a fake node lease) and assert that copy here.
     });
 });
