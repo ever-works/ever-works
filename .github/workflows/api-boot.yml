@@ -3,8 +3,9 @@ name: API boot
 # D-4 (Gauzy Ever Works #41) — a Nest DI failure is invisible to unit specs and to
 # type-check: the API has broken at boot twice, and the DI reachability spec is
 # structural only. This job builds the API and its workspace dependencies, starts
-# `node dist/main.js` on an in-memory SQLite database (no Postgres, Redis or
-# credentials: the bare env below is enough to boot), and asserts that
+# `node dist/main.js` on an in-memory SQLite database (no Postgres, Redis or real
+# credentials: the bare env below is enough to boot, checked from a directory with
+# no `.env`), and asserts that
 # `GET /api/health` answers 200. A provider the container cannot resolve makes the
 # process exit during bootstrap, which fails the job with the log tail.
 on:
@@ -80,6 +81,9 @@ jobs:
           DATABASE_TYPE: sqlite
           DATABASE_IN_MEMORY: 'true'
           DATABASE_AUTOMIGRATE: 'true'
+          # Required at bootstrap (`config/constants.ts`). A CI-only fixture value, not a
+          # secret: the booted API serves no traffic and is killed once healthy.
+          AUTH_SECRET: api-boot-ci-only-fixture-value-not-a-secret-000000
           PORT: '3999'
         run: |
           node dist/main.js > "$RUNNER_TEMP/api-boot.log" 2>&1 &
