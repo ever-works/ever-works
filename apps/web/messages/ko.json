@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "미션의 App Works에 작업을 등록했습니다.",
+                    "no-tasks": "미션의 App Works에 등록할 새 항목이 없습니다."
                 }
             },
             "goals": {

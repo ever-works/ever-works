@@ -19,6 +19,9 @@ import { MissionCloneService } from './mission-clone.service';
 import { MissionTemplateManifestService } from './mission-template-manifest.service';
 import { MissionsService } from './missions.service';
 import { MissionTickService } from './mission-tick.service';
+import { Task } from '../entities/task.entity';
+import { FacadesModule } from '../facades/facades.module';
+import { MissionTaskPlannerService } from './mission-task-planner.service';
 
 /**
  * Phase 3 PR G — MissionsModule skeleton (Missions/Ideas/Works
@@ -52,6 +55,10 @@ import { MissionTickService } from './mission-tick.service';
             Work,
             WorkProposal,
             UserUpload,
+            // APW-08 T35 — the Mission tick reads the Tasks on its App Works (open cap, recent
+            // titles, duplicates). Injected `@Optional()`, so it MUST be registered here or it
+            // silently resolves to undefined (pinned by missions.module.task-output.spec).
+            Task,
         ]),
         TitlerModule,
         // Provides ActivityLogService so MissionTickService can emit
@@ -60,6 +67,8 @@ import { MissionTickService } from './mission-tick.service';
         ActivityLogModule,
         UserResearchModule,
         WorkAgentModule,
+        // APW-08 T35 — the planner's AiFacadeService.
+        FacadesModule,
     ],
     providers: [
         // MissionTickService hands the org's existing Works to idea
@@ -72,6 +81,8 @@ import { MissionTickService } from './mission-tick.service';
         MissionCloneService,
         MissionTemplateManifestService,
         MissionAttachmentRepository,
+        // APW-08 T35 (FR-51) — proposes the Tasks a Mission files on its App Works.
+        MissionTaskPlannerService,
     ],
     exports: [
         MissionsService,

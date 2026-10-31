@@ -2361,7 +2361,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Tareas registradas en los App Works de la Misión.",
+                    "no-tasks": "Nada nuevo que registrar en los App Works de la Misión."
                 }
             },
             "goals": {

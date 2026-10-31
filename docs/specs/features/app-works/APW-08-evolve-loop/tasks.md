@@ -975,6 +975,35 @@ _Delivers FR-45…FR-55._
       plan carries `maxBudgetUsd` rounded down** (APW08-G15); the existing `mission-tick.service.spec.ts` passes
       unchanged. Run: `pnpm --filter @ever-works/agent test mission-tick`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-task-tick`, stacked on T34):
+      part 1 built — the planner and the tick branch; the per-run budget (APW08-G15) is part 2.**
+      - **Planner.** `MissionTaskPlannerService` uses `AiFacadeService.askJson`, schema-checked (title ≤ 120,
+        description ≤ 4000). It is given the Mission, the Work, its 20 latest Task titles and the relation
+        (Improves → product changes, Operates → maintenance). The Work description and the titles are fenced as
+        untrusted data.
+      - **Tick branch.** `MissionTickService` branches on `outputMode`: `ideas` is unchanged, `tasks` files Tasks,
+        `both` files Ideas then Tasks.
+        - It covers at most 5 App Works attached as Improves or Operates.
+        - The open-Tasks cap counts this Mission's open Tasks on that Work. Each tick files at most
+          `tasksPerTick`, within the cap.
+        - A proposal whose normalised title matches an open Task on that Work is dropped.
+        - Tasks are filed with the Mission, the Work and the `mission-task` label: in Backlog when
+          `requireApprovalBeforeCreate` is set; otherwise in To do, and started through `TasksService.runTask`
+          with the Mission's Agent (else the Work's default).
+        - The work is per Work and best-effort: one Work failing never stops the others.
+      - **Notice.** "Nothing to file" (FR-54, S27) is at most one `mission_nothing_to_file` Activity per Mission
+        per UTC day, stamped on `taskOutputNoticeAt`. The feed narration copy is in `en`, the only locale with a
+        feed tree.
+      - **Telemetry.** `mission.task_output.tick` and `mission.task_output.nothing_to_file` are emitted (the rest of
+        T43).
+      - **Wiring.** `MissionsModule` registers `Task` and imports `FacadesModule`; `missions.module.task-output.spec`
+        pins it. `TasksService` is resolved lazily, so there is no module cycle.
+
+      Specs:
+      - `mission-tick.task-output` 9/9 (cap and duplicate rules bite-proven);
+      - `mission-task-planner` 4/4;
+      - module wiring 2/2;
+      - `mission-tick.service` 28/28 and `missions.service` 51/51, unchanged.
 
 - [ ] **T36. Mission web.**
       **Create** `apps/web/src/components/missions/MissionOutputCard.tsx`,

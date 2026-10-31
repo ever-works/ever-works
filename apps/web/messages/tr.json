@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Görevin App Works’üne işler kaydedildi.",
+                    "no-tasks": "Görevin App Works’üne kaydedilecek yeni bir şey yok."
                 }
             },
             "goals": {

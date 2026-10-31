@@ -301,11 +301,15 @@ export class MissionsController {
             | 'spawned'
             | 'cap-hit'
             | 'no-ideas'
+            | 'tasks-filed'
+            | 'no-tasks'
             | 'failed'
             | 'cron-no-match';
         missionId: string;
         ideasCreated?: number;
         ideasQueued?: number;
+        /** APW-08 T35 — Tasks filed on the Mission's App Works. */
+        tasksFiled?: number;
         message?: string;
     }> {
         return this.service.runNow(auth.userId, id, this.scopeContext?.getScope());

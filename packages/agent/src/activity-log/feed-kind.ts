@@ -213,6 +213,7 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.MISSION_FAILED]: 'problem',
     [ActivityActionType.MISSION_DELETED]: 'work',
     [ActivityActionType.MISSION_TICK_CAPPED]: 'problem',
+    [ActivityActionType.MISSION_NOTHING_TO_FILE]: 'work',
     [ActivityActionType.MISSION_TICK]: 'work',
 
     // Goals

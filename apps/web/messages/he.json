@@ -2361,7 +2361,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "משימות תויקו ב-App Works של המשימה.",
+                    "no-tasks": "אין שום דבר חדש לתייק ב-App Works של המשימה."
                 }
             },
             "goals": {

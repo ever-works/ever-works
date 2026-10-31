@@ -855,11 +855,15 @@ export class MissionsService {
             | 'spawned'
             | 'cap-hit'
             | 'no-ideas'
+            | 'tasks-filed'
+            | 'no-tasks'
             | 'failed'
             | 'cron-no-match';
         missionId: string;
         ideasCreated?: number;
         ideasQueued?: number;
+        /** APW-08 T35 — Tasks filed on the Mission's App Works. */
+        tasksFiled?: number;
         message?: string;
     }> {
         const mission = await this.findOrThrow(userId, missionId, scope);
@@ -880,6 +884,7 @@ export class MissionsService {
             missionId,
             ideasCreated: result.ideasCreated,
             ideasQueued: result.ideasQueued,
+            tasksFiled: result.tasksFiled,
             message: result.message,
         };
     }

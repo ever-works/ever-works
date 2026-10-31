@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Đã ghi các tác vụ vào App Works của Nhiệm vụ.",
+                    "no-tasks": "Không có gì mới để ghi vào App Works của Nhiệm vụ."
                 }
             },
             "goals": {

@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "บันทึกงานลงใน App Works ของภารกิจแล้ว",
+                    "no-tasks": "ไม่มีอะไรใหม่ให้บันทึกใน App Works ของภารกิจ"
                 }
             },
             "goals": {

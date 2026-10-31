@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Taken aangemaakt op de App Works van de Missie.",
+                    "no-tasks": "Niets nieuws om aan te maken op de App Works van de Missie."
                 }
             },
             "goals": {
