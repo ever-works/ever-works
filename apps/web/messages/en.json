@@ -3722,6 +3722,26 @@
                     "detached": "Goal detached",
                     "detachError": "Couldn't detach Goal"
                 }
+            },
+            "output": {
+                "title": "Output",
+                "ideas": "Ideas",
+                "tasks": "Tasks on attached App Works",
+                "both": "Both",
+                "tasksPerTick": "Tasks per tick",
+                "openCap": "Open Tasks cap per Work",
+                "appliesTo": "Applies to Works attached as Improves or Operates.",
+                "noAppWork": "Attach an App Work as Improves or Operates to file Tasks on it.",
+                "tasksOnWorks": "Tasks on attached Works",
+                "nothingToFile": "No attached App Work to file Tasks on.",
+                "tasksOnWorksEmpty": "No Tasks filed yet.",
+                "save": "Save",
+                "saved": "Output saved",
+                "saveError": "Couldn't save the output",
+                "loading": "Loading…",
+                "unavailable": "Couldn't load the Tasks.",
+                "previous": "Previous",
+                "next": "Next"
             }
         },
         "ideasPage": {

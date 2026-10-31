@@ -2395,6 +2395,26 @@
                     "detached": "Ziel getrennt",
                     "detachError": "Ziel konnte nicht getrennt werden"
                 }
+            },
+            "output": {
+                "title": "Ausgabe",
+                "ideas": "Ideen",
+                "tasks": "Tasks in angehängten App Works",
+                "both": "Beides",
+                "tasksPerTick": "Tasks pro Durchlauf",
+                "openCap": "Max. offene Tasks pro Work",
+                "appliesTo": "Gilt für Works, die als „Verbessert“ oder „Betreibt“ angehängt sind.",
+                "noAppWork": "Hängen Sie ein App Work als „Verbessert“ oder „Betreibt“ an, um darin Tasks anzulegen.",
+                "tasksOnWorks": "Tasks in angehängten Works",
+                "nothingToFile": "Kein angehängtes App Work, in dem Tasks angelegt werden können.",
+                "tasksOnWorksEmpty": "Noch keine Tasks angelegt.",
+                "save": "Speichern",
+                "saved": "Ausgabe gespeichert",
+                "saveError": "Ausgabe konnte nicht gespeichert werden",
+                "loading": "Wird geladen…",
+                "unavailable": "Tasks konnten nicht geladen werden.",
+                "previous": "Zurück",
+                "next": "Weiter"
             }
         },
         "ideasPage": {

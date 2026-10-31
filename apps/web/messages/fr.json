@@ -2395,6 +2395,26 @@
                     "detached": "Objectif détaché",
                     "detachError": "Impossible de détacher l'Objectif"
                 }
+            },
+            "output": {
+                "title": "Sortie",
+                "ideas": "Idées",
+                "tasks": "Tâches sur les App Works attachés",
+                "both": "Les deux",
+                "tasksPerTick": "Tâches par cycle",
+                "openCap": "Plafond de tâches ouvertes par Work",
+                "appliesTo": "S’applique aux Works attachés en « Améliore » ou « Exploite ».",
+                "noAppWork": "Attachez un App Work en « Améliore » ou « Exploite » pour y créer des tâches.",
+                "tasksOnWorks": "Tâches sur les Works attachés",
+                "nothingToFile": "Aucun App Work attaché sur lequel créer des tâches.",
+                "tasksOnWorksEmpty": "Aucune tâche créée pour l’instant.",
+                "save": "Enregistrer",
+                "saved": "Sortie enregistrée",
+                "saveError": "Impossible d’enregistrer la sortie",
+                "loading": "Chargement…",
+                "unavailable": "Impossible de charger les tâches.",
+                "previous": "Précédent",
+                "next": "Suivant"
             }
         },
         "ideasPage": {

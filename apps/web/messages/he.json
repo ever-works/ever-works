@@ -2395,6 +2395,26 @@
                     "detached": "היעד נותק",
                     "detachError": "לא ניתן היה לנתק את היעד"
                 }
+            },
+            "output": {
+                "title": "פלט",
+                "ideas": "רעיונות",
+                "tasks": "משימות ב-App Works המצורפים",
+                "both": "שניהם",
+                "tasksPerTick": "משימות לכל מחזור",
+                "openCap": "מכסת משימות פתוחות לכל Work",
+                "appliesTo": "חל על Works המצורפים כ„משפר” או „מפעיל”.",
+                "noAppWork": "צרפו App Work כ„משפר” או „מפעיל” כדי לתייק בו משימות.",
+                "tasksOnWorks": "משימות ב-Works המצורפים",
+                "nothingToFile": "אין App Work מצורף לתיוק משימות.",
+                "tasksOnWorksEmpty": "עדיין לא תויקו משימות.",
+                "save": "שמירה",
+                "saved": "הפלט נשמר",
+                "saveError": "לא ניתן היה לשמור את הפלט",
+                "loading": "טוען…",
+                "unavailable": "לא ניתן היה לטעון את המשימות.",
+                "previous": "הקודם",
+                "next": "הבא"
             }
         },
         "ideasPage": {

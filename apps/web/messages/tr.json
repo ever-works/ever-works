@@ -2364,6 +2364,26 @@
                     "detached": "Hedef ayrıldı",
                     "detachError": "Hedef ayrılamadı"
                 }
+            },
+            "output": {
+                "title": "Çıktı",
+                "ideas": "Fikirler",
+                "tasks": "Ekli App Works üzerindeki işler",
+                "both": "İkisi de",
+                "tasksPerTick": "Döngü başına iş",
+                "openCap": "Work başına açık iş sınırı",
+                "appliesTo": "“İyileştirir” veya “İşletir” olarak eklenen Works için geçerlidir.",
+                "noAppWork": "İş kaydetmek için bir App Work’ü “İyileştirir” veya “İşletir” olarak ekleyin.",
+                "tasksOnWorks": "Ekli Works üzerindeki işler",
+                "nothingToFile": "İş kaydedilecek ekli bir App Work yok.",
+                "tasksOnWorksEmpty": "Henüz kaydedilmiş iş yok.",
+                "save": "Kaydet",
+                "saved": "Çıktı kaydedildi",
+                "saveError": "Çıktı kaydedilemedi",
+                "loading": "Yükleniyor…",
+                "unavailable": "İşler yüklenemedi.",
+                "previous": "Önceki",
+                "next": "Sonraki"
             }
         },
         "ideasPage": {

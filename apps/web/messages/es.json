@@ -2395,6 +2395,26 @@
                     "detached": "Objetivo desvinculado",
                     "detachError": "No se pudo desvincular el Objetivo"
                 }
+            },
+            "output": {
+                "title": "Salida",
+                "ideas": "Ideas",
+                "tasks": "Tareas en los App Works adjuntos",
+                "both": "Ambas",
+                "tasksPerTick": "Tareas por ciclo",
+                "openCap": "Límite de tareas abiertas por Work",
+                "appliesTo": "Se aplica a los Works adjuntos como «Mejora» u «Opera».",
+                "noAppWork": "Adjunta un App Work como «Mejora» u «Opera» para registrar tareas en él.",
+                "tasksOnWorks": "Tareas en los Works adjuntos",
+                "nothingToFile": "No hay ningún App Work adjunto en el que registrar tareas.",
+                "tasksOnWorksEmpty": "Aún no se han registrado tareas.",
+                "save": "Guardar",
+                "saved": "Salida guardada",
+                "saveError": "No se pudo guardar la salida",
+                "loading": "Cargando…",
+                "unavailable": "No se pudieron cargar las tareas.",
+                "previous": "Anterior",
+                "next": "Siguiente"
             }
         },
         "ideasPage": {

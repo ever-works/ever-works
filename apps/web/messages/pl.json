@@ -2364,6 +2364,26 @@
                     "detached": "Cel odłączony",
                     "detachError": "Nie udało się odłączyć Celu"
                 }
+            },
+            "output": {
+                "title": "Wynik",
+                "ideas": "Pomysły",
+                "tasks": "Zadania w dołączonych App Works",
+                "both": "Oba",
+                "tasksPerTick": "Zadania na cykl",
+                "openCap": "Limit otwartych zadań na Work",
+                "appliesTo": "Dotyczy Works dołączonych jako „Ulepsza” lub „Obsługuje”.",
+                "noAppWork": "Dołącz App Work jako „Ulepsza” lub „Obsługuje”, aby zapisywać w nim zadania.",
+                "tasksOnWorks": "Zadania w dołączonych Works",
+                "nothingToFile": "Brak dołączonego App Work, w którym można zapisać zadania.",
+                "tasksOnWorksEmpty": "Nie zapisano jeszcze żadnych zadań.",
+                "save": "Zapisz",
+                "saved": "Wynik zapisany",
+                "saveError": "Nie udało się zapisać wyniku",
+                "loading": "Ładowanie…",
+                "unavailable": "Nie udało się wczytać zadań.",
+                "previous": "Poprzednia",
+                "next": "Następna"
             }
         },
         "ideasPage": {

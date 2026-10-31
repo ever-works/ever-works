@@ -2364,6 +2364,26 @@
                     "detached": "목표가 분리되었습니다",
                     "detachError": "목표를 분리할 수 없습니다"
                 }
+            },
+            "output": {
+                "title": "출력",
+                "ideas": "아이디어",
+                "tasks": "첨부된 App Works의 작업",
+                "both": "둘 다",
+                "tasksPerTick": "실행당 작업 수",
+                "openCap": "Work당 열린 작업 한도",
+                "appliesTo": "“개선” 또는 “운영”으로 첨부된 Works에 적용됩니다.",
+                "noAppWork": "작업을 등록하려면 App Work를 “개선” 또는 “운영”으로 첨부하세요.",
+                "tasksOnWorks": "첨부된 Works의 작업",
+                "nothingToFile": "작업을 등록할 App Work가 첨부되어 있지 않습니다.",
+                "tasksOnWorksEmpty": "아직 등록된 작업이 없습니다.",
+                "save": "저장",
+                "saved": "출력이 저장되었습니다",
+                "saveError": "출력을 저장하지 못했습니다",
+                "loading": "불러오는 중…",
+                "unavailable": "작업을 불러오지 못했습니다.",
+                "previous": "이전",
+                "next": "다음"
             }
         },
         "ideasPage": {

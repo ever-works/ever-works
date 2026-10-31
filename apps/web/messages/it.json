@@ -2364,6 +2364,26 @@
                     "detached": "Obiettivo scollegato",
                     "detachError": "Impossibile scollegare l'Obiettivo"
                 }
+            },
+            "output": {
+                "title": "Output",
+                "ideas": "Idee",
+                "tasks": "Task sugli App Works allegati",
+                "both": "Entrambi",
+                "tasksPerTick": "Task per ciclo",
+                "openCap": "Limite di task aperti per Work",
+                "appliesTo": "Si applica ai Works allegati come «Migliora» o «Gestisce».",
+                "noAppWork": "Allega un App Work come «Migliora» o «Gestisce» per registrarvi task.",
+                "tasksOnWorks": "Task sui Works allegati",
+                "nothingToFile": "Nessun App Work allegato su cui registrare task.",
+                "tasksOnWorksEmpty": "Nessun task registrato finora.",
+                "save": "Salva",
+                "saved": "Output salvato",
+                "saveError": "Impossibile salvare l’output",
+                "loading": "Caricamento…",
+                "unavailable": "Impossibile caricare i task.",
+                "previous": "Precedente",
+                "next": "Successivo"
             }
         },
         "ideasPage": {

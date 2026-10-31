@@ -2364,6 +2364,26 @@
                     "detached": "ゴールを切り離しました",
                     "detachError": "ゴールを切り離せませんでした"
                 }
+            },
+            "output": {
+                "title": "出力",
+                "ideas": "アイデア",
+                "tasks": "添付された App Works のタスク",
+                "both": "両方",
+                "tasksPerTick": "1 回あたりのタスク数",
+                "openCap": "Work ごとの未完了タスク上限",
+                "appliesTo": "「改善」または「運用」として添付された Works に適用されます。",
+                "noAppWork": "タスクを登録するには、App Work を「改善」または「運用」として添付してください。",
+                "tasksOnWorks": "添付された Works のタスク",
+                "nothingToFile": "タスクを登録できる App Work が添付されていません。",
+                "tasksOnWorksEmpty": "まだタスクは登録されていません。",
+                "save": "保存",
+                "saved": "出力を保存しました",
+                "saveError": "出力を保存できませんでした",
+                "loading": "読み込み中…",
+                "unavailable": "タスクを読み込めませんでした。",
+                "previous": "前へ",
+                "next": "次へ"
             }
         },
         "ideasPage": {

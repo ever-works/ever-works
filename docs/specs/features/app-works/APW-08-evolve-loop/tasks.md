@@ -1031,6 +1031,21 @@ _Delivers FR-45…FR-55._
       no-App-Work notice, 20 rows per page; `MissionDetailClient.unit.spec.tsx` passes unchanged. Run:
       `pnpm --filter ever-works-web test Mission`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-web`, stacked on T35): built.**
+      - **`MissionOutputCard`** (in the Mission page's right rail): three radios. When the Mission files Tasks it
+        shows the Tasks-per-tick (1..3) and open-cap (1..10) inputs, clamped like the API. The no-App-Work notice
+        shows when no App Work is attached as Improves or Operates, and after the API answers `noAppWorkRelation`.
+      - **`MissionTasksOnWorksPanel`** (in the content column, only while the Mission files Tasks): the
+        `mission-task` Tasks, 20 per page, via the new `listMissionTasksOnWorksAction`. They are sorted by the list
+        API's own order, most recent activity first.
+      - **Web types:** `Mission.outputMode` / `taskOutput` / `warnings`, and `MissionWorkRelationDto.workKind`.
+      - **Copy:** `dashboard.missionDetail.output` in all 21 locales.
+
+      Specs:
+      - `MissionOutputCard.unit` 4/4;
+      - `MissionTasksOnWorksPanel.unit` 3/3;
+      - `components/missions` 77/77, with `MissionDetailClient.unit` unchanged;
+      - web `tsc` clean.
 
 - [ ] **T37. P2 i18n, e2e, gate.**
       **Modify** `apps/web/messages/en.json` — `dashboard.goalNew.work`, `dashboard.missionDetail.output`; mirror into

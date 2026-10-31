@@ -2364,6 +2364,26 @@
                     "detached": "Objetivo desanexado",
                     "detachError": "Não foi possível desanexar o Objetivo"
                 }
+            },
+            "output": {
+                "title": "Saída",
+                "ideas": "Ideias",
+                "tasks": "Tarefas nos App Works anexados",
+                "both": "Ambos",
+                "tasksPerTick": "Tarefas por ciclo",
+                "openCap": "Limite de tarefas abertas por Work",
+                "appliesTo": "Aplica-se a Works anexados como “Melhora” ou “Opera”.",
+                "noAppWork": "Anexe um App Work como “Melhora” ou “Opera” para registrar tarefas nele.",
+                "tasksOnWorks": "Tarefas nos Works anexados",
+                "nothingToFile": "Nenhum App Work anexado para registrar tarefas.",
+                "tasksOnWorksEmpty": "Nenhuma tarefa registrada ainda.",
+                "save": "Salvar",
+                "saved": "Saída salva",
+                "saveError": "Não foi possível salvar a saída",
+                "loading": "Carregando…",
+                "unavailable": "Não foi possível carregar as tarefas.",
+                "previous": "Anterior",
+                "next": "Próxima"
             }
         },
         "ideasPage": {

@@ -2364,6 +2364,26 @@
                     "detached": "已解除目标关联",
                     "detachError": "无法解除目标关联"
                 }
+            },
+            "output": {
+                "title": "输出",
+                "ideas": "想法",
+                "tasks": "附加的 App Works 上的任务",
+                "both": "两者",
+                "tasksPerTick": "每轮任务数",
+                "openCap": "每个 Work 的未完成任务上限",
+                "appliesTo": "适用于以“改进”或“运营”关系附加的 Works。",
+                "noAppWork": "以“改进”或“运营”关系附加一个 App Work，才能在其上录入任务。",
+                "tasksOnWorks": "附加的 Works 上的任务",
+                "nothingToFile": "没有可录入任务的附加 App Work。",
+                "tasksOnWorksEmpty": "尚未录入任何任务。",
+                "save": "保存",
+                "saved": "已保存输出",
+                "saveError": "无法保存输出",
+                "loading": "加载中…",
+                "unavailable": "无法加载任务。",
+                "previous": "上一页",
+                "next": "下一页"
             }
         },
         "ideasPage": {

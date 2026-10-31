@@ -2364,6 +2364,26 @@
                     "detached": "लक्ष्य अलग किया गया",
                     "detachError": "लक्ष्य अलग नहीं किया जा सका"
                 }
+            },
+            "output": {
+                "title": "आउटपुट",
+                "ideas": "Ideas",
+                "tasks": "जुड़े App Works पर Tasks",
+                "both": "दोनों",
+                "tasksPerTick": "प्रति tick Tasks",
+                "openCap": "प्रति Work खुले Tasks की सीमा",
+                "appliesTo": "“सुधारता है” या “चलाता है” के रूप में जुड़े Works पर लागू।",
+                "noAppWork": "Tasks दर्ज करने के लिए किसी App Work को “सुधारता है” या “चलाता है” के रूप में जोड़ें।",
+                "tasksOnWorks": "जुड़े Works पर Tasks",
+                "nothingToFile": "Tasks दर्ज करने के लिए कोई App Work जुड़ा नहीं है।",
+                "tasksOnWorksEmpty": "अभी तक कोई Task दर्ज नहीं हुआ।",
+                "save": "सहेजें",
+                "saved": "आउटपुट सहेजा गया",
+                "saveError": "आउटपुट सहेजा नहीं जा सका",
+                "loading": "लोड हो रहा है…",
+                "unavailable": "Tasks लोड नहीं हो सके।",
+                "previous": "पिछला",
+                "next": "अगला"
             }
         },
         "ideasPage": {

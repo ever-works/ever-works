@@ -2364,6 +2364,26 @@
                     "detached": "Sasaran dilepaskan",
                     "detachError": "Tidak dapat melepaskan Sasaran"
                 }
+            },
+            "output": {
+                "title": "Keluaran",
+                "ideas": "Ide",
+                "tasks": "Tugas di App Works terlampir",
+                "both": "Keduanya",
+                "tasksPerTick": "Tugas per siklus",
+                "openCap": "Batas tugas terbuka per Work",
+                "appliesTo": "Berlaku untuk Works yang dilampirkan sebagai Meningkatkan atau Mengoperasikan.",
+                "noAppWork": "Lampirkan App Work sebagai Meningkatkan atau Mengoperasikan untuk mencatat tugas di sana.",
+                "tasksOnWorks": "Tugas di Works terlampir",
+                "nothingToFile": "Tidak ada App Work terlampir untuk mencatat tugas.",
+                "tasksOnWorksEmpty": "Belum ada tugas yang dicatat.",
+                "save": "Simpan",
+                "saved": "Keluaran disimpan",
+                "saveError": "Tidak dapat menyimpan keluaran",
+                "loading": "Memuat…",
+                "unavailable": "Tidak dapat memuat tugas.",
+                "previous": "Sebelumnya",
+                "next": "Berikutnya"
             }
         },
         "ideasPage": {

@@ -2364,6 +2364,26 @@
                     "detached": "Đã gỡ Mục tiêu",
                     "detachError": "Không thể gỡ Mục tiêu"
                 }
+            },
+            "output": {
+                "title": "Đầu ra",
+                "ideas": "Ý tưởng",
+                "tasks": "Tác vụ trên các App Works đính kèm",
+                "both": "Cả hai",
+                "tasksPerTick": "Tác vụ mỗi lượt",
+                "openCap": "Giới hạn tác vụ mở mỗi Work",
+                "appliesTo": "Áp dụng cho các Works được đính kèm dưới dạng “Cải thiện” hoặc “Vận hành”.",
+                "noAppWork": "Đính kèm một App Work dưới dạng “Cải thiện” hoặc “Vận hành” để ghi tác vụ vào đó.",
+                "tasksOnWorks": "Tác vụ trên các Works đính kèm",
+                "nothingToFile": "Không có App Work đính kèm để ghi tác vụ.",
+                "tasksOnWorksEmpty": "Chưa có tác vụ nào được ghi.",
+                "save": "Lưu",
+                "saved": "Đã lưu đầu ra",
+                "saveError": "Không thể lưu đầu ra",
+                "loading": "Đang tải…",
+                "unavailable": "Không thể tải các tác vụ.",
+                "previous": "Trước",
+                "next": "Tiếp"
             }
         },
         "ideasPage": {

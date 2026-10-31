@@ -2364,6 +2364,26 @@
                     "detached": "Doel losgekoppeld",
                     "detachError": "Kan Doel niet loskoppelen"
                 }
+            },
+            "output": {
+                "title": "Uitvoer",
+                "ideas": "Ideeën",
+                "tasks": "Taken op gekoppelde App Works",
+                "both": "Beide",
+                "tasksPerTick": "Taken per ronde",
+                "openCap": "Max. open taken per Work",
+                "appliesTo": "Geldt voor Works die als ‘Verbetert’ of ‘Beheert’ zijn gekoppeld.",
+                "noAppWork": "Koppel een App Work als ‘Verbetert’ of ‘Beheert’ om er taken op aan te maken.",
+                "tasksOnWorks": "Taken op gekoppelde Works",
+                "nothingToFile": "Geen gekoppeld App Work om taken op aan te maken.",
+                "tasksOnWorksEmpty": "Nog geen taken aangemaakt.",
+                "save": "Opslaan",
+                "saved": "Uitvoer opgeslagen",
+                "saveError": "De uitvoer kon niet worden opgeslagen",
+                "loading": "Laden…",
+                "unavailable": "De taken konden niet worden geladen.",
+                "previous": "Vorige",
+                "next": "Volgende"
             }
         },
         "ideasPage": {
