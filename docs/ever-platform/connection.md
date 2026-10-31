@@ -62,11 +62,13 @@ stays an administrator's step. When the integration ends (turned off or revoked
 in app.ever.co, or the installation disconnects), the stored client is removed;
 local accounts and their connected identities stay.
 
-**Which accounts are linked:** when someone connects or disconnects an Ever ID
-(at sign-up or in Settings), the installation tells Ever Platform: the local
-account id, the Ever ID issuer and subject, that the person linked it, and the
-account's tenant id. Never an e-mail address or a name. Links that existed
-before the client was ready are reported once.
+**Which accounts are linked:** when someone connects an Ever ID (at sign-up or
+in Settings), signs in with it, or disconnects it, the installation tells Ever
+Platform: the local account id, the Ever ID issuer and subject, that the person
+linked it, and the account's tenant id. Never an e-mail address or a name. Ever
+Platform records a link only for someone who signed in through this
+installation's own client, so an Ever ID connected before the client existed is
+reported at that person's next sign-in.
 
 ## People's export and deletion requests
 

@@ -215,19 +215,15 @@ export class PersonRequestsHandler {
     private async acknowledge(row: EverConnectPersonRequest): Promise<PersonRequestAnswer> {
         const client = await this.platform.client();
         if (!client) throw new PersonRequestNotAnsweredError('not_connected');
-        // The answer as the contract pins it (`detail.reason_code`, `legal_basis`);
-        // the SDK checks it against its own copy of the schema before sending.
-        const body = {
+        const body: RequestBody<'instanceAckRequest'> = {
             job_id: row.jobId,
-            result: row.result,
+            result: row.result as RequestBody<'instanceAckRequest'>['result'],
             ...(row.reasonCode ? { detail: { reason_code: row.reasonCode } } : {}),
             ...(row.legalBasis ? { legal_basis: row.legalBasis } : {}),
             ...(row.exportUrl ? { export_url: row.exportUrl } : {}),
         };
         try {
-            await client.call('instanceAckRequest', {
-                body: body as unknown as RequestBody<'instanceAckRequest'>,
-            });
+            await client.call('instanceAckRequest', { body });
         } catch (error) {
             const failure = platformFailure(error);
             if (failure.kind === 'problem' && (failure.status === 404 || failure.status === 409)) {
@@ -240,8 +236,8 @@ export class PersonRequestsHandler {
                 failure.kind === 'refused' ||
                 (failure.kind === 'problem' && failure.status === 422)
             ) {
-                // The answer does not fit the contract this build sends; sending it
-                // again changes nothing. It stays unrecorded and is logged.
+                // The answer does not fit the contract; sending it again changes
+                // nothing. It stays unrecorded and is logged.
                 this.logger.error(`Person request answer refused: ${describeFailure(failure)}`);
                 return toAnswer(row, false);
             }

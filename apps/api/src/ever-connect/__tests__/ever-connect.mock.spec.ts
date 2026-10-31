@@ -61,8 +61,15 @@ const MOCK_BIN = join(
     'tools/egress-audit/node_modules/@ever-co/connect-tools/dist/mock-platform/bin/ever-mock-platform.mjs',
 );
 const MOCK_ISSUER = 'https://mock-platform.test';
-/** The person the mock's requests name (its default `people[0]`). */
-const MOCK_PERSON = { issuer: 'https://auth.ever.co', subject: '275396402232829475' };
+/**
+ * The one Ever ID person the mock knows (its `people[0]`, which its deletion and
+ * export requests name), under the issuer of the sign-in client it makes: a link
+ * for any other subject answers `422 subject_unknown`, as on Ever Platform.
+ */
+const MOCK_PERSON = { issuer: `${MOCK_ISSUER}/idp`, subject: 'sub-ada' };
+const MOCK_CONFIG = {
+    people: [{ ...MOCK_PERSON, person_id: '01JMQCKPERS0N00000000000P1', org_role: 'owner' }],
+};
 
 const describeMock =
     process.env.EVER_CONNECT_MOCK_URL || existsSync(MOCK_BIN) ? describe : describe.skip;
@@ -80,6 +87,7 @@ async function startMock(): Promise<{ url: string; process: ChildProcess | null 
     }
     const child = spawn(process.execPath, [MOCK_BIN, '--host', '127.0.0.1', '--port', '0'], {
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, EVER_MOCK_CONFIG_JSON: JSON.stringify(MOCK_CONFIG) },
     });
     const url = await new Promise<string>((resolve, reject) => {
         let out = '';
@@ -174,7 +182,7 @@ describeMock('Ever Connect — against the mock platform', () => {
         platformSettings = new PluginPlatformSettingsService();
         settings = new EverIdClientSettings(integrations, platformSettings);
         settings.onModuleInit();
-        login = new EverIdLoginHandler(connection, integrations, settings, reporter);
+        login = new EverIdLoginHandler(connection, integrations, settings);
         const requests = new PersonRequestsHandler(connection, dataSource, {
             log: jest.fn().mockResolvedValue({}),
         } as unknown as ActivityLogService);

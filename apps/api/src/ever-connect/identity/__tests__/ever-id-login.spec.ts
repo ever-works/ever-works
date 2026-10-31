@@ -5,7 +5,6 @@ import {
     EVER_ID_WEB_BACKCHANNEL_LOGOUT_PATH,
     EverIdLoginHandler,
 } from '../ever-id-login.handler';
-import type { PersonLinkReporter } from '../person-link.reporter';
 import { FakeIntegration, FakePlatform, problem } from './fakes.helper-spec';
 
 /**
@@ -28,7 +27,6 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
     let integration: FakeIntegration;
     let platformSettings: PluginPlatformSettingsService;
     let settings: EverIdClientSettings;
-    let reporter: { reportExistingLinks: jest.Mock };
     let handler: EverIdLoginHandler;
     const savedEnv = { ...process.env };
 
@@ -51,13 +49,7 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
         platformSettings = new PluginPlatformSettingsService();
         settings = new EverIdClientSettings(integration, platformSettings);
         settings.onModuleInit();
-        reporter = { reportExistingLinks: jest.fn().mockResolvedValue(0) };
-        handler = new EverIdLoginHandler(
-            platform,
-            integration,
-            settings,
-            reporter as unknown as PersonLinkReporter,
-        );
+        handler = new EverIdLoginHandler(platform, integration, settings);
     });
 
     afterEach(() => {
@@ -93,7 +85,8 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
         expect(new URL(String(request.input?.body?.redirect_uri)).origin).toBe(
             new URL(String(request.input?.body?.logout_uri)).origin,
         );
-        expect(request.input?.idempotencyKey).toMatch(/^oidc-client-/);
+        // The platform takes no idempotency key here (a repeat answers 409).
+        expect(request.input?.idempotencyKey).toBeUndefined();
 
         // The pending client is read again on its schedule.
         await jest.advanceTimersByTimeAsync(CLIENT_READ_FIRST_MS);
@@ -104,7 +97,6 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
             clientSecret: 'ics_secret',
         });
         expect(integration.writes).toBe(1);
-        expect(reporter.reportExistingLinks).toHaveBeenCalledWith(ISSUER);
 
         // A later read carries no secret: the stored client stays.
         expect(await handler.refresh()).toBe('ready');
@@ -141,7 +133,7 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
         expect(integration.stored).toBeNull();
     });
 
-    it('an outage is retried with the same idempotency key, a new request gets a new one', async () => {
+    it('an outage is retried; after a revocation the client is asked for again', async () => {
         platform.answer(
             'instanceRequestOidcClient',
             problem(503, 'unavailable'),
@@ -156,8 +148,7 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
         expect(await handler.start()).toBe('requesting');
         await jest.advanceTimersByTimeAsync(CLIENT_READ_FIRST_MS);
         expect(handler.getStatus()).toBe('ready');
-        const [first, retry] = platform.callsOf('instanceRequestOidcClient');
-        expect(retry.input?.idempotencyKey).toBe(first.input?.idempotencyKey);
+        expect(platform.callsOf('instanceRequestOidcClient')).toHaveLength(2);
 
         // Revoked at Ever Platform: the next read forgets the client.
         expect(await handler.refresh()).toBe('off');
@@ -165,8 +156,7 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
 
         platform.answer('instanceGetOidcClient', ready('ics_2'));
         expect(await handler.start()).toBe('ready');
-        const third = platform.callsOf('instanceRequestOidcClient')[2];
-        expect(third.input?.idempotencyKey).not.toBe(first.input?.idempotencyKey);
+        expect(platform.callsOf('instanceRequestOidcClient')).toHaveLength(3);
         expect(integration.stored?.clientSecret).toBe('ics_2');
     });
 
@@ -208,7 +198,6 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
         await started;
         expect(integration.stored).toBeNull();
         expect(handler.getStatus()).toBe('off');
-        expect(reporter.reportExistingLinks).not.toHaveBeenCalled();
     });
 
     it('a revoked client is forgotten', async () => {

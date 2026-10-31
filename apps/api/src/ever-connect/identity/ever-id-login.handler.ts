@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { config } from '../../config/constants';
@@ -12,7 +11,6 @@ import {
     type EverPlatformCaller,
 } from './ever-connect-identity.ports';
 import { EverIdClientSettings } from './ever-id-client.settings';
-import { PersonLinkReporter } from './person-link.reporter';
 import { describeFailure, platformFailure } from './platform-answer';
 
 /**
@@ -73,13 +71,11 @@ export class EverIdLoginHandler implements OnModuleDestroy {
     /** Raised by {@link end}: an answer that arrives for an ended run stores nothing. */
     private generation = 0;
     private inFlight: Promise<EverIdLoginClientStatus> | null = null;
-    private requestKey: string | null = null;
 
     constructor(
         @Inject(EVER_CONNECT_PLATFORM) private readonly platform: EverConnectPlatform,
         @Inject(EVER_ID_LOGIN_INTEGRATION) private readonly integration: EverIdLoginIntegration,
         private readonly settings: EverIdClientSettings,
-        private readonly reporter: PersonLinkReporter,
     ) {}
 
     onModuleDestroy(): void {
@@ -162,23 +158,12 @@ export class EverIdLoginHandler implements OnModuleDestroy {
         if (!client) return this.set('off');
         if (await this.integration.readClient()) return this.set('ready');
 
-        const body = this.clientAddresses();
-        // One key per request, kept while it is retried: a retry is answered once,
-        // and a later request (after a revocation) is a new one.
-        this.requestKey ??= `oidc-client-${randomUUID()}`;
+        // No idempotency key: a request repeated after an outage is answered
+        // `409` once the first one went through, and then the client is read.
         try {
-            await client.call('instanceRequestOidcClient', {
-                body,
-                idempotencyKey: this.requestKey,
-            });
-            this.requestKey = null;
+            await client.call('instanceRequestOidcClient', { body: this.clientAddresses() });
         } catch (error) {
             const failure = platformFailure(error);
-            const retryable =
-                failure.kind === 'transient' ||
-                failure.kind === 'rate_limited' ||
-                (failure.kind === 'problem' && failure.status >= 500);
-            if (!retryable) this.requestKey = null;
             if (failure.kind === 'problem' && failure.status === 409) {
                 // A client is pending or ready already: read it.
             } else if (failure.kind === 'problem' && failure.status === 403) {
@@ -295,18 +280,9 @@ export class EverIdLoginHandler implements OnModuleDestroy {
                 return this.status;
             }
             this.settings.invalidate();
-            this.set('ready');
-            // Links made before the client existed are reported once.
-            this.reporter
-                .reportExistingLinks(issuer)
-                .catch((error) =>
-                    this.logger.warn(
-                        `Existing Ever ID links not reported: ${
-                            error instanceof Error ? error.name : 'unknown'
-                        }`,
-                    ),
-                );
-            return this.status;
+            // Links made before the client existed are reported at each person's
+            // next sign-in through it (see PersonLinkReporter).
+            return this.set('ready');
         }
 
         const stored = await this.integration.readClient();

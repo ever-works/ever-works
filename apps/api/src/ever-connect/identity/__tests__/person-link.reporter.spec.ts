@@ -1,6 +1,10 @@
-import { Repository, type DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { ExternalIdentity } from '@ever-works/agent/entities';
-import { EverIdIdentityLinkedEvent, EverIdIdentityUnlinkedEvent } from '@ever-works/agent/events';
+import {
+    EverIdIdentityLinkedEvent,
+    EverIdIdentityUnlinkedEvent,
+    EverIdSignedInEvent,
+} from '@ever-works/agent/events';
 import { PERSON_LINK_RETRY_DELAYS_MS, PersonLinkReporter } from '../person-link.reporter';
 import { createIdentityDataSource, insertIdentity } from './db.helper-spec';
 import { FakeIntegration, FakePlatform, FakeQueue, problem } from './fakes.helper-spec';
@@ -14,8 +18,10 @@ import { FakeIntegration, FakePlatform, FakeQueue, problem } from './fakes.helpe
  * - Nothing is queued while the installation is not connected, `ever_id_login`
  *   is off or no client was handed over, for another provider's identity, or
  *   for a provisioned one; a queued report is dropped unsent once it is off.
- * - `422 subject_unknown` and outages are retried for a day, then given up.
- * - Links made before the client was ready are queued once, page by page.
+ * - `422 subject_unknown` is final for a report; outages are retried for a day,
+ *   then given up.
+ * - A sign-in reports the link again, so a link made before the client existed
+ *   is reported at the person's next sign-in through it.
  */
 describe('PersonLinkReporter — person links reported to Ever Platform', () => {
     const ISSUER = 'https://id.example.test';
@@ -89,7 +95,8 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
             identity_subject: 'sub-ada',
             link_method: 'explicit',
         });
-        expect(create.input?.idempotencyKey).toBe(`person-link-${queue.reports[0].id}`);
+        // No idempotency key: the same report again answers the link already recorded.
+        expect(create.input?.idempotencyKey).toBeUndefined();
 
         await dataSource.getRepository(ExternalIdentity).delete({ id: identity.id });
         await reporter.onIdentityUnlinked(
@@ -164,7 +171,7 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
         expect(platform.calls).toHaveLength(1);
     });
 
-    it('subject_unknown and outages are retried for a day, then given up', async () => {
+    it('subject_unknown is final for the report; outages are retried for a day, then given up', async () => {
         const report = {
             id: 'r1',
             op: 'link' as const,
@@ -173,21 +180,27 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
             subject: 'sub-gone',
             linkMethod: 'explicit' as const,
         };
+        // Not an Ever ID person, being deleted, or not signed in through this
+        // installation's client yet: the next sign-in reports again.
         platform.answer('instanceCreatePersonLink', problem(422, 'subject_unknown'));
-        for (let attempt = 0; attempt < PERSON_LINK_RETRY_DELAYS_MS.length; attempt += 1) {
-            expect(await reporter.send(report, attempt)).toEqual({
-                outcome: 'retry',
-                afterMs: PERSON_LINK_RETRY_DELAYS_MS[attempt],
-                code: 'subject_unknown',
-            });
-        }
-        expect(await reporter.send(report, PERSON_LINK_RETRY_DELAYS_MS.length)).toEqual({
+        expect(await reporter.send(report, 0)).toEqual({
             outcome: 'failed',
             code: 'subject_unknown',
         });
 
         platform.answer('instanceCreatePersonLink', problem(503, 'unavailable'));
-        expect(await reporter.send(report, 0)).toMatchObject({ outcome: 'retry' });
+        for (let attempt = 0; attempt < PERSON_LINK_RETRY_DELAYS_MS.length; attempt += 1) {
+            expect(await reporter.send(report, attempt)).toEqual({
+                outcome: 'retry',
+                afterMs: PERSON_LINK_RETRY_DELAYS_MS[attempt],
+                code: 'unavailable',
+            });
+        }
+        expect(await reporter.send(report, PERSON_LINK_RETRY_DELAYS_MS.length)).toEqual({
+            outcome: 'failed',
+            code: 'unavailable',
+        });
+
         platform.answer('instanceCreatePersonLink', problem(422, 'link_not_found'));
         expect(await reporter.send(report, 0)).toEqual({
             outcome: 'failed',
@@ -195,29 +208,34 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
         });
     });
 
-    it('queues the links that existed before the client was ready, page by page', async () => {
-        for (let i = 0; i < 205; i += 1) {
-            await insertIdentity(dataSource, { issuer: ISSUER, subject: `sub-${i}` });
-        }
-        await insertIdentity(dataSource, {
+    it('a sign-in reports the link again (a link made before the client existed is reported then)', async () => {
+        const identity = await insertIdentity(dataSource, { issuer: ISSUER, subject: 'sub-early' });
+        await reporter.onSignedIn(
+            new EverIdSignedInEvent({ identityId: identity.id, userId: identity.userId }),
+        );
+        expect(queue.reports).toEqual([
+            expect.objectContaining({ op: 'link', userRef: identity.userId, subject: 'sub-early' }),
+        ]);
+
+        // Not for a provisioned identity, another provider's, or while nothing is reported.
+        const provisioned = await insertIdentity(dataSource, {
             issuer: ISSUER,
             subject: 'sub-p',
             linkedVia: 'provisioning',
         });
-        await insertIdentity(dataSource, {
+        const other = await insertIdentity(dataSource, {
             issuer: 'https://other.example.test',
             subject: 'sub-o',
         });
-
-        const find = jest.spyOn(Repository.prototype, 'find');
-        expect(await reporter.reportExistingLinks(ISSUER)).toBe(205);
-        // The first page has no `id` cursor: an empty string is not a uuid (PostgreSQL).
-        const where = (find.mock.calls[0][0] as { where: Record<string, unknown> }).where;
-        expect(where).not.toHaveProperty('id');
-        expect(find.mock.calls[1][0]).toMatchObject({ where: { id: expect.anything() } });
-        find.mockRestore();
-        expect(new Set(queue.reports.map((r) => (r.op === 'link' ? r.subject : '')))).toEqual(
-            new Set(Array.from({ length: 205 }, (_, i) => `sub-${i}`)),
+        for (const row of [provisioned, other]) {
+            await reporter.onSignedIn(
+                new EverIdSignedInEvent({ identityId: row.id, userId: row.userId }),
+            );
+        }
+        integration.enabled = false;
+        await reporter.onSignedIn(
+            new EverIdSignedInEvent({ identityId: identity.id, userId: identity.userId }),
         );
+        expect(queue.reports).toHaveLength(1);
     });
 });

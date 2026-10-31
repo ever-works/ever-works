@@ -188,12 +188,10 @@ describe('PersonRequestsHandler — deletion and export requests', () => {
 
         const participant = {
             deleteAccounts: jest.fn(),
-            exportAccounts: jest
-                .fn()
-                .mockResolvedValue({
-                    result: 'exported',
-                    exportUrl: 'https://works.example.test/exports/1',
-                }),
+            exportAccounts: jest.fn().mockResolvedValue({
+                result: 'exported',
+                exportUrl: 'https://works.example.test/exports/1',
+            }),
         };
         expect(await handler(participant).handle(exportRequest(JOB_2, [hash]))).toMatchObject({
             result: 'exported',
@@ -211,12 +209,10 @@ describe('PersonRequestsHandler — deletion and export requests', () => {
         await insertIdentity(dataSource, { issuer: ISSUER, subject: 'sub-ada' });
         const participant = {
             deleteAccounts: jest.fn(),
-            exportAccounts: jest
-                .fn()
-                .mockResolvedValue({
-                    result: 'exported',
-                    exportUrl: 'http://works.example.test/x',
-                }),
+            exportAccounts: jest.fn().mockResolvedValue({
+                result: 'exported',
+                exportUrl: 'http://works.example.test/x',
+            }),
         };
         expect(
             await handler(participant).handle(exportRequest(JOB, [subjectHash(ISSUER, 'sub-ada')])),

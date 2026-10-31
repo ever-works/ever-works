@@ -2,9 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, MoreThan, Not } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { ExternalIdentity } from '@ever-works/agent/entities';
-import { EverIdIdentityLinkedEvent, EverIdIdentityUnlinkedEvent } from '@ever-works/agent/events';
+import {
+    EverIdIdentityLinkedEvent,
+    EverIdIdentityUnlinkedEvent,
+    EverIdSignedInEvent,
+} from '@ever-works/agent/events';
 import {
     EVER_CONNECT_PLATFORM,
     EVER_CONNECT_REPORT_QUEUE,
@@ -17,9 +21,8 @@ import {
 import { platformFailure } from './platform-answer';
 
 /**
- * The waits between deliveries of a report Ever Platform could not take yet
- * (unknown subject, an outage): up to a day; after the last one the report is
- * given up (`failed`).
+ * The waits between deliveries of a report Ever Platform could not take yet (an
+ * outage): up to a day; after the last one the report is given up (`failed`).
  */
 export const PERSON_LINK_RETRY_DELAYS_MS = [
     60_000,
@@ -29,9 +32,6 @@ export const PERSON_LINK_RETRY_DELAYS_MS = [
     6 * 3_600_000,
     24 * 3_600_000,
 ] as const;
-
-/** How many existing links one page of the catch-up reads. */
-const EXISTING_LINKS_PAGE = 200;
 
 /**
  * The result of one delivery, for the queue that holds the report.
@@ -52,10 +52,15 @@ export type PersonLinkSendOutcome =
  * (`POST`/`DELETE /v1/instances/me/person-links`), so a person's deletion or
  * export request later reaches this installation.
  *
- * It listens for the connected-identity events of the Ever ID sign-in and puts
- * a report on the Ever Connect queue when the installation is connected,
- * `ever_id_login` is on and the identity belongs to Ever Platform's issuer;
- * the queue delivers it through {@link send}. Identifiers only: the local
+ * It listens for the connected-identity events of the Ever ID sign-in (an
+ * identity connected, used to sign in, or removed) and puts a report on the
+ * Ever Connect queue when the installation is connected, `ever_id_login` is on
+ * and the identity belongs to Ever Platform's issuer; the queue delivers it
+ * through {@link send}. Ever Platform takes a link only for a person who signed
+ * in through this installation's own Ever ID client, so a link is reported
+ * when it is made and again at each sign-in (the same report again answers the
+ * link already recorded): a link made before the client existed is reported at
+ * the person's next sign-in. Identifiers only: the local
  * account id, the issuer and subject, how it was linked and the account's
  * tenant — never an e-mail address or a name. Identities created by
  * provisioning are Ever Platform's own and are not reported.
@@ -73,16 +78,13 @@ export class PersonLinkReporter {
 
     @OnEvent(EverIdIdentityLinkedEvent.EVENT_NAME, { async: true })
     async onIdentityLinked(event: EverIdIdentityLinkedEvent): Promise<void> {
-        try {
-            if (event.linkedVia === 'provisioning') return;
-            const issuer = await this.reportingIssuer();
-            if (!issuer) return;
-            const identity = await this.identities().findOne({ where: { id: event.identityId } });
-            if (!identity || identity.issuer !== issuer) return;
-            await this.queue.enqueue(linkReport(identity));
-        } catch (error) {
-            this.logger.warn(`Ever ID link not queued for Ever Platform: ${errorName(error)}`);
-        }
+        if (event.linkedVia === 'provisioning') return;
+        await this.queueLink(event.identityId);
+    }
+
+    @OnEvent(EverIdSignedInEvent.EVENT_NAME, { async: true })
+    async onSignedIn(event: EverIdSignedInEvent): Promise<void> {
+        await this.queueLink(event.identityId);
     }
 
     @OnEvent(EverIdIdentityUnlinkedEvent.EVENT_NAME, { async: true })
@@ -99,35 +101,6 @@ export class PersonLinkReporter {
             await this.queue.enqueue({ id: randomUUID(), op: 'unlink', userRef: event.userId });
         } catch (error) {
             this.logger.warn(`Ever ID unlink not queued for Ever Platform: ${errorName(error)}`);
-        }
-    }
-
-    /**
-     * Queue a report for every link of `issuer` that existed before the client
-     * was ready (once, when it becomes ready), page by page. Returns how many.
-     */
-    async reportExistingLinks(issuer: string): Promise<number> {
-        if (!(await this.reportingIssuer())) return 0;
-        let queued = 0;
-        // No cursor on the first page: `id` is a uuid column, which an empty
-        // string cannot be compared with (PostgreSQL refuses it).
-        let after: string | null = null;
-        for (;;) {
-            const page = await this.identities().find({
-                where: {
-                    issuer,
-                    linkedVia: Not('provisioning'),
-                    ...(after ? { id: MoreThan(after) } : {}),
-                },
-                order: { id: 'ASC' },
-                take: EXISTING_LINKS_PAGE,
-            });
-            for (const identity of page) {
-                await this.queue.enqueue(linkReport(identity));
-                queued += 1;
-            }
-            if (page.length < EXISTING_LINKS_PAGE) return queued;
-            after = page[page.length - 1].id;
         }
     }
 
@@ -151,7 +124,6 @@ export class PersonLinkReporter {
                         link_method: report.linkMethod,
                         ...(report.tenantId ? { product_tenant_id: report.tenantId } : {}),
                     },
-                    idempotencyKey: `person-link-${report.id}`,
                 });
             } else {
                 await client.call('instanceDeletePersonLink', { path: { ref: report.userRef } });
@@ -176,15 +148,29 @@ export class PersonLinkReporter {
                         return { outcome: 'sent' };
                     // `ever_id_login` off, revoked, or the installation disconnected.
                     if (failure.status === 403) return { outcome: 'dropped', code: failure.code };
-                    // Not (yet) an Ever ID person — also a person whose deletion started.
-                    if (failure.code === 'subject_unknown') {
-                        return this.retryOrFail(report, attempt, failure.code);
-                    }
+                    // `subject_unknown` is final for this report: not an Ever ID person,
+                    // a person whose deletion started, or one who has not signed in
+                    // through this installation's own client (a later sign-in reports again).
                     if (failure.status === 401 || failure.status >= 500) {
                         return this.retryOrFail(report, attempt, failure.code);
                     }
                     return this.failed(report, failure.code);
             }
+        }
+    }
+
+    /** Queue a link report for one connected identity, when links are reported now. */
+    private async queueLink(identityId: string): Promise<void> {
+        try {
+            const issuer = await this.reportingIssuer();
+            if (!issuer) return;
+            const identity = await this.identities().findOne({ where: { id: identityId } });
+            if (!identity || identity.issuer !== issuer || identity.linkedVia === 'provisioning') {
+                return;
+            }
+            await this.queue.enqueue(linkReport(identity));
+        } catch (error) {
+            this.logger.warn(`Ever ID link not queued for Ever Platform: ${errorName(error)}`);
         }
     }
 
