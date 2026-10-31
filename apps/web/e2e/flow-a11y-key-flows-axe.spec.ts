@@ -2,6 +2,7 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
 import { API_BASE } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { openChatPanel, chatComposer } from './helpers/chat';
+import { runAxe, seriousViolations, WCAG_A_AA } from './helpers/axe';
 
 /**
  * Accessibility — axe-core + keyboard + focus + ARIA on KEY AUTHENTICATED flows.
@@ -39,10 +40,9 @@ import { openChatPanel, chatComposer } from './helpers/chat';
  *   - "Create Organization" opens CreateOrganizationModal — a headlessui Dialog
  *     (role="dialog", aria-modal="true", focus-trapped, Escape-to-close) with a
  *     "Name" input + "Create" button. (components/ui/dialog.tsx)
- *   - axe-core is NOT an installed dep; we inject it from unpkg CDN at runtime
- *     (reachable here) and SKIP gracefully if the CDN is blocked — mirroring the
- *     existing accessibility-axe-deep.spec.ts pattern so CI without egress still
- *     passes rather than failing.
+ *   - axe-core is an `apps/web` devDependency, injected from the installed
+ *     package by `helpers/axe.ts` (no CDN, which the app's CSP refuses anyway).
+ *     A load failure fails the test rather than skipping the axe assertion.
  *
  * RESILIENCE: dev-mode hydration race → retry-to-open menus, generous timeouts,
  * .first(), expect.poll/toPass. Cold auth-redirect to /login on the very first
@@ -52,47 +52,6 @@ import { openChatPanel, chatComposer } from './helpers/chat';
  */
 
 const SERIOUS_VIOLATION_CEILING = 12;
-
-interface AxeNode {
-    html?: string;
-    target?: string[];
-}
-interface AxeViolation {
-    id: string;
-    impact: string | null;
-    nodes: AxeNode[];
-}
-interface AxeResult {
-    violations: AxeViolation[];
-}
-
-/** Inject axe-core from CDN (idempotent). Returns false if it could not load. */
-async function loadAxe(page: Page): Promise<boolean> {
-    return page.evaluate(async () => {
-        const w = window as unknown as { axe?: unknown };
-        if (w.axe) return true;
-        return new Promise<boolean>((resolve) => {
-            const s = document.createElement('script');
-            s.src = 'https://unpkg.com/axe-core@4.10/axe.min.js';
-            s.onload = () => resolve(true);
-            s.onerror = () => resolve(false);
-            document.head.appendChild(s);
-        });
-    });
-}
-
-/** Run axe (wcag2a + wcag2aa) against the live DOM. Null if axe is unavailable. */
-async function runAxe(page: Page): Promise<AxeResult | null> {
-    if (!(await loadAxe(page))) return null;
-    return page.evaluate(async () => {
-        const w = window as unknown as { axe: { run: (o: unknown) => Promise<AxeResult> } };
-        return w.axe.run({ runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } });
-    });
-}
-
-function seriousPlus(result: AxeResult): AxeViolation[] {
-    return result.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-}
 
 /**
  * Navigate to an authenticated dashboard route, recovering from the cold
@@ -141,7 +100,6 @@ test.describe('a11y — axe + keyboard + focus on authenticated key flows', () =
             '/catalog',
             '/catalog/playbooks/weekly-operations-report',
         ];
-        let axeRanAtLeastOnce = false;
 
         for (const route of routes) {
             const loaded = await gotoAuthed(page, route);
@@ -163,23 +121,12 @@ test.describe('a11y — axe + keyboard + focus on authenticated key flows', () =
             const lang = await page.locator('html').getAttribute('lang');
             expect((lang || '').length, `${route} <html lang>`).toBeGreaterThan(0);
 
-            const results = await runAxe(page);
-            if (!results) continue; // CDN blocked — skip the axe assertion for this route.
-            axeRanAtLeastOnce = true;
-            const serious = seriousPlus(results);
+            const serious = seriousViolations(await runAxe(page, { tags: WCAG_A_AA }));
             const ids = serious.map((v) => v.id).join(', ');
             expect(
                 serious.length,
                 `${route} serious+ a11y violations: ${serious.length} (${ids || 'none'})`,
             ).toBeLessThan(SERIOUS_VIOLATION_CEILING);
-        }
-
-        if (!axeRanAtLeastOnce) {
-            test.info().annotations.push({
-                type: 'informational',
-                description:
-                    'axe-core CDN was unavailable on every route — landmark contract still asserted',
-            });
         }
     });
 
@@ -221,11 +168,7 @@ test.describe('a11y — axe + keyboard + focus on authenticated key flows', () =
         });
         expect(focusedIsComposer, 'chat composer is keyboard-focusable').toBe(true);
 
-        const results = await runAxe(page);
-        if (!results) {
-            test.skip(true, 'axe-core CDN unavailable — cannot scan the chat panel');
-        }
-        const serious = seriousPlus(results!);
+        const serious = seriousViolations(await runAxe(page, { tags: WCAG_A_AA }));
         const ids = serious.map((v) => v.id).join(', ');
         expect(
             serious.length,
@@ -577,16 +520,7 @@ test.describe('a11y — axe + keyboard + focus on authenticated key flows', () =
         }
 
         // axe-core bound on the authenticated form route.
-        const results = await runAxe(page);
-        if (!results) {
-            test.info().annotations.push({
-                type: 'informational',
-                description:
-                    'axe-core CDN unavailable on /works/new — labelling + keyboard still asserted',
-            });
-            return;
-        }
-        const serious = seriousPlus(results);
+        const serious = seriousViolations(await runAxe(page, { tags: WCAG_A_AA }));
         const ids = serious.map((v) => v.id).join(', ');
         expect(
             serious.length,
