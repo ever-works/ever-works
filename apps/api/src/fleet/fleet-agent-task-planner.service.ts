@@ -4,10 +4,13 @@ import { PromptAssemblerService } from '@ever-works/agent/agents';
 import {
     APP_RUN_BRIEF_SOURCE,
     APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+    APP_WORKS_TELEMETRY_SINK,
+    AppChangeTelemetry,
     appWorkTaskToolPolicyApplies,
     describeAppChangesPaused,
     readAppWorkSwitches,
     type AppRunBriefSource,
+    type AppWorksTelemetrySink,
 } from '@ever-works/agent/app-works';
 import { config } from '@ever-works/agent/config';
 import {
@@ -501,7 +504,19 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         @Optional()
         @Inject(APP_RUN_BRIEF_SOURCE)
         private readonly appRunBriefs?: AppRunBriefSource,
+        // APW-08 T43 — `app.change.tool_denied` when an App Work run's MCP bridge is withheld.
+        // The API's @Global() PostHog alias; absent (unit tests), nothing is sent. Appended LAST
+        // + @Optional() per the positional-spec arity rule.
+        @Optional()
+        @Inject(APP_WORKS_TELEMETRY_SINK)
+        private readonly appWorksSink?: AppWorksTelemetrySink,
     ) {}
+
+    /** APW-08 T43 — the evolve-loop events over the App Works sanitizer (built on first use). */
+    private appChangeTelemetryInstance?: AppChangeTelemetry;
+    private get appChangeTelemetry(): AppChangeTelemetry {
+        return (this.appChangeTelemetryInstance ??= new AppChangeTelemetry(this.appWorksSink));
+    }
 
     /**
      * Instance defaults overlaid with the tenant's plugin settings. Every
@@ -893,6 +908,16 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             this.logger.log(
                 `Task ${task.slug ?? task.id}: App Work run — the platform-MCP bridge is withheld (${APP_WORK_TOOL_POLICY_REFUSAL_CODE}).`,
             );
+            // APW-08 T43 (plan §8.1, XC-05) — the group only, never a tool name or argument. The
+            // App Work is the Task's when that is one, else the Agent's own (an App-scoped Agent).
+            const workId = work && isAppWorkKind(work.kind) ? work.id : (agent.workId ?? null);
+            if (workId) {
+                this.appChangeTelemetry.track(
+                    'app.change.tool_denied',
+                    { workId, taskId: task.id, group: 'mcp' },
+                    task.userId,
+                );
+            }
         }
         // APW-08 T18 — an App Work run's brief: the App rules at the workspace's base, and the
         // repository's instruction files fenced as untrusted content. Best-effort (`null` when
