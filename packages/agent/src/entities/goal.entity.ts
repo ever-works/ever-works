@@ -328,6 +328,8 @@ export const GOAL_EXECUTION_TARGETS: readonly GoalExecutionTarget[] = ['cloud', 
 // (every Goal that never started a loop) is excluded by the equality, so
 // the cron's cheap case stays one indexed lookup returning zero rows.
 @Index('idx_goals_loop_status', ['loopStatus'])
+// APW-08 T31 (FR-45) — the Goals scoped to one Work (migration 1792350000000-AddGoalWorkScope).
+@Index('idx_goals_work', ['workId'])
 export class Goal {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -631,6 +633,16 @@ export class Goal {
 
     @Column({ type: 'varchar', length: 64, nullable: true })
     createdById?: string | null;
+
+    /**
+     * APW-08 T31 (FR-45, FR-46) — the one Work this Goal works on, or NULL (every Goal before
+     * APW-08 P2). Its iteration Tasks are filed on it. Set at creation or while the loop is not
+     * running, and only to a Work reachable in the Goal's own scope. No relation (a deleted Work
+     * pauses the loop, FR-48; it never cascades to the Goal). Migration
+     * 1792350000000-AddGoalWorkScope.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    workId?: string | null;
 
     @CreateDateColumn()
     createdAt: Date;

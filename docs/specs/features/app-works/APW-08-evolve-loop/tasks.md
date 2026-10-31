@@ -821,7 +821,7 @@ _Delivers FR-45…FR-55._
 - [ ] **T31. Goal Work scope — schema and API.**
       **Modify** `packages/agent/src/entities/goal.entity.ts` — append `workId` (uuid, nullable, no relation) and
       `@Index('idx_goals_work', ['workId'])`.
-      **Create** `apps/api/src/migrations/1792080100000-AddGoalWorkScope.ts` (new).
+      **Create** `apps/api/src/migrations/1792350000000-AddGoalWorkScope.ts` (new).
       **Modify** `apps/api/src/goals/dto/goal.dto.ts` (`workId?: string | null`, `@IsUUID`),
       `apps/api/src/goals/goals.controller.ts`, `packages/agent/src/goals/goals.service.ts` — validate reachability in
       the Goal's scope; `409 loopRunning` on change while running.
@@ -832,6 +832,18 @@ _Delivers FR-45…FR-55._
       Work answers not found. Run: `cd apps/api && pnpm test AddGoalWorkScope goal` and
       `pnpm --filter @ever-works/agent test goals.service`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-work-scope`): built.**
+      - `goals.workId` (uuid, nullable, no FK so a deleted Work pauses rather than cascades) and `idx_goals_work`.
+        The migration is `1792350000000-AddGoalWorkScope`: the next free App Works slot. The plan's
+        `1792080100000` predates the block's later stamps.
+      - `GoalsService` resolves the Work the way Task creation does: it must exist, be the acting user's, and be in
+        the same scope. A missing Work, another account's Work, or one in another scope all get the same
+        `404 workNotFound`. Without a Work repository a `workId` is refused, never stored unchecked.
+      - A change while `loopStatus = 'running'` is `409 loopRunning`; resending the current Work is not a change.
+      - The single read adds `workName`.
+      - DTOs: `workId?: uuid | null`.
+
+      Specs: migration 3/3; DTO 35/35; service 60/60, with both rules bite-proven; controller 30/30 (3 new).
 
 - [ ] **T32. Orchestrator.**
       **Modify** `packages/agent/src/goals/goal-orchestrator.service.ts` — `applyDispatch` passes
