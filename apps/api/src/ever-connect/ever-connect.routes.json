@@ -1,0 +1,50 @@
+{
+    "manifest": "ever-connect.routes.v1",
+    "product": "works",
+    "module": "ever-connect",
+    "description": "Routes of the Ever Connect module (an installation's connection to Ever Platform). `public` lists routes that answer without a session and `inbound` lists requests Ever Platform makes to this installation: only the address statement, which answers 404 unless Ever Platform is checking the installation's published address. `routes` lists every route with the authentication it requires. Generated from the controllers by routes-manifest.spec.ts (UPDATE_ROUTES_MANIFEST=1 rewrites it).",
+    "public": [
+        {
+            "method": "GET",
+            "path": "/.well-known/ever-connect"
+        }
+    ],
+    "inbound": [
+        {
+            "method": "GET",
+            "path": "/.well-known/ever-connect"
+        }
+    ],
+    "routes": [
+        {
+            "method": "POST",
+            "path": "/api/ever-connect/connect",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "POST",
+            "path": "/api/ever-connect/disconnect",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "POST",
+            "path": "/api/ever-connect/integrations/:key/accept",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "POST",
+            "path": "/api/ever-connect/integrations/refresh",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "GET",
+            "path": "/api/ever-connect/status",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "GET",
+            "path": "/.well-known/ever-connect",
+            "auth": "public"
+        }
+    ]
+}

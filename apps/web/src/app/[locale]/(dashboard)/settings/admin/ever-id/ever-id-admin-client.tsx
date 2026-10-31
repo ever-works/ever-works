@@ -43,7 +43,7 @@ const FIELD_LABELS = {
 
 type FieldKey = keyof typeof FIELD_LABELS;
 
-const SOURCE_KEYS: readonly EverIdSettingSource[] = ['admin', 'env', 'default', 'unset'];
+const SOURCE_KEYS: readonly EverIdSettingSource[] = ['admin', 'env', 'platform', 'default', 'unset'];
 
 function isFieldKey(value: string): value is FieldKey {
     return Object.prototype.hasOwnProperty.call(FIELD_LABELS, value);

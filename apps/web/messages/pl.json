@@ -4279,6 +4279,7 @@
                         "title": "Skąd pochodzi każda wartość",
                         "admin": "Ustawienia wtyczki",
                         "env": "Środowisko",
+                        "platform": "Ever Platform",
                         "default": "Domyślna",
                         "unset": "Nie ustawiono"
                     },

@@ -17,6 +17,7 @@ import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import { PluginRegistryService, loadPluginSchema } from './plugin-registry.service';
 import { PluginEvents } from '../plugins.constants';
 import { PluginSecretEncService } from './plugin-secret-enc.service';
+import { PluginPlatformSettingsService } from './plugin-platform-settings.service';
 import {
     SettingsSchemaValidatorService,
     type SettingsScope as ValidatorSettingsScope,
@@ -71,6 +72,9 @@ export class PluginSettingsService {
         // PluginSettingsService directly keep working. Module DI provides it.
         @Optional()
         private readonly secretEnc?: PluginSecretEncService,
+        // Optional for the same reason; without it no plugin has Ever Platform values.
+        @Optional()
+        private readonly platformSettings?: PluginPlatformSettingsService,
     ) {}
 
     /**
@@ -107,7 +111,8 @@ export class PluginSettingsService {
      * 2. User settings
      * 3. Admin settings
      * 4. Environment variables
-     * 5. Plugin defaults
+     * 5. Values Ever Platform handed the installation ({@link PluginPlatformSettingsService})
+     * 6. Plugin defaults
      *
      * EW-742 P1 — the spec adds a `tenant` tier between `user` and
      * `admin (global)` in the cascade (see
@@ -200,6 +205,7 @@ export class PluginSettingsService {
                 : {};
         }
 
+        const platform = this.platformSettings ? await this.platformSettings.read(pluginId) : {};
         for (const def of definitions) {
             resolved[def.key] = this.resolveSetting(
                 def,
@@ -207,6 +213,7 @@ export class PluginSettingsService {
                     work: { ...workSettings, ...workSecrets },
                     user: { ...userSettings, ...userSecrets },
                     admin: { ...adminSettings, ...adminSecrets },
+                    platform,
                 },
                 effectiveOptions,
             );
@@ -685,12 +692,13 @@ export class PluginSettingsService {
             work: Record<string, unknown>;
             user: Record<string, unknown>;
             admin: Record<string, unknown>;
+            platform?: Readonly<Record<string, unknown>>;
         },
         options?: SettingsResolutionOptions,
     ): ResolvedSetting {
         const { key, envVar, defaultValue, scope: settingScope } = definition;
 
-        // Resolution order based on priority (work > user > admin > env > default)
+        // Resolution order based on priority (work > user > admin > env > platform > default)
         // isFallback indicates when a value comes from a scope that doesn't match the setting's intended scope
 
         // 1. Work settings (if workId provided)
@@ -712,6 +720,7 @@ export class PluginSettingsService {
         sources: {
             user: Record<string, unknown>;
             admin: Record<string, unknown>;
+            platform?: Readonly<Record<string, unknown>>;
         },
         options?: SettingsResolutionOptions,
     ): ResolvedSetting {
@@ -756,7 +765,19 @@ export class PluginSettingsService {
             }
         }
 
-        // 5. Default value
+        // 5. What Ever Platform handed this installation (see PluginPlatformSettingsService):
+        // below every value an operator set, held to the property schema like an env value.
+        const platformValue = sources.platform?.[key];
+        if (platformValue !== undefined && this.platformValueConforms(definition, platformValue)) {
+            return {
+                key,
+                value: platformValue,
+                source: 'platform',
+                isFallback: true,
+            };
+        }
+
+        // 6. Default value
         return {
             key,
             value: defaultValue,
@@ -869,6 +890,16 @@ export class PluginSettingsService {
             );
         }
         return false;
+    }
+
+    /** {@link envValueConforms} for a value Ever Platform handed over: refused silently. */
+    private platformValueConforms(definition: SettingDefinition, value: unknown): boolean {
+        if (!this.settingsValidator || definition.secret) return true;
+        return this.settingsValidator.validateSettings(
+            { [definition.key]: value },
+            { type: 'object', properties: { [definition.key]: definition.schema } } as JsonSchema,
+            definition.scope,
+        ).valid;
     }
 
     /**

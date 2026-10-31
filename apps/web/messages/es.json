@@ -4348,6 +4348,7 @@
                         "title": "De dónde viene cada valor",
                         "admin": "Configuración del plugin",
                         "env": "Entorno",
+                        "platform": "Ever Platform",
                         "default": "Predeterminado",
                         "unset": "Sin configurar"
                     },

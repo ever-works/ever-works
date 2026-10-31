@@ -45,6 +45,8 @@
 export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentPluginPackage',
     'AgentPluginPackageAllowlist',
+    // Self-serve account deletion — the email-link token and the PII-free audit record.
+    'AccountDeletionRequest',
     'ActivityLog',
     // Safety rails (AW-24) — one stored rung per (scope, kind of work).
     'AutonomyGrant',
@@ -96,6 +98,13 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Environments (Settings → Environments) — named, reusable runtime
     // recipes (packages + networking) assigned per-Agent.
     'Environment',
+    // Ever Connect — the connection, its integrations, the report outbox, the
+    // worker lease and the answers to Ever Platform's person requests.
+    'EverConnectConnection',
+    'EverConnectIntegration',
+    'EverConnectLease',
+    'EverConnectOutbox',
+    'EverConnectPersonRequest',
     // Anonymous usage statistics — the one instance row (identity + statistics
     // key), the last 12 send attempts, and the one schedule/lease row.
     'EverInstance',

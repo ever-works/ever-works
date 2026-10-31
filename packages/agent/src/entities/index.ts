@@ -290,3 +290,11 @@ export * from './integration-idempotency-key.entity';
 export * from './_record-visibility';
 // Self-serve account deletion — email-link token + PII-free audit record.
 export * from './account-deletion-request.entity';
+// Ever Connect — a connected installation's answers to Ever Platform's deletion and
+// export requests for a person (ids and machine codes only).
+export * from './ever-connect-person-request.entity';
+// Ever Connect — the connection, its integrations, the report outbox and the worker lease.
+export * from './ever-connect-connection.entity';
+export * from './ever-connect-integration.entity';
+export * from './ever-connect-outbox.entity';
+export * from './ever-connect-lease.entity';

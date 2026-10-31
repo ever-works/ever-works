@@ -72,8 +72,11 @@ export interface IdentityProviderState {
     unavailableSince: string | null;
 }
 
-/** One configuration field's provenance, for the administrator surface (never its value). */
-export type IdentityProviderSettingSource = 'admin' | 'env' | 'default' | 'unset';
+/**
+ * One configuration field's provenance, for the administrator surface (never its value).
+ * `platform`: handed over by Ever Platform to a connected installation.
+ */
+export type IdentityProviderSettingSource = 'admin' | 'env' | 'platform' | 'default' | 'unset';
 
 export interface IdentityProviderConfigurationStatus {
     configured: boolean;
@@ -372,7 +375,9 @@ export class IdentityProviderFacadeService {
                   ? 'admin'
                   : setting?.source === 'env'
                     ? 'env'
-                    : 'default';
+                    : setting?.source === 'platform'
+                      ? 'platform'
+                      : 'default';
         }
         const missing = required.filter((key) => !isPresent(resolved[key]?.value));
         const value = (key: string): unknown => resolved[key]?.value;
@@ -384,7 +389,8 @@ export class IdentityProviderFacadeService {
             : [];
         // The resolution above is what the plugin's own context sees: for an
         // admin-only plugin the settings service never hands a stored secret back,
-        // so `clientSecret` resolves from its environment variable or not at all.
+        // so `clientSecret` resolves from its environment variable, from the client
+        // Ever Platform handed a connected installation, or not at all.
         return {
             configured: missing.length === 0,
             missing,

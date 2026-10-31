@@ -22,7 +22,7 @@ export * from './app-build.events';
 // by phase (2026-10-17). Emitted by `AppEnvService` beside the Activity row;
 // APW-05's `AppBuildsListener` re-prepares on the build-phase names.
 export * from './app-env.events';
-// APW-12 (Ever ID) — `ever_id.identity_linked` / `ever_id.identity_unlinked`, ids only,
-// additive and without a listener in this repository.
+// APW-12 (Ever ID) — `ever_id.identity_linked` / `ever_id.signed_in` /
+// `ever_id.identity_unlinked`, ids only; the Ever Connect module listens to them.
 export * from './ever-id.events';
 export * from './base';
