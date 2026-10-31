@@ -7186,7 +7186,7 @@
                     "other": "Đã xảy ra lỗi khi thiết lập kho mã."
                 },
                 "overview": {
-                    "changesPaused": "Changes to apps are paused by the operator.",
+                    "changesPaused": "Nhà vận hành đã tạm dừng các thay đổi đối với ứng dụng.",
                     "title": "App",
                     "repository": "Kho mã Work",
                     "upstream": "Kho nguồn",

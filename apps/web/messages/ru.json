@@ -7186,7 +7186,7 @@
                     "other": "Что-то пошло не так при настройке репозитория."
                 },
                 "overview": {
-                    "changesPaused": "Changes to apps are paused by the operator.",
+                    "changesPaused": "Изменения в приложениях приостановлены оператором.",
                     "title": "Приложение",
                     "repository": "Репозиторий Work",
                     "upstream": "Upstream",

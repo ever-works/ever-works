@@ -7255,7 +7255,7 @@
                     "other": "משהו השתבש בזמן הגדרת המאגר."
                 },
                 "overview": {
-                    "changesPaused": "Changes to apps are paused by the operator.",
+                    "changesPaused": "המפעיל השהה שינויים באפליקציות.",
                     "title": "App",
                     "repository": "מאגר העבודה",
                     "upstream": "מאגר המקור",

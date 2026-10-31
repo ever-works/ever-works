@@ -7255,7 +7255,7 @@
                     "other": "Beim Einrichten des Repositorys ist ein Fehler aufgetreten."
                 },
                 "overview": {
-                    "changesPaused": "Changes to apps are paused by the operator.",
+                    "changesPaused": "Änderungen an Apps wurden vom Betreiber pausiert.",
                     "title": "App",
                     "repository": "Werk-Repository",
                     "upstream": "Upstream",

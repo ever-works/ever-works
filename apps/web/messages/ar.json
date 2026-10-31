@@ -7255,7 +7255,7 @@
                     "other": "حدث خطأ أثناء إعداد المستودع."
                 },
                 "overview": {
-                    "changesPaused": "Changes to apps are paused by the operator.",
+                    "changesPaused": "أوقف المشغّل التغييرات على التطبيقات مؤقتًا.",
                     "title": "التطبيق",
                     "repository": "مستودع العمل",
                     "upstream": "المصدر الأصلي (upstream)",

@@ -785,6 +785,9 @@ export interface AppUpstreamDispatchResult {
     runId: string | null;
 }
 
+/** APW-08 T49 — how long the Overview waits for the operator switches before rendering without them. */
+const APP_WORK_SWITCHES_TIMEOUT_MS = 3_000;
+
 export const workAPI = {
     // Get all works with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -1017,6 +1020,9 @@ export const workAPI = {
     getAppWorkSwitches: async (): Promise<{ changesEnabled: boolean; autoDeployEnabled: boolean }> => {
         return serverFetch<{ changesEnabled: boolean; autoDeployEnabled: boolean }>(
             `/app-works/switches`,
+            // Bounded (CodeRabbit on #3046): a stalled read must not hold the Overview; the page's
+            // fail-soft catch then renders it without the banner.
+            { signal: AbortSignal.timeout(APP_WORK_SWITCHES_TIMEOUT_MS) },
         );
     },
 

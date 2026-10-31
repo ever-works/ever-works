@@ -7186,7 +7186,7 @@
                     "other": "Під час налаштування репозиторію сталася помилка."
                 },
                 "overview": {
-                    "changesPaused": "Changes to apps are paused by the operator.",
+                    "changesPaused": "Зміни в застосунках призупинено оператором.",
                     "title": "App",
                     "repository": "Репозиторій Work",
                     "upstream": "Вихідний репозиторій",
