@@ -6,6 +6,7 @@ import { PromptAssemblerService } from '../../agents/prompt-assembler.service';
 import { AppBuildSucceededListener } from '../../app-runtime/app-build-succeeded.listener';
 import { AppBuildSucceededEvent } from '../../events/app-build.events';
 import { TaskTransitionService } from '../../tasks-domain/task-transition.service';
+import { FLEET_SESSION_SCHEDULE_LABEL } from '../../tasks-domain/task-session-schedule.port';
 import { agentReviewRunScope } from '../../tasks-domain/task-agent-review';
 import { TaskPriority, TaskStatus, type Task } from '../../entities/task.entity';
 import { AppChangeRequestService } from '../app-change-request.service';
@@ -212,7 +213,9 @@ describe('APW-08 T49 — TaskTransitionService.dispatchAgentRun (board, Goal, re
     let dispatcher: { enqueue: jest.Mock };
     let works: { findById: jest.Mock };
 
-    function makeSvc(): TaskTransitionService {
+    function makeSvc(
+        opts: { noRuns?: boolean; sessionSchedules?: unknown } = {},
+    ): TaskTransitionService {
         runs = {
             createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
@@ -232,7 +235,7 @@ describe('APW-08 T49 — TaskTransitionService.dispatchAgentRun (board, Goal, re
             { findByTaskId: jest.fn().mockResolvedValue([]) },
             { allApproved: jest.fn().mockResolvedValue(true) },
             { findAgentAssignees: jest.fn().mockResolvedValue([]) },
-            runs,
+            opts.noRuns ? undefined : runs,
             dispatcher,
             undefined, // notifications
             undefined, // runDenorm
@@ -240,19 +243,78 @@ describe('APW-08 T49 — TaskTransitionService.dispatchAgentRun (board, Goal, re
             works,
             undefined, // terminalSessions
             agents,
+            undefined, // agentReviews
+            undefined, // domainEvents
+            opts.sessionSchedules,
         );
     }
 
+    // Updated with park-with-auto-resume (R-30: "jobs pause … turning it back on resumes"): the
+    // run is no longer refused — it is PARKED, and nothing starts. Just as strict: no enqueue.
     it(
-        'switch OFF: an App Work Task gets no run row and no enqueue, and says why',
+        'switch OFF: the run of an App Work Task is PARKED app-changes-paused — a row, nothing started, no enqueue',
         withEnv({ [CHANGES]: 'false' }, async () => {
             const result = await makeSvc().dispatchAgentRun(makeTask(), 'agent-a');
+            expect(result).toMatchObject({ runId: 'r1', dispatched: false, parked: true });
+            expect(runs.createQueued).toHaveBeenCalledTimes(1);
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ queuedReason: 'app-changes-paused' }),
+            );
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+        }),
+    );
+
+    it(
+        'switch OFF without a run repository (no row to park in): refused as before, and says why',
+        withEnv({ [CHANGES]: 'false' }, async () => {
+            const result = await makeSvc({ noRuns: true }).dispatchAgentRun(makeTask(), 'agent-a');
             expect(result).toMatchObject({ runId: null, dispatched: false, parked: false });
             expect(result.error).toMatch(
                 new RegExp(`^${APP_WORK_SWITCH_OFF_CODE}: ${CHANGES} is off`),
             );
             expect(runs.createQueued).not.toHaveBeenCalled();
             expect(dispatcher.enqueue).not.toHaveBeenCalled();
+        }),
+    );
+
+    // Review of #3053 — the session path has no run row to park in and starts the Fleet session at
+    // once, so the fire is refused while changes are paused (it fires again on its next tick).
+    it(
+        'switch OFF: an Agent-session schedule fire on an App Work is REFUSED — no session, no row',
+        withEnv({ [CHANGES]: 'false' }, async () => {
+            const sessionSchedules = {
+                dispatch: jest.fn().mockResolvedValue({ dispatched: true }),
+            };
+            const result = await makeSvc({ sessionSchedules }).dispatchAgentRun(
+                makeTask({ labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+                'agent-a',
+            );
+            expect(result).toMatchObject({ runId: null, dispatched: false, parked: false });
+            expect(result.error).toMatch(
+                new RegExp(`^${APP_WORK_SWITCH_OFF_CODE}: ${CHANGES} is off`),
+            );
+            expect(sessionSchedules.dispatch).not.toHaveBeenCalled();
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+        }),
+    );
+
+    it(
+        'switch ON, or another kind of Work: the Agent-session schedule fire starts its session',
+        withEnv({ [CHANGES]: 'false' }, async () => {
+            const sessionSchedules = {
+                dispatch: jest.fn().mockResolvedValue({ dispatched: true }),
+            };
+            await makeSvc({ sessionSchedules }).dispatchAgentRun(
+                makeTask({ workId: 'w-site', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+                'agent-a',
+            );
+            process.env[CHANGES] = 'true';
+            await makeSvc({ sessionSchedules }).dispatchAgentRun(
+                makeTask({ labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+                'agent-a',
+            );
+            expect(sessionSchedules.dispatch).toHaveBeenCalledTimes(2);
         }),
     );
 
