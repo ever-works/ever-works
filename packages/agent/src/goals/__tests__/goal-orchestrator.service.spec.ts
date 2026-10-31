@@ -2132,6 +2132,76 @@ describe('GoalOrchestratorService — the Goal’s Work (APW-08 T32)', () => {
         }
     });
 
+    it('Tasks that cannot count never fill the scan window ahead of an open pull request (review of #3060)', async () => {
+        const { service, tasks } = build({
+            goal: running({ iteration: 3, lastProgressIteration: 3 }),
+            works: worksWith(APP_WORK),
+        });
+        for (let i = 0; i < 250; i++) {
+            tasks._rows.push(
+                openChange({
+                    id: `old-${i}`,
+                    title: `[Goal] Customer self-service — iteration ${i}`,
+                    status: 'blocked',
+                    ...(i % 2 === 0 ? { prState: 'merged' } : { prNumber: null, prUrl: null }),
+                    createdAt: new Date(Date.UTC(2026, 9, 1) + i),
+                }),
+            );
+        }
+        tasks._rows.push(openChange());
+        expect(await service.advance('u1', 'g1')).toMatchObject({
+            action: 'wait',
+            reasonCode: 'awaiting-merge',
+            reasoning: "Waiting for iteration 3's pull request to be merged or closed.",
+        });
+    });
+
+    it('a Task with a run in flight never awaits a merge, even past the 500-Task window (review of #3060)', async () => {
+        const { service, tasks, runs } = build({
+            goal: running({ iteration: 3, lastProgressIteration: 3 }),
+            works: worksWith(APP_WORK),
+        });
+        for (let i = 0; i < 500; i++) {
+            tasks._rows.push({
+                id: `done-${i}`,
+                goalId: 'g1',
+                workId: WORK,
+                title: `[Goal] Customer self-service — iteration ${i}`,
+                status: 'done',
+                createdAt: new Date(Date.UTC(2026, 9, 1) + i),
+            });
+        }
+        tasks._rows.push(openChange());
+        runs._rows.push({
+            id: 'r-it3',
+            taskId: 'task-it3',
+            status: 'running',
+            costCents: 0,
+            startedAt: new Date('2026-10-31T10:05:00.000Z'),
+        });
+        expect((await service.advance('u1', 'g1')).reasonCode).not.toBe('awaiting-merge');
+    });
+
+    it('a failed read of the runs in flight is not "nothing awaits": the loop waits', async () => {
+        const { service, tasks, runs, tasksService } = build({
+            goal: running({ iteration: 3, lastProgressIteration: 3 }),
+            works: worksWith(APP_WORK),
+        });
+        tasks._rows.push(openChange());
+        const realFind = runs.find.getMockImplementation()!;
+        runs.find.mockImplementation(async (opts: any = {}) => {
+            if (opts.where?.taskId?._type === 'in' && opts.where?.status?._type === 'in') {
+                throw new Error('db down');
+            }
+            return realFind(opts);
+        });
+        expect(await service.advance('u1', 'g1')).toMatchObject({
+            action: 'wait',
+            reasonCode: 'work-unreadable',
+        });
+        expect(tasksService.create).not.toHaveBeenCalled();
+    });
+
     it('a non-App Work never counts an open pull request', async () => {
         const { service, tasks } = build({
             goal: running({ iteration: 3, lastProgressIteration: 3 }),
