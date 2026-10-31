@@ -65,14 +65,13 @@ Each Task's **Cost** section shows what its runs cost (an unpriced run reads *un
 
 ## When the operator pauses changes
 
-An operator can stop new changes to every App Work (`EVER_WORKS_APP_CHANGES_ENABLED=false`) or stop changes deploying themselves (`EVER_WORKS_APP_AUTO_DEPLOY_ENABLED=false`). With changes off, no new change run starts, a request is refused, and the Overview says **"Changes to apps are paused by the operator."** Boards, delivery chains and history stay readable, running deployments keep running, and turning the switch back on resumes.
+An operator can stop new changes to every App Work (`EVER_WORKS_APP_CHANGES_ENABLED=false`) or stop changes deploying themselves (`EVER_WORKS_APP_AUTO_DEPLOY_ENABLED=false`). With changes off, a request is refused and the Overview says **"Changes to apps are paused by the operator."** A change run that would start is **parked** instead: it waits, nothing runs, and it starts by itself once the switch is back on. A scheduled Agent session on an App Work is skipped while changes are paused and fires again on its next schedule. Boards, delivery chains and history stay readable, and running deployments keep running.
 
 ## Not yet
 
 - **Goals and Missions scoped to an App Work**, and a Mission that files Tasks on one.
 - **Templates** that propose App Work rules.
 - **Safety-rail holds** that block a Task with the rail's reason when a guardrail refuses an action mid-run.
-- Parking a refused Task and resuming it automatically when the operator switch comes back on.
 
 ## Related
 
