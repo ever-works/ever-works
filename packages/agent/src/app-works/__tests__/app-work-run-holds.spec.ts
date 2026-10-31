@@ -7,7 +7,11 @@ import {
     APP_WORK_RUN_STOP_RAILS,
     classifyAppWorkRunStop,
 } from '../app-work-run-holds';
-import { AppWorkRunHoldsService } from '../app-work-run-holds.service';
+import {
+    APP_WORK_RUN_REFUSALS_SCAN,
+    APP_WORK_RUN_REFUSALS_WINDOW_MARGIN_MS,
+    AppWorkRunHoldsService,
+} from '../app-work-run-holds.service';
 
 /**
  * APW-08 T46 (Resolution R-17, FR-66, FR-67; ACC-08-31) — safety-rail holds on App Work runs.
@@ -130,10 +134,21 @@ describe('APW-08 T46 — AppWorkRunHoldsService (needs_input → BLOCKED + one e
         runs = {
             findById: jest.fn(async () => ({
                 id: RUN,
-                startedAt: new Date('2026-10-31T10:00:00Z'),
+                createdAt: new Date('2026-10-31T10:00:00Z'),
+                // Re-stamped when the run was claimed again: never the window's start.
+                startedAt: new Date('2026-10-31T10:30:00Z'),
             })),
         };
-        refusals = { find: jest.fn(async () => refusalRows) };
+        // The stop-rail query (`railId: In(...)`) answers the stop rows; the plain one, all rows.
+        refusals = {
+            find: jest.fn(async (opts: { where: { railId?: unknown } }) =>
+                opts.where.railId
+                    ? refusalRows.filter((row) =>
+                          APP_WORK_RUN_STOP_RAILS.includes(row.railId as string),
+                      )
+                    : refusalRows.slice(0, APP_WORK_RUN_REFUSALS_SCAN),
+            ),
+        };
         escalations = { record: jest.fn(async () => ({ id: 'esc-1' })) };
         transitions = { transition: jest.fn(async () => task) };
     });
@@ -178,15 +193,70 @@ describe('APW-08 T46 — AppWorkRunHoldsService (needs_input → BLOCKED + one e
         await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'completed' });
         expect(transitions.transition).not.toHaveBeenCalled();
         expect(escalations.record).not.toHaveBeenCalled();
-        // A non-App Work is never asked for its verdicts.
-        expect(refusals.find).toHaveBeenCalledTimes(1);
+        // A non-App Work is never asked for its verdicts (the App run: stop rails, then all).
+        expect(refusals.find).toHaveBeenCalledTimes(2);
     });
 
-    it('a Task already blocked or finished is not moved, but the refusal is still escalated', async () => {
+    it('a Task already blocked is not moved, and the refusal is still escalated', async () => {
         task.status = TaskStatus.BLOCKED;
         await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'completed' });
         expect(transitions.transition).not.toHaveBeenCalled();
         expect(escalations.record).toHaveBeenCalledTimes(1);
+    });
+
+    // Review of #3050 — the escalation says "so the Task is blocked": never filed when it is not.
+    it('a Task already finished (or moved back) is not moved, and nothing is escalated', async () => {
+        for (const status of [TaskStatus.DONE, TaskStatus.CANCELLED, TaskStatus.TODO]) {
+            task.status = status;
+            await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'completed' });
+        }
+        expect(transitions.transition).not.toHaveBeenCalled();
+        expect(escalations.record).not.toHaveBeenCalled();
+    });
+
+    it('a lost compare-and-set: escalated only if the winner left the Task BLOCKED', async () => {
+        transitions.transition.mockRejectedValue(new Error('cas lost'));
+        tasks.findById
+            .mockResolvedValueOnce(task) // the run's Task
+            .mockResolvedValueOnce({ ...task, status: TaskStatus.IN_REVIEW }); // after the race
+        await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'completed' });
+        expect(escalations.record).not.toHaveBeenCalled();
+
+        tasks.findById
+            .mockResolvedValueOnce(task)
+            .mockResolvedValueOnce({ ...task, status: TaskStatus.BLOCKED }); // e.g. gate-exhausted
+        await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'completed' });
+        expect(escalations.record).toHaveBeenCalledTimes(1);
+    });
+
+    it('no transition service bound: nothing is blocked, so nothing is escalated', async () => {
+        transitions = undefined as never;
+        await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'completed' });
+        expect(escalations.record).not.toHaveBeenCalled();
+    });
+
+    it('a stop rail past the first page of verdicts still makes the run a wait (review of #3050)', async () => {
+        refusalRows = [
+            ...Array.from({ length: APP_WORK_RUN_REFUSALS_SCAN }, () => ({
+                railId: 'ladder',
+                category: 'publish.external',
+                verdict: 'refused',
+            })),
+            { railId: 'workspace-pause', category: null, verdict: 'refused' },
+        ];
+        await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'failed' });
+        expect(transitions.transition).not.toHaveBeenCalled();
+        expect(escalations.record).not.toHaveBeenCalled();
+    });
+
+    it('the window opens a margin before the run ROW was created, not at a re-stamped start', async () => {
+        await build().onRunTerminal({ taskId: TASK, runId: RUN, status: 'completed' });
+        const where = refusals.find.mock.calls[0][0].where as { createdAt: { value: Date } };
+        expect(where.createdAt.value.toISOString()).toBe(
+            new Date(
+                Date.parse('2026-10-31T10:00:00Z') - APP_WORK_RUN_REFUSALS_WINDOW_MARGIN_MS,
+            ).toISOString(),
+        );
     });
 
     it('never throws: an unreadable Task, a failing transition or escalation are logged, nothing escapes', async () => {
@@ -226,7 +296,9 @@ describe('APW-08 T46 — end to end through TaskRunDenormService.recordTerminal 
         const escalations = { record: jest.fn(async () => ({ id: 'esc-1' })) };
         const holds = new AppWorkRunHoldsService(
             taskRepo as never,
-            { findById: jest.fn(async () => ({ id: 'work-app', kind: 'app', name: 'Bookings' })) } as never,
+            {
+                findById: jest.fn(async () => ({ id: 'work-app', kind: 'app', name: 'Bookings' })),
+            } as never,
             { get: jest.fn(() => transitions) } as never,
             { findById: jest.fn(async () => ({ id: 'r1', startedAt: new Date() })) } as never,
             {
@@ -247,7 +319,11 @@ describe('APW-08 T46 — end to end through TaskRunDenormService.recordTerminal 
         await expect(denorm.recordTerminal('t1', 'r1', 'completed')).resolves.toBe(true);
         await onRunTerminal.mock.results[0].value;
 
-        expect(onRunTerminal).toHaveBeenCalledWith({ taskId: 't1', runId: 'r1', status: 'completed' });
+        expect(onRunTerminal).toHaveBeenCalledWith({
+            taskId: 't1',
+            runId: 'r1',
+            status: 'completed',
+        });
         expect(row.status).toBe(TaskStatus.BLOCKED);
         expect(escalations.record).toHaveBeenCalledTimes(1);
     });
@@ -267,7 +343,11 @@ describe('APW-08 T46 — end to end through TaskRunDenormService.recordTerminal 
     it('without the handler the terminal write is exactly what it was', async () => {
         const repo = { updateLatestRun: jest.fn(async () => true) };
         await expect(
-            new TaskRunDenormService(repo as unknown as TaskRepository).recordTerminal('t1', 'r1', 'failed'),
+            new TaskRunDenormService(repo as unknown as TaskRepository).recordTerminal(
+                't1',
+                'r1',
+                'failed',
+            ),
         ).resolves.toBe(true);
         expect(repo.updateLatestRun).toHaveBeenCalledTimes(1);
     });

@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, type Repository } from 'typeorm';
+import { In, MoreThanOrEqual, type Repository } from 'typeorm';
 import { isAppWorkKind } from '@ever-works/contracts';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -12,10 +12,17 @@ import { AgentEscalationService } from '../agents/agent-escalation.service';
 import { heuristicConfidence } from '../agents/escalation-confidence';
 import { TaskTransitionService } from '../tasks-domain/task-transition.service';
 import type { AppWorkRunStopHandler } from '../tasks-domain/task-run-stop.port';
-import { classifyAppWorkRunStop } from './app-work-run-holds';
+import { APP_WORK_RUN_STOP_RAILS, classifyAppWorkRunStop } from './app-work-run-holds';
 
 /** The most gate verdicts of one run read to classify it (the first one decides). */
 export const APP_WORK_RUN_REFUSALS_SCAN = 50;
+
+/**
+ * Review of #3050 — the window opens this long before the run's row was created. `runId` alone
+ * decides which verdicts are the run's; the window only lets the `(userId, createdAt)` index
+ * narrow the scan, so it errs wide (clock skew between the API and the database).
+ */
+export const APP_WORK_RUN_REFUSALS_WINDOW_MARGIN_MS = 60_000;
 
 /**
  * APW-08 T46 (Resolution R-17, FR-66, FR-67; ACC-08-31) — an App Work run a safety rail refused
@@ -58,23 +65,32 @@ export class AppWorkRunHoldsService implements AppWorkRunStopHandler {
             const work = await this.works.findById(task.workId);
             if (!work || !isAppWorkKind(work.kind)) return;
 
-            // The run's own window: verdicts recorded since it started (the user + time index).
+            // The run's own verdicts. The window opens at the run's ROW creation (a re-claimed run
+            // re-stamps `startedAt`, which would drop its earlier verdicts), less a margin.
             const run = this.runs ? await this.runs.findById(input.runId).catch(() => null) : null;
-            const since =
-                (run as { startedAt?: Date | null; createdAt?: Date | null } | null)?.startedAt ??
-                (run as { createdAt?: Date | null } | null)?.createdAt ??
-                null;
+            const created = (run as { createdAt?: Date | null } | null)?.createdAt ?? null;
+            const since = created
+                ? new Date(new Date(created).getTime() - APP_WORK_RUN_REFUSALS_WINDOW_MARGIN_MS)
+                : null;
+            const where = {
+                userId: task.userId,
+                runId: input.runId,
+                ...(since ? { createdAt: MoreThanOrEqual(since) } : {}),
+            };
+            // A stop or pause rail decides first, wherever it falls in the run (review of #3050:
+            // one past the oldest 50 verdicts was missed, and the owner asked instead of waiting).
+            const stops = await this.refusals.find({
+                where: { ...where, railId: In([...APP_WORK_RUN_STOP_RAILS]) },
+                order: { createdAt: 'ASC' },
+                take: APP_WORK_RUN_REFUSALS_SCAN,
+            });
             const rows = await this.refusals.find({
-                where: {
-                    userId: task.userId,
-                    runId: input.runId,
-                    ...(since ? { createdAt: MoreThanOrEqual(since) } : {}),
-                },
+                where,
                 order: { createdAt: 'ASC' },
                 take: APP_WORK_RUN_REFUSALS_SCAN,
             });
             const stop = classifyAppWorkRunStop({
-                refusals: rows.map((row) => ({
+                refusals: [...stops, ...rows].map((row) => ({
                     railId: row.railId,
                     category: row.category ?? null,
                     verdict: row.verdict,
@@ -82,7 +98,8 @@ export class AppWorkRunHoldsService implements AppWorkRunStopHandler {
             });
             if (stop?.kind !== 'needs_input') return;
 
-            await this.block(task);
+            // Review of #3050 — the escalation says "so the Task is blocked": filed only when it is.
+            if (!(await this.block(task))) return;
             await this.escalate(task, work.id, work.name, input.runId, stop.railId, stop.category);
         } catch (error) {
             this.logger.warn(
@@ -93,19 +110,35 @@ export class AppWorkRunHoldsService implements AppWorkRunStopHandler {
         }
     }
 
-    /** `in_progress` / `in_review` → BLOCKED. A Task already elsewhere is left where it is. */
-    private async block(task: Task): Promise<void> {
-        if (task.status !== TaskStatus.IN_PROGRESS && task.status !== TaskStatus.IN_REVIEW) return;
+    /**
+     * `in_progress` / `in_review` → BLOCKED; true when the Task is BLOCKED afterwards (already, by
+     * this move, or by a concurrent one that won the compare-and-set). A Task elsewhere (done,
+     * cancelled, back in todo) is left where it is, and false is answered.
+     */
+    private async block(task: Task): Promise<boolean> {
+        if (task.status === TaskStatus.BLOCKED) return true;
+        if (task.status !== TaskStatus.IN_PROGRESS && task.status !== TaskStatus.IN_REVIEW) {
+            return false;
+        }
         const transitions = this.transitions();
-        if (!transitions) return;
+        if (!transitions) {
+            this.logger.warn(
+                `Task ${task.id}: a safety rail refused its run, but no transition service is bound; it is not blocked and nothing is escalated.`,
+            );
+            return false;
+        }
         try {
             await transitions.transition(task, TaskStatus.BLOCKED, { actorType: 'agent' });
+            return true;
         } catch (error) {
+            const fresh = await this.tasks.findById(task.id).catch(() => null);
+            if (fresh?.status === TaskStatus.BLOCKED) return true;
             this.logger.warn(
                 `Task ${task.id}: could not be blocked after a safety rail refused its run (${
                     error instanceof Error ? error.message : String(error)
-                }); the escalation is still raised.`,
+                }); it is ${fresh?.status ?? 'unreadable'}, so nothing is escalated.`,
             );
+            return false;
         }
     }
 
