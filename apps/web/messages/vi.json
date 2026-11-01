@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Miễn phí",
                         "pro": "Pro",
-                        "standard": "Tiêu chuẩn",
-                        "premium": "Cao cấp",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Không giới hạn"
                     },
                     "usageRequired": "Chuyển sang thanh toán theo sử dụng để dùng chu kỳ này.",

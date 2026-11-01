@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Gratis",
                         "pro": "Pro",
-                        "standard": "Standaard",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Onbeperkt"
                     },
                     "usageRequired": "Schakel over naar betaling per gebruik om deze frequentie te gebruiken.",

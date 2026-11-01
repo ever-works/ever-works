@@ -49,7 +49,7 @@ export type SubscriptionPlanHosting = 'cloud' | 'selfhosted';
  * 🛑 The first three codes are LOAD-BEARING and must never be renamed or removed: they are stored
  * verbatim in `subscription_plans.code`, in `user_subscriptions.planCode`, and in Stripe session
  * metadata on every subscription ever created. Their DISPLAY names moved to the marketing tiers
- * (Standard is shown as "Pro", Premium as "Enterprise") — that is a `displayName` change in the
+ * (Standard is shown as "Pro", Premium as "Unlimited", which was "Enterprise" until 2026-11-01) — that is a `displayName` change in the
  * plan seed, not a code change.
  *
  * The three `SELFHOSTED_*` codes were added 2026-08-22 when Ever Works gained paid self-hosted
@@ -65,13 +65,13 @@ export enum SubscriptionPlanCode {
     FREE = 'free',
     /** Cloud, shown as "Pro" — $49/mo or $408/yr, 25 seats, 3,000 credits/mo, 90-day free trial. */
     STANDARD = 'standard',
-    /** Cloud, shown as "Enterprise" — $499/mo or $4,188/yr, 50 seats, 25,000 credits/mo, 90-day free trial. */
+    /** Cloud, shown as "Unlimited" (was "Enterprise") — $499/mo or $4,188/yr, 50 seats, 25,000 credits/mo, 90-day free trial. */
     PREMIUM = 'premium',
     /** Self-hosted Community Edition — free AGPLv3 download, unlimited seats, no Stripe object. */
     SELFHOSTED_COMMUNITY = 'selfhosted_community',
     /** Self-hosted Pro Edition — $49/mo, $408/yr, or a $99 one-time perpetual commercial licence; 25 seats. */
     SELFHOSTED_PRO = 'selfhosted_pro',
-    /** Self-hosted Enterprise Edition — $499/mo or $4,188/yr commercial licence; 50 seats. */
+    /** Self-hosted Unlimited Edition (was "Enterprise Edition") — $499/mo or $4,188/yr commercial licence; 50 seats. */
     SELFHOSTED_ENTERPRISE = 'selfhosted_enterprise',
 }
 

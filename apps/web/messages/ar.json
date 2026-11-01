@@ -4852,8 +4852,8 @@
                     "plans": {
                         "free": "مجاني",
                         "pro": "احترافي",
-                        "standard": "قياسي",
-                        "premium": "مميز",
+                        "standard": "احترافي",
+                        "premium": "Unlimited",
                         "unmetered": "غير محدود"
                     },
                     "usageRequired": "التبديل إلى الدفع حسب الاستخدام لاستخدام هذا التكرار.",

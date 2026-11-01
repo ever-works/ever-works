@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "무료",
                         "pro": "Pro",
-                        "standard": "스탠다드",
-                        "premium": "프리미엄",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "측정 없음"
                     },
                     "usageRequired": "이 주기를 사용하려면 사용량 기반으로 전환하세요.",

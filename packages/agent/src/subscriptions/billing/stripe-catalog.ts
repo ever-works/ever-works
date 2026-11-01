@@ -333,7 +333,8 @@ export function seatAmountCents(plan: CatalogPlan, interval: SeatInterval): numb
  * every `user_subscriptions` row and in Stripe metadata on every subscription ever created, so it
  * can never be renamed. A catalog TIER is what the price is called in the shared account. `standard`
  * has always been sold as "Pro" and `premium` as "Enterprise"; this map is where those two facts
- * meet, instead of the string being parsed out of the code at each call site.
+ * meet, instead of the string being parsed out of the code at each call site. (Since 2026-11-01 the
+ * app LABELS `premium` "Unlimited"; the catalog tier stays `enterprise`, so nothing here changes.)
  *
  * Returns `null` for a code this catalog does not sell, which callers must treat as "bill from the
  * plan row instead" — never as a reason to fail a purchase.

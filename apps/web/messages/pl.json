@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Darmowy",
                         "pro": "Pro",
-                        "standard": "Standardowy",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Bez limitu"
                     },
                     "usageRequired": "Przełącz na płatność za użycie, aby użyć tego interwału.",

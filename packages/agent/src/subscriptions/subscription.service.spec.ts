@@ -312,7 +312,7 @@ describe('SubscriptionService', () => {
             expect(std.allowedCadences).toEqual(STANDARD_ALLOWED_CADENCES);
         });
 
-        it('PREMIUM seed row is the "Enterprise" tier: $499/mo, $4,188/yr, 50 seats at $10 + ALL cadences', async () => {
+        it('PREMIUM seed row is the "Unlimited" tier: $499/mo, $4,188/yr, 50 seats at $10 + ALL cadences', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
             const premium = planRepository.upsert.mock.calls
@@ -320,7 +320,7 @@ describe('SubscriptionService', () => {
                 .find((p: any) => p.code === SubscriptionPlanCode.PREMIUM);
             expect(premium).toMatchObject({
                 code: SubscriptionPlanCode.PREMIUM,
-                displayName: 'Enterprise',
+                displayName: 'Unlimited',
                 hosting: 'cloud',
                 maxWorks: 15,
                 monthlyPrice: '499',
@@ -690,7 +690,7 @@ describe('SubscriptionService', () => {
                 expect(byCadence[cadence].reason).toBeUndefined();
             }
 
-            // The three NOT-allowed cadences should recommend Enterprise (the catalog name of `premium`)
+            // The three NOT-allowed cadences should recommend Unlimited (the display name of `premium`)
             for (const cadence of [
                 WorkScheduleCadence.EVERY_8_HOURS,
                 WorkScheduleCadence.EVERY_3_HOURS,
@@ -698,7 +698,7 @@ describe('SubscriptionService', () => {
             ]) {
                 expect(byCadence[cadence].allowed).toBe(false);
                 expect(byCadence[cadence].payPerUse).toBe(true);
-                expect(byCadence[cadence].reason).toBe('Upgrade to Enterprise for this cadence');
+                expect(byCadence[cadence].reason).toBe('Upgrade to Unlimited for this cadence');
             }
         });
 
@@ -725,9 +725,9 @@ describe('SubscriptionService', () => {
         // Validated by emitting a pure-payPerUse plan (allowedCadences: []) so
         // EVERY cadence triggers the reason field.
         it.each([
-            [WorkScheduleCadence.HOURLY, 'Enterprise'],
-            [WorkScheduleCadence.EVERY_3_HOURS, 'Enterprise'],
-            [WorkScheduleCadence.EVERY_8_HOURS, 'Enterprise'],
+            [WorkScheduleCadence.HOURLY, 'Unlimited'],
+            [WorkScheduleCadence.EVERY_3_HOURS, 'Unlimited'],
+            [WorkScheduleCadence.EVERY_8_HOURS, 'Unlimited'],
             [WorkScheduleCadence.EVERY_12_HOURS, 'Pro'],
             [WorkScheduleCadence.DAILY, 'Pro'],
             [WorkScheduleCadence.WEEKLY, 'Pro'],
@@ -1154,10 +1154,10 @@ describe('listPlans — the switcher only offers what this deployment can actual
     const ALL_SIX = [
         cloudPlan('free', 'Free'),
         cloudPlan('standard', 'Pro'),
-        cloudPlan('premium', 'Enterprise'),
+        cloudPlan('premium', 'Unlimited'),
         selfHostedPlan('selfhosted_community', 'Community Edition'),
         selfHostedPlan('selfhosted_pro', 'Pro Edition'),
-        selfHostedPlan('selfhosted_enterprise', 'Enterprise Edition'),
+        selfHostedPlan('selfhosted_enterprise', 'Unlimited Edition'),
     ];
 
     it('excludes every self-hosted edition', async () => {

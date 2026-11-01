@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "無料",
                         "pro": "Pro",
-                        "standard": "スタンダード",
-                        "premium": "プレミアム",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "無制限"
                     },
                     "usageRequired": "この間隔を使用するには従量課金に切り替えてください。",
