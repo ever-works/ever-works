@@ -4852,8 +4852,8 @@
                     "plans": {
                         "free": "Безплатен",
                         "pro": "Pro",
-                        "standard": "Стандартен",
-                        "premium": "Премиум",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Без лимит"
                     },
                     "usageRequired": "Превключи към плащане на употреба, за да използваш този интервал.",

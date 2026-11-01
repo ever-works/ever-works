@@ -4852,8 +4852,8 @@
                     "plans": {
                         "free": "Kostenlos",
                         "pro": "Pro",
-                        "standard": "Standard",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Unbegrenzt"
                     },
                     "usageRequired": "Zu nutzungsabhängig wechseln, um dieses Intervall zu nutzen.",

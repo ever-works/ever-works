@@ -4852,8 +4852,8 @@
                     "plans": {
                         "free": "Gratuit",
                         "pro": "Pro",
-                        "standard": "Standard",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Illimité"
                     },
                     "usageRequired": "Passez à à l'usage pour utiliser cette cadence.",

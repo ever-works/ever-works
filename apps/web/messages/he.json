@@ -4852,8 +4852,8 @@
                     "plans": {
                         "free": "חינם",
                         "pro": "פרו",
-                        "standard": "סטנדרטי",
-                        "premium": "פרימיום",
+                        "standard": "פרו",
+                        "premium": "Unlimited",
                         "unmetered": "ללא מדידה"
                     },
                     "usageRequired": "עבור לקצב תשלום לפי שימוש כדי להשתמש בקצב זה.",

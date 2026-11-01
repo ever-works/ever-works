@@ -16,7 +16,7 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
  *      a balance already at/above the level receives nothing), and
  *   3. **plan allowance grants** open the current allowance month's
  *      bucket for every active cloud subscription that has not received
- *      it yet (3,000 Pro / 25,000 Enterprise, expiring at month end).
+ *      it yet (3,000 Pro / 25,000 Unlimited, expiring at month end).
  *
  * The real services live in the API (ledger, entitlement and subscription
  * repositories are wired there); the worker only calls

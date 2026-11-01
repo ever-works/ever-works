@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Безкоштовний",
                         "pro": "Pro",
-                        "standard": "Стандартний",
-                        "premium": "Преміум",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Необмежений"
                     },
                     "usageRequired": "Перейдіть на оплату за використання, щоб скористатися цією періодичністю.",

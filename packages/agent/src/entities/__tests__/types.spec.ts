@@ -56,7 +56,7 @@ describe('entities/types', () => {
             // 🛑 These three strings are stored verbatim in `subscription_plans.code`, in
             // `user_subscriptions.planCode`, and in Stripe metadata on every subscription ever
             // created. Renaming one orphans live subscriptions. Their DISPLAY names moved to the
-            // marketing tiers ('standard' shows as "Pro", 'premium' as "Enterprise") — that is a
+            // marketing tiers ('standard' shows as "Pro", 'premium' as "Unlimited") — that is a
             // `displayName` change in the plan seed, never a change here.
             expect(SubscriptionPlanCode.FREE).toBe('free');
             expect(SubscriptionPlanCode.STANDARD).toBe('standard');
