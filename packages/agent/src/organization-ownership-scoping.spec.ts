@@ -107,6 +107,8 @@ function mission(overrides: Partial<Mission>): Mission {
         visibilityExplicit: false,
         // Aggregate version (EW-P2, migration 1795100000000): the column default.
         version: 1,
+        // APW-08 T34 (migration 1792360000000): the column default.
+        outputMode: 'ideas',
         createdAt: new Date('2026-08-22T00:00:00.000Z'),
         updatedAt: new Date('2026-08-22T00:00:00.000Z'),
         ...overrides,
