@@ -99,6 +99,26 @@ describe('PluginSettingsService — values Ever Platform handed the installation
         expect(resolved.displayName).toMatchObject({ source: 'admin', value: 'Ours' });
     });
 
+    it('is used whole or not at all: one key set by an operator drops the whole set', async () => {
+        const platform = new PluginPlatformSettingsService();
+        platform.register(PLUGIN, async () => handedOver);
+
+        // An admin who stored only the issuer must not get the platform's client
+        // id and secret sent to that issuer.
+        const byAdmin = await build(platform, {
+            issuerUrl: 'https://own.example.test',
+        }).getResolvedSettings(PLUGIN, { includeSecrets: true });
+        expect(byAdmin.issuerUrl).toMatchObject({ source: 'admin' });
+        expect(byAdmin.clientId).toMatchObject({ source: 'default', value: undefined });
+        expect(byAdmin.clientSecret).toMatchObject({ source: 'default', value: undefined });
+
+        process.env[ENV.client] = 'hand-made-client';
+        const byEnv = await build(platform).getResolvedSettings(PLUGIN, { includeSecrets: true });
+        expect(byEnv.clientId).toMatchObject({ source: 'env', value: 'hand-made-client' });
+        expect(byEnv.issuerUrl).toMatchObject({ source: 'default', value: undefined });
+        expect(byEnv.clientSecret).toMatchObject({ source: 'default', value: undefined });
+    });
+
     it('an off-pattern value is ignored, like an env value', async () => {
         const platform = new PluginPlatformSettingsService();
         platform.register(PLUGIN, async () => ({ issuerUrl: 'http://plain.example.test' }));

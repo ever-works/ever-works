@@ -11,8 +11,8 @@ import { API_URL } from '@/lib/constants';
  * the sign-in client it makes for a connected installation. The API route itself
  * stays reachable as before.
  *
- * Nothing of the browser travels: no cookie, no session. The body is capped; the
- * answer is never cached.
+ * Nothing of the browser travels: no cookie, no session; only the sender's address,
+ * for the API's rate limit. The body is capped; the answer is never cached.
  */
 
 /** A logout token is a few hundred bytes; anything far larger is not one. */
@@ -42,6 +42,23 @@ async function readCapped(request: NextRequest, max: number): Promise<string | n
     return Buffer.concat(chunks).toString('utf8');
 }
 
+/**
+ * The sender's address, so the API's per-IP limit on this public route counts per
+ * sender rather than for the web server as a whole (otherwise anyone posting junk
+ * here would use up the allowance real notices from Ever ID share).
+ *
+ * Same rule as `clientIpHeaders` in `lib/api/account-deletion.ts`: the incoming
+ * `X-Forwarded-For` chain is passed on WHOLE (its left-most entry is whatever the
+ * caller wrote; the API's `TRUST_PROXY_HOPS` counts from the right, where the
+ * ingress appended the real peer), with `X-Real-IP` as the fallback.
+ */
+function clientIpHeaders(request: NextRequest): Record<string, string> {
+    const chain = request.headers.get('x-forwarded-for')?.trim();
+    if (chain) return { 'X-Forwarded-For': chain };
+    const realIp = request.headers.get('x-real-ip')?.trim();
+    return realIp ? { 'X-Forwarded-For': realIp } : {};
+}
+
 export async function POST(request: NextRequest) {
     const declared = Number(request.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return answer(400);
@@ -54,6 +71,7 @@ export async function POST(request: NextRequest) {
             headers: {
                 'Content-Type':
                     request.headers.get('content-type') ?? 'application/x-www-form-urlencoded',
+                ...clientIpHeaders(request),
             },
             body,
             cache: 'no-store',

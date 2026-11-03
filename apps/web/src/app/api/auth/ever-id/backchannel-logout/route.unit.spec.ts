@@ -46,6 +46,23 @@ describe('POST /api/auth/ever-id/backchannel-logout (web)', () => {
         expect(init.headers).toEqual({ 'Content-Type': 'application/x-www-form-urlencoded' });
     });
 
+    it("passes the sender's address on, so the API's per-IP limit counts per sender", async () => {
+        const { POST } = await import('./route');
+        await POST(notice(NOTICE, { 'x-forwarded-for': '198.51.100.7, 10.0.0.2' }));
+        await POST(notice(NOTICE, { 'x-real-ip': '203.0.113.9' }));
+
+        const headersOf = (call: number) =>
+            (fetchMock.mock.calls[call] as [string, RequestInit])[1].headers;
+        expect(headersOf(0)).toEqual({
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Forwarded-For': '198.51.100.7, 10.0.0.2',
+        });
+        expect(headersOf(1)).toEqual({
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Forwarded-For': '203.0.113.9',
+        });
+    });
+
     it('answers a refused notice with the API status', async () => {
         fetchMock.mockResolvedValue(new Response(null, { status: 400 }));
         const { POST } = await import('./route');
