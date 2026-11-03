@@ -1,8 +1,8 @@
 /**
  * APW-08 T52 (XC-25, FR-71, ACC-08-35) — the evolve loop's P1 surfaces are accessible.
  *
- * axe-core (WCAG 2 A + AA, injected from the CDN as in `flow-app-deploy-a11y.spec.ts`, skipped by
- * name when the CDN is blocked) reports **no serious or critical** violation on:
+ * axe-core (WCAG 2 A + AA, injected from the installed package by `helpers/axe.ts`) reports **no
+ * serious or critical** violation on:
  *
  *   - the board's delivery chips and the App Work header (`/works/:id/tasks`);
  *   - a failed change's Task page: the Delivery section (timeline, Build links, Create a fix Task,
@@ -26,6 +26,7 @@
  */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { API_BASE, authedHeaders } from './helpers/api';
+import { describeViolations, runAxe, seriousViolations, WCAG_A_AA } from './helpers/axe';
 import {
     createWorkTask,
     gotoDashboard,
@@ -38,65 +39,13 @@ import {
 
 test.describe.configure({ mode: 'serial' });
 
-// axe-core is injected from the CDN, which the app's own Content-Security-Policy (`script-src`
-// lists no CDN) refuses: without this the script never loads and every axe check would skip
-// itself. Test-only: the browser ignores the page's CSP for this file, nothing in the app changes.
-test.use({ bypassCSP: true });
-
 const LIVE_URL = 'https://a11y-e2e.example.com';
 
 const DELIVERY = '[data-testid="task-delivery-section"]';
 const COST = '[data-testid="task-cost-section"]';
 
-interface AxeViolation {
-    id: string;
-    impact: string | null;
-    nodes: Array<{ html?: string; target?: string[] }>;
-}
-
-/** Run axe on `include`, or `null` when axe-core could not be loaded. */
-async function runAxe(page: Page, include: string[]): Promise<AxeViolation[] | null> {
-    const loaded = await page.evaluate(async () => {
-        if ((window as unknown as { axe?: unknown }).axe) return true;
-        return new Promise<boolean>((resolve) => {
-            const s = document.createElement('script');
-            s.src = 'https://unpkg.com/axe-core@4.10/axe.min.js';
-            s.onload = () => resolve(true);
-            s.onerror = () => resolve(false);
-            document.head.appendChild(s);
-        });
-    });
-    if (!loaded) return null;
-    return page.evaluate(async (selectors) => {
-        const w = window as unknown as {
-            axe: {
-                run: (
-                    context: unknown,
-                    options: unknown,
-                ) => Promise<{ violations: AxeViolation[] }>;
-            };
-        };
-        const result = await w.axe.run(
-            { include: selectors.map((selector) => [selector]) },
-            { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } },
-        );
-        return result.violations;
-    }, include);
-}
-
-function describeViolations(violations: AxeViolation[]): string {
-    return violations
-        .map(
-            (v) =>
-                `${v.id} (${v.impact}): ${v.nodes.map((n) => (n.target ?? []).join(' ')).join(' | ')}`,
-        )
-        .join('; ');
-}
-
 async function expectNoSeriousViolations(page: Page, include: string[]): Promise<void> {
-    const violations = await runAxe(page, include);
-    test.skip(violations === null, 'axe-core could not load (CDN blocked?)');
-    const serious = violations!.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    const serious = seriousViolations(await runAxe(page, { include, tags: WCAG_A_AA }));
     expect(serious, `serious+ violations: ${describeViolations(serious) || 'none'}`).toEqual([]);
 }
 

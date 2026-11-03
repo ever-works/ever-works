@@ -291,7 +291,7 @@ spec files.**
 - [x] `playwright-trace.spec.ts` — golden-path trace recording for regression triage (artifact-only — login → dashboard → works → settings)
 - [x] `pwa-offline.spec.ts` — service worker registration is queryable, /manifest.webmanifest reachable, /sw.js reachable (skips when not registered)
 - [x] `internationalization-rtl.spec.ts` — `/ar/` / `/he/` / `/fa/` / `/ur/` carry `dir="rtl"`, `/en/` stays `ltr`, locale flip back to en doesn't blank the page
-- [x] `accessibility-axe-deep.spec.ts` — axe-core injected via CDN against login + register, serious+ violations bounded below 10, color-contrast violations ≤ 3
+- [x] `accessibility-axe-deep.spec.ts` — axe-core injected from the installed package (`helpers/axe.ts`) against login + register, serious+ violations bounded below 10, color-contrast nodes ≤ 3
 - [x] `csv-export-schema.spec.ts` — activity-log + usage CSV header rows contain recognised column families; no PII (email, token) in header row
 - [x] `oauth-consent-screen.spec.ts` — github authorize URL has client_id + redirect_uri + scope + response_type=code + state; redirect_uri is https in prod-shaped URLs; redirect_uri belongs to localhost or \*.ever.works (no external redirector)
 - [x] `rate-limit-headers.spec.ts` — successful requests carry `X-RateLimit-Limit`/`Remaining`/`Reset`, remaining never increases between consecutive calls, 429 carries Retry-After (numeric or HTTP-date)

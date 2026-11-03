@@ -1,9 +1,9 @@
 /**
  * APW-06 T63 (ACC-06-44) — the App Work's Deploy tab is accessible.
  *
- * axe-core (the `accessibility-axe-deep.spec.ts` pattern: injected from the CDN, WCAG 2 A
- * and AA rules, skipped by name when the CDN is blocked) runs on the Deploy tab of an App
- * Work in the **None** state, and again with the **Connect your cluster** dialog open.
+ * axe-core (WCAG 2 A and AA rules, injected from the installed package by `helpers/axe.ts`)
+ * runs on the Deploy tab of an App Work in the **None** state, and again with the **Connect
+ * your cluster** dialog open.
  * Each run must report **no serious or critical** violation inside the App Deploy surface.
  *
  * Keyboard: the dialog's opener is reachable by `Tab`, `Esc` closes the dialog, and focus
@@ -19,6 +19,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { API_BASE } from './helpers/api';
+import { describeViolations, runAxe, seriousViolations, WCAG_A_AA } from './helpers/axe';
 import { appWorkCreateBody, createAppWork } from './helpers/app-works';
 import { connectCustomerGitHub } from './helpers/github-connection';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
@@ -34,55 +35,6 @@ const LANE_LOGIN = 'apw-e2e-user';
 
 /** The App Deploy surface's root (`AppDeployPage.tsx`). */
 const DEPLOY_PAGE = '[data-testid="app-deploy-page"]';
-
-interface AxeViolation {
-    id: string;
-    impact: string | null;
-    nodes: Array<{ html?: string; target?: string[] }>;
-}
-
-/** Run axe on `include`, or `null` when axe-core could not be loaded. */
-async function runAxe(page: Page, include: string): Promise<AxeViolation[] | null> {
-    const loaded = await page.evaluate(async () => {
-        if ((window as unknown as { axe?: unknown }).axe) return true;
-        return new Promise<boolean>((resolve) => {
-            const s = document.createElement('script');
-            s.src = 'https://unpkg.com/axe-core@4.10/axe.min.js';
-            s.onload = () => resolve(true);
-            s.onerror = () => resolve(false);
-            document.head.appendChild(s);
-        });
-    });
-    if (!loaded) return null;
-    return page.evaluate(async (selector) => {
-        const w = window as unknown as {
-            axe: {
-                run: (
-                    context: unknown,
-                    options: unknown,
-                ) => Promise<{ violations: AxeViolation[] }>;
-            };
-        };
-        const result = await w.axe.run(
-            { include: [selector] },
-            { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } },
-        );
-        return result.violations;
-    }, include);
-}
-
-function seriousOf(violations: AxeViolation[]): AxeViolation[] {
-    return violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-}
-
-function describeViolations(violations: AxeViolation[]): string {
-    return violations
-        .map(
-            (v) =>
-                `${v.id} (${v.impact}): ${v.nodes.map((n) => (n.target ?? []).join(' ')).join(' | ')}`,
-        )
-        .join('; ');
-}
 
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -182,9 +134,9 @@ test('ACC-06-44 — the Deploy tab in the None state has no serious axe violatio
     // R-12: a fresh App Work's target is None — don't deploy yet.
     await expect(page.getByTestId('app-target-none')).toBeChecked();
 
-    const violations = await runAxe(page, DEPLOY_PAGE);
-    test.skip(violations === null, 'axe-core could not load (CDN blocked?)');
-    const serious = seriousOf(violations!);
+    const serious = seriousViolations(
+        await runAxe(page, { include: [DEPLOY_PAGE], tags: WCAG_A_AA }),
+    );
     expect(serious, `serious+ violations: ${describeViolations(serious) || 'none'}`).toEqual([]);
 });
 
@@ -212,11 +164,15 @@ test('ACC-06-44 — the Connect dialog: no serious axe violation, Esc closes it 
         }
         await expect(dialog).toBeVisible({ timeout: 3_000 });
     }).toPass({ timeout: 30_000 });
-    await expect(page.getByRole('dialog')).toBeVisible();
+    // One modal dialog is open. Headless UI's `role="dialog"` element is a zero-size
+    // positioning wrapper, so visibility is asserted on the panel's content above, not on
+    // the role (the `app-works-a11y.spec.ts` pattern).
+    await expect(page.locator('[role="dialog"]')).toHaveCount(1);
+    await expect(page.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
 
-    const violations = await runAxe(page, '[role="dialog"]');
-    test.skip(violations === null, 'axe-core could not load (CDN blocked?)');
-    const serious = seriousOf(violations!);
+    const serious = seriousViolations(
+        await runAxe(page, { include: ['[role="dialog"]'], tags: WCAG_A_AA }),
+    );
     expect(serious, `serious+ violations: ${describeViolations(serious) || 'none'}`).toEqual([]);
 
     await page.keyboard.press('Escape');

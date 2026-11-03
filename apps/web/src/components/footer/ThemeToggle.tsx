@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { cn } from '@/lib/utils/cn';
 import React, { PropsWithChildren } from 'react';
@@ -16,6 +17,9 @@ type TogglerProps = {
     themeTogger?: boolean;
     firstBtnClassName?: string;
     secondBtnClassName?: string;
+    /** Accessible names: the buttons hold only an icon. */
+    firstBtnLabel?: string;
+    secondBtnLabel?: string;
 } & PropsWithChildren;
 
 export function Toggler({
@@ -25,6 +29,8 @@ export function Toggler({
     onClickTwo,
     firstBtnClassName,
     secondBtnClassName,
+    firstBtnLabel,
+    secondBtnLabel,
 }: TogglerProps) {
     const childrenArr = React.Children.toArray(children);
 
@@ -37,7 +43,9 @@ export function Toggler({
             )}
         >
             <button
+                type="button"
                 onClick={onClickOne}
+                aria-label={firstBtnLabel}
                 className={cn(
                     'flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full ml-[-2px]',
                     'bg-white shadow-sm dark:bg-transparent dark:shadow-none',
@@ -48,7 +56,9 @@ export function Toggler({
             </button>
 
             <button
+                type="button"
                 onClick={onClickTwo}
+                aria-label={secondBtnLabel}
                 className={cn(
                     'flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full mr-[-2px]',
                     'dark:bg-toggle-dark',
@@ -63,6 +73,7 @@ export function Toggler({
 
 export function ThemeToggle({ className }: IClassName) {
     const { toggleTheme, mounted } = useTheme();
+    const t = useTranslations('common.theme');
 
     // Prevent hydration mismatch
     if (!mounted) {
@@ -90,6 +101,8 @@ export function ThemeToggle({ className }: IClassName) {
             className={className}
             onClickOne={() => toggleTheme('light')}
             onClickTwo={() => toggleTheme('dark')}
+            firstBtnLabel={t('switchToLight')}
+            secondBtnLabel={t('switchToDark')}
         >
             <>
                 {/* Sun outline for dark mode */}

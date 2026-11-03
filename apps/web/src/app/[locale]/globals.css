@@ -32,7 +32,8 @@
 
     --color-text: #0f172a;
     --color-text-secondary: #475569;
-    --color-text-muted: #94a3b8;
+    /* #64748b: 4.6-4.8:1 on the light surfaces (WCAG AA); #94a3b8 was 2.5:1 (#533). */
+    --color-text-muted: #64748b;
 
     --color-border: #e2e8f0;
     --color-border-secondary: #cbd5e1;
@@ -41,6 +42,15 @@
     --color-warning: #f59e0b;
     --color-danger: #ef4444;
     --color-info: #3b82f6;
+
+    /* Text tones of the status colours. As text, the fills above are 1.6:1 (success),
+       3.3:1 (danger) and 2.0:1 (warning) on their own tints; these are 6.4:1, 5.5:1 and
+       4.7:1 (WCAG AA, #533).
+       `text-*` reads `--text-color-*` before `--color-*`, so `bg-` and `border-` keep
+       the fills. */
+    --text-color-success: #166534;
+    --text-color-danger: #b91c1c;
+    --text-color-warning: #b45309;
 
     /* Dark mode colors */
     --color-background-dark: #0f1419;
@@ -103,6 +113,15 @@
     --color-gitlab: #fc6d26;
     --color-bitbucket: #0052cc;
     --color-bitbucket-light: #4c9aff;
+}
+
+/* The darker light-mode text tones above would be too dark on the dark surfaces, where the
+   bright ones read well: dark mode keeps them. */
+.dark {
+    --color-text-muted: #94a3b8;
+    --text-color-success: var(--color-success);
+    --text-color-danger: var(--color-danger);
+    --text-color-warning: var(--color-warning);
 }
 
 /* Decorative card top-border accent — horizontal fade from transparent → white → transparent */
@@ -474,7 +493,9 @@ select:-webkit-autofill:focus {
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.604 0.208 261);
+    /* #2563eb (the `--color-primary` above): 5.2:1 as text on white and under white text;
+       oklch(0.604 0.208 261) was 4.0:1 (#533). */
+    --primary: #2563eb;
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
