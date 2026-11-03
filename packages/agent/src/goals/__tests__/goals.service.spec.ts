@@ -883,6 +883,49 @@ describe('GoalsService — the Goal’s Work (APW-08 T31)', () => {
         );
     });
 
+    // Review of #3061 — the edit is built on an unlocked read; the write re-reads the row (locked
+    // on Postgres / MySQL) so a loop start that committed in between is neither undone nor bypassed.
+    it('update: a loop started after the read refuses a Work change, and an edit never writes back stale loop columns', async () => {
+        const service = build();
+        goalsRepo._rows.push(
+            makeGoalRow({ id: 'g-race-work', loopStatus: 'paused' } as never),
+            makeGoalRow({ id: 'g-race-title', loopStatus: 'paused' } as never),
+        );
+        const startedAt = new Date('2026-11-03T00:00:00.000Z');
+        const committed = new Map(
+            goalsRepo._rows.map(
+                (row) =>
+                    [
+                        row.id as string,
+                        { ...row, loopStatus: 'running', loopStartedAt: startedAt },
+                    ] as [string, AnyRow],
+            ),
+        );
+        (goalsRepo as unknown as { manager: unknown }).manager = {
+            connection: { options: { type: 'postgres' } },
+            getRepository: () => ({
+                findOne: jest.fn(async (opts: { where: { id: string } }) =>
+                    committed.get(opts.where.id),
+                ),
+            }),
+        };
+        goalsRepo.save.mockClear();
+        await expect(service.update('u1', 'g-race-work', { workId: WORK })).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(goalsRepo.save).not.toHaveBeenCalled();
+
+        await service.update('u1', 'g-race-title', { title: 'Renamed' });
+        expect(goalsRepo.save).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                id: 'g-race-title',
+                title: 'Renamed',
+                loopStatus: 'running',
+                loopStartedAt: startedAt,
+            }),
+        );
+    });
+
     it('update: a change while the loop runs is 409 loopRunning; resending the same Work is not a change', async () => {
         const service = build();
         goalsRepo._rows.push(

@@ -135,6 +135,10 @@ export async function listMissionTasksOnWorksAction(
     const page = await tasksAPI.list({
         missionId,
         label: 'mission-task',
+        // Review of #3061 — every Task of this Mission the viewer may read, not only their own:
+        // an Organization member opening a shared Mission sees its Tasks too. The visibility
+        // predicate still applies, and a personal-scope Mission stays owner-only.
+        view: 'organization',
         // FR-55 — newest first; `updatedAt` (the default) would skip or repeat rows across pages
         // while agents keep updating the Tasks.
         orderBy: 'createdAt',

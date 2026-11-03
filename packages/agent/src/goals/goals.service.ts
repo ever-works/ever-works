@@ -114,6 +114,27 @@ export type GoalWithinCreate = (
     manager: EntityManager,
 ) => Promise<void>;
 
+/**
+ * Review of #3061 — the Goal columns the loop orchestrator owns (`saveGoalColumns` writes exactly
+ * these); a Goal edit never writes them back from a stale copy.
+ */
+const GOAL_LOOP_OWNED_COLUMNS = [
+    'loopStatus',
+    'loopStartedAt',
+    'iteration',
+    'spentCents',
+    'activeAgentId',
+    'archivedAt',
+] as const;
+
+/** FR-45 — a running loop keeps the Work it started on. */
+function goalLoopRunningConflict(): ConflictException {
+    return new ConflictException({
+        code: 'loopRunning',
+        message: "The Goal's Work can't change while its loop is running. Pause the loop first.",
+    });
+}
+
 @Injectable()
 export class GoalsService {
     private readonly logger = new Logger(GoalsService.name);
@@ -653,19 +674,15 @@ export class GoalsService {
             }
             if (input.constraints !== undefined) existing.constraints = input.constraints;
         }
+        let workChanged = false;
         if (input.workId !== undefined) {
             const next = input.workId ?? null;
             if (next !== (existing.workId ?? null)) {
                 // FR-45 — a running loop keeps the Work it started on: its iteration Tasks, its
                 // in-flight pull requests and the awaiting-merge count all point at it.
-                if (existing.loopStatus === 'running') {
-                    throw new ConflictException({
-                        code: 'loopRunning',
-                        message:
-                            "The Goal's Work can't change while its loop is running. Pause the loop first.",
-                    });
-                }
+                if (existing.loopStatus === 'running') throw goalLoopRunningConflict();
                 existing.workId = await this.resolveGoalWork(userId, next, scope);
+                workChanged = true;
             }
         }
         const statusBefore = existing.status;
@@ -689,19 +706,36 @@ export class GoalsService {
         );
         const statusChanged = existing.status !== statusBefore;
         const dto = toGoalDto(
-            await this.persist(existing, (publisher, manager, row) =>
-                publisher.changed(
-                    manager,
-                    'goal',
-                    row.id,
-                    statusChanged ? 'goal.status_changed' : 'goal.updated',
-                    {
-                        changedFields: statusChanged
-                            ? [...new Set([...changedFields, 'status'])]
-                            : changedFields,
-                        ...(statusChanged ? { previous: { status: statusBefore } } : {}),
-                    },
-                ),
+            await this.persist(
+                existing,
+                (publisher, manager, row) =>
+                    publisher.changed(
+                        manager,
+                        'goal',
+                        row.id,
+                        statusChanged ? 'goal.status_changed' : 'goal.updated',
+                        {
+                            changedFields: statusChanged
+                                ? [...new Set([...changedFields, 'status'])]
+                                : changedFields,
+                            ...(statusChanged ? { previous: { status: statusBefore } } : {}),
+                        },
+                    ),
+                // Review of #3061 — the edit was built on a row read without a lock; the loop's
+                // own columns are the orchestrator's, so they are taken from the row as it is NOW
+                // (locked on Postgres / MySQL), never written back stale, and a Work change is
+                // re-checked against that row: a loop that started meanwhile refuses it.
+                async (manager) => {
+                    const current = manager ? await this.reloadForUpdate(manager, existing) : null;
+                    if (!current) return;
+                    const target = existing as unknown as Record<string, unknown>;
+                    const committed = current as unknown as Record<string, unknown>;
+                    for (const column of GOAL_LOOP_OWNED_COLUMNS)
+                        target[column] = committed[column];
+                    if (workChanged && current.loopStatus === 'running') {
+                        throw goalLoopRunningConflict();
+                    }
+                },
             ),
         );
         // Review of #3061 — the answer names the Work, like the single-Goal read.
@@ -1045,10 +1079,17 @@ export class GoalsService {
             manager: EntityManager,
             row: Goal,
         ) => Promise<unknown>,
+        // Review of #3061 — runs just before the save, inside the write's transaction when there
+        // is one (`manager` undefined only for a repository without one, e.g. a unit-test fake).
+        beforeSave?: (manager: EntityManager | undefined) => Promise<void>,
     ): Promise<Goal> {
         const publisher = this.domainEvents;
-        if (!publisher) return this.goals.save(withoutAggregateVersion(goal));
+        if (!publisher) {
+            await beforeSave?.(this.goals.manager);
+            return this.goals.save(withoutAggregateVersion(goal));
+        }
         return publisher.transaction(async (manager) => {
+            await beforeSave?.(manager);
             const row = await manager.getRepository(Goal).save(withoutAggregateVersion(goal));
             await record(publisher, manager, row);
             return row;
