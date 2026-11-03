@@ -99,9 +99,9 @@ describe('AddEverConnect1797300000000', () => {
             `INSERT INTO "ever_connect_connection" ("id", "platformInstanceId") VALUES ('self', '01K6A7S2ABCDEFGHJKMNPQRSTV')`,
         );
         await run('up');
-        expect(await dataSource.query(`SELECT "id", "status" FROM "ever_connect_connection"`)).toEqual([
-            { id: 'self', status: 'disconnected' },
-        ]);
+        expect(
+            await dataSource.query(`SELECT "id", "status" FROM "ever_connect_connection"`),
+        ).toEqual([{ id: 'self', status: 'disconnected' }]);
     });
 
     it('down() removes the tables', async () => {
