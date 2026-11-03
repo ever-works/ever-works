@@ -114,19 +114,6 @@ export type GoalWithinCreate = (
     manager: EntityManager,
 ) => Promise<void>;
 
-/**
- * Review of #3061 — the Goal columns the loop orchestrator owns (`saveGoalColumns` writes exactly
- * these); a Goal edit never writes them back from a stale copy.
- */
-const GOAL_LOOP_OWNED_COLUMNS = [
-    'loopStatus',
-    'loopStartedAt',
-    'iteration',
-    'spentCents',
-    'activeAgentId',
-    'archivedAt',
-] as const;
-
 /** FR-45 — a running loop keeps the Work it started on. */
 function goalLoopRunningConflict(): ConflictException {
     return new ConflictException({
@@ -197,9 +184,17 @@ export class GoalsService {
      */
     private async withWorkName(dto: GoalDto, viewerUserId: string): Promise<GoalDto> {
         if (!dto.workId || !this.works) return { ...dto, workName: null };
-        const work = await this.works
-            .findOne({ where: { id: dto.workId }, select: ['id', 'name', 'userId'] })
-            .catch(() => null);
+        let work: Pick<Work, 'id' | 'name' | 'userId'> | null;
+        try {
+            work = await this.works.findOne({
+                where: { id: dto.workId },
+                select: ['id', 'name', 'userId'],
+            });
+        } catch {
+            // Review of #3061 — a failed read is not "no name": the answer leaves `workName` out,
+            // so the page keeps the name it shows instead of blanking it on a passing glitch.
+            return dto;
+        }
         return { ...dto, workName: work && work.userId === viewerUserId ? work.name : null };
     }
 
@@ -609,6 +604,9 @@ export class GoalsService {
         scope?: OwnershipScope,
     ): Promise<GoalDto> {
         const existing = await this.findOrThrow(userId, goalId, scope);
+        // Review of #3061 — what the edit read, so the write can tell the columns it changed
+        // from the ones it merely carried (see the save below).
+        const asRead = { ...existing } as unknown as Record<string, unknown>;
 
         if (isDeliveryGoal(existing)) {
             // The kind is immutable and a delivery Goal has no metric: any
@@ -721,17 +719,21 @@ export class GoalsService {
                             ...(statusChanged ? { previous: { status: statusBefore } } : {}),
                         },
                     ),
-                // Review of #3061 — the edit was built on a row read without a lock; the loop's
-                // own columns are the orchestrator's, so they are taken from the row as it is NOW
-                // (locked on Postgres / MySQL), never written back stale, and a Work change is
-                // re-checked against that row: a loop that started meanwhile refuses it.
+                // Review of #3061 — the edit was built on a row read without a lock. Inside the
+                // write's transaction the row is read again (locked on Postgres / MySQL), and every
+                // column this edit did NOT change is taken from that row, so a concurrent write —
+                // the loop orchestrator's (`loopStatus`, `iteration`, spend) or the evaluator's
+                // (`status`, `outcome`, `nextCheckAt`, `currentValue`, `resolvedScore`) — is never
+                // written back stale. A Work change is re-checked against that row: a loop that
+                // started meanwhile refuses it.
                 async (manager) => {
                     const current = manager ? await this.reloadForUpdate(manager, existing) : null;
-                    if (!current) return;
+                    if (!current || current === existing) return;
                     const target = existing as unknown as Record<string, unknown>;
                     const committed = current as unknown as Record<string, unknown>;
-                    for (const column of GOAL_LOOP_OWNED_COLUMNS)
-                        target[column] = committed[column];
+                    for (const column of Object.keys(committed)) {
+                        if (target[column] === asRead[column]) target[column] = committed[column];
+                    }
                     if (workChanged && current.loopStatus === 'running') {
                         throw goalLoopRunningConflict();
                     }
@@ -1085,7 +1087,16 @@ export class GoalsService {
     ): Promise<Goal> {
         const publisher = this.domainEvents;
         if (!publisher) {
-            await beforeSave?.(this.goals.manager);
+            // Review of #3061 — `beforeSave` re-reads the row `FOR UPDATE`, which Postgres only
+            // allows inside a transaction: open one, as `recordExternalSample` does.
+            const manager = this.goals.manager;
+            if (beforeSave && manager) {
+                return manager.transaction(async (tx) => {
+                    await beforeSave(tx);
+                    return tx.getRepository(Goal).save(withoutAggregateVersion(goal));
+                });
+            }
+            await beforeSave?.(undefined);
             return this.goals.save(withoutAggregateVersion(goal));
         }
         return publisher.transaction(async (manager) => {
