@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RemoveDomainDialog } from './RemoveDomainDialog';
 
 interface DomainManagementProps {
     work: Work;
@@ -44,6 +45,13 @@ function DomainManagementContent({ work }: DomainManagementProps) {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [newDomain, setNewDomain] = useState('');
     const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+    // EW-611 — the domain awaiting confirmation in `RemoveDomainDialog`.
+    // `null` closes the dialog; a hostname opens it for that row.
+    const [domainPendingRemoval, setDomainPendingRemoval] = useState<string | null>(null);
+    // Tracked separately from `isPending`: `useTransition` is shared with add
+    // and verify, so it cannot tell the dialog whether *this* removal is the
+    // request in flight.
+    const [isRemoving, setIsRemoving] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -90,15 +98,27 @@ function DomainManagementContent({ work }: DomainManagementProps) {
         });
     };
 
-    const handleRemoveDomain = (domain: string) => {
+    // EW-611 — removal is confirmed in a dialog first (it patches provider
+    // DNS/ingress and drops the `WorkCustomDomain` row), so the trash icon
+    // only arms the dialog and this runs on confirm.
+    const handleConfirmRemoveDomain = () => {
+        const domain = domainPendingRemoval;
+        if (!domain || isRemoving) return;
+
+        setIsRemoving(true);
         startTransition(async () => {
-            const result = await removeDomainAction(work.id, domain);
-            if (result.success) {
-                setDomains((prev) => (prev ?? []).filter((d) => d.name !== domain));
-                toast.success(t('removed'));
-                router.refresh();
-            } else {
-                toast.error(result.error || t('removeFailed'));
+            try {
+                const result = await removeDomainAction(work.id, domain);
+                if (result.success) {
+                    setDomains((prev) => (prev ?? []).filter((d) => d.name !== domain));
+                    setDomainPendingRemoval(null);
+                    toast.success(t('removed'));
+                    router.refresh();
+                } else {
+                    toast.error(result.error || t('removeFailed'));
+                }
+            } finally {
+                setIsRemoving(false);
             }
         });
     };
@@ -269,10 +289,14 @@ function DomainManagementContent({ work }: DomainManagementProps) {
                                                 )}
                                             {!isVercelAutoAssigned(domain.name) && (
                                                 <button
-                                                    onClick={() => handleRemoveDomain(domain.name)}
+                                                    onClick={() =>
+                                                        setDomainPendingRemoval(domain.name)
+                                                    }
                                                     disabled={isPending}
                                                     className="p-1.5 rounded-md text-text-secondary dark:text-text-secondary-dark hover:text-error dark:hover:text-error-dark hover:bg-error/10 dark:hover:bg-error-dark/10 transition-colors"
                                                     title={t('removeButton')}
+                                                    aria-label={t('removeButton')}
+                                                    data-testid={`remove-domain-${domain.name}`}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -343,6 +367,13 @@ function DomainManagementContent({ work }: DomainManagementProps) {
                     )}
                 </div>
             </div>
+
+            <RemoveDomainDialog
+                domain={domainPendingRemoval}
+                isRemoving={isRemoving}
+                onCancel={() => setDomainPendingRemoval(null)}
+                onConfirm={handleConfirmRemoveDomain}
+            />
         </div>
     );
 }

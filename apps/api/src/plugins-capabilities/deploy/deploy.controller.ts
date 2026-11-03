@@ -882,18 +882,38 @@ export class DeployController {
             });
         }
 
+        let removed: boolean;
         try {
-            const removed = await this.deployFacade.removeDomain(domain, {
+            removed = await this.deployFacade.removeDomain(domain, {
                 userId: isCreator ? auth.userId : work.user.id,
                 workId: id,
             });
-            return { status: 'success', removed };
         } catch {
             throw new BadRequestException({
                 status: 'error',
                 message: 'Failed to remove domain',
             });
         }
+
+        // EW-611 — detaching a domain rewrites DNS/ingress and can take a site
+        // offline, so it belongs in the audit trail next to `work.deployed`
+        // and `work.managed-subdomain.updated`. `removed:false` (the row was
+        // already gone) is recorded too: the audit trail should show that
+        // somebody asked, not only that something changed. Fire-and-forget
+        // like its siblings so a logging outage never fails the request.
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'work.custom-domain.removed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Removed custom domain ${domain} from ${work.name}`,
+                details: { domain, removed },
+            })
+            .catch(() => {});
+
+        return { status: 'success', removed };
     }
 
     /**

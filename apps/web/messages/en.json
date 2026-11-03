@@ -5922,7 +5922,14 @@
                     "dnsTitle": "Configure these DNS records:",
                     "dnsName": "Name:",
                     "dnsValue": "Value:",
-                    "copyButton": "Copy"
+                    "copyButton": "Copy",
+                    "removeDialog": {
+                        "title": "Remove {domain}?",
+                        "description": "This detaches the domain from your deployment and deletes it from this Work.",
+                        "hint": "Visitors using this domain will stop reaching your site once DNS changes propagate. You can add it back at any time.",
+                        "cancel": "Cancel",
+                        "confirm": "Remove domain"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

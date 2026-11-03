@@ -834,13 +834,72 @@ export class DeployFacadeService implements IDeployFacade {
     }
 
     /**
+     * Resolve the deploy plugin + token for an operation that must still
+     * succeed when the provider is unreachable.
+     *
+     * EW-611 — `resolvePluginAndTokenWithWork` throws when the Work has no
+     * `deployProvider`, when the provider plugin is not registered/loaded, or
+     * when the user has no credentials for it. Those are all *expected*
+     * states for a stale domain row left behind by a provider the Work has
+     * since moved off, so removal must degrade to a local cleanup instead of
+     * failing. Returns `null` on any of those, never throws.
+     */
+    private async tryResolvePluginAndToken(options: DeployFacadeOptions): Promise<{
+        plugin: IDeploymentPlugin;
+        token: string;
+    } | null> {
+        try {
+            const { plugin, token } = await this.resolvePluginAndTokenWithWork(options);
+            return { plugin, token };
+        } catch (error) {
+            this.logger.warn(
+                `Deploy provider is not usable for work ${options.workId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
      * Remove a domain from a deployed work.
-     * Removes from provider first, then from DB.
+     *
+     * The `WorkCustomDomain` row is the source of truth the dashboard renders,
+     * so deleting it is the operation the user actually asked for. Detaching
+     * the domain at the deploy provider is a best-effort courtesy on top of
+     * that, and it is skipped entirely when the row belongs to a provider the
+     * Work no longer deploys to.
+     *
+     * EW-611 — the motivating case is a Work that moved from `vercel` to
+     * `k8s`: the `*.vercel.app` / custom-domain rows created by the Vercel
+     * plugin are stale, the Vercel token may be gone, and the k8s Ingress
+     * never had those hosts. Round-tripping to a disconnected provider (or,
+     * worse, asking the *new* provider to detach a host it does not know)
+     * only produces errors, so:
+     *
+     * - the plugin/token resolution is non-fatal (`tryResolvePluginAndToken`);
+     * - `plugin.removeDomain` runs only when the row's `provider` matches the
+     *   currently-resolved plugin — a mismatch means the row is stale;
+     * - a provider failure is logged and swallowed (the domain may already be
+     *   gone provider-side, which is exactly the idempotent case);
+     * - the DB delete always runs, and its result is what we return.
+     *
+     * Returns `true` when a row was deleted, `false` when there was nothing
+     * left to delete (already-removed domains are therefore a no-op success
+     * for callers, not an error).
      */
     async removeDomain(domain: string, options: DeployFacadeOptions): Promise<boolean> {
-        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
+        const work = await this.workRepository.findById(options.workId);
+        if (!work) {
+            throw new DeployFacadeError(`Work not found: ${options.workId}`, 'removeDomain');
+        }
+
+        const resolved = await this.tryResolvePluginAndToken(options);
         let deploymentContext: EffectiveDeploymentOperationContext | undefined;
-        const getDeploymentContext = async (): Promise<EffectiveDeploymentOperationContext> => {
+        const getDeploymentContext = async (
+            plugin: IDeploymentPlugin,
+            token: string,
+        ): Promise<EffectiveDeploymentOperationContext> => {
             deploymentContext ??= await this.resolveDeploymentLookupContext(
                 plugin,
                 token,
@@ -850,29 +909,39 @@ export class DeployFacadeService implements IDeployFacade {
             return deploymentContext;
         };
 
-        // If provider supports removal and domain is synced, remove from provider
+        // Detach at the provider only when the row belongs to the provider we
+        // can actually talk to right now.
         const dbRecord = await this.domainRepository.findOne(options.workId, domain);
-        if (dbRecord?.provider && plugin.removeDomain) {
-            try {
-                const effective = await getDeploymentContext();
-                const projectId = await this.resolveProjectId(
-                    plugin,
-                    token,
-                    work,
-                    options,
-                    effective,
+        if (resolved && dbRecord?.provider && resolved.plugin.removeDomain) {
+            const { plugin, token } = resolved;
+            if (dbRecord.provider !== plugin.id) {
+                this.logger.log(
+                    `Skipping provider detach for "${domain}" on work ${options.workId}: ` +
+                        `row was created by "${dbRecord.provider}" but the work now deploys to ` +
+                        `"${plugin.id}". Removing the stale record locally.`,
                 );
-                await plugin.removeDomain(
-                    projectId,
-                    domain,
-                    effective.token,
-                    effective.teamScope,
-                    effective.context,
-                );
-            } catch (error) {
-                this.logger.warn(
-                    `Failed to remove domain from provider, removing from DB anyway: ${error}`,
-                );
+            } else {
+                try {
+                    const effective = await getDeploymentContext(plugin, token);
+                    const projectId = await this.resolveProjectId(
+                        plugin,
+                        token,
+                        work,
+                        options,
+                        effective,
+                    );
+                    await plugin.removeDomain(
+                        projectId,
+                        domain,
+                        effective.token,
+                        effective.teamScope,
+                        effective.context,
+                    );
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to remove domain from provider, removing from DB anyway: ${error}`,
+                    );
+                }
             }
         }
 
@@ -880,10 +949,11 @@ export class DeployFacadeService implements IDeployFacade {
         const removed = await this.domainRepository.removeDomain(options.workId, domain);
 
         // If the removed domain was the current website URL, re-lookup to update
-        if (removed && work.website === `https://${domain}`) {
+        if (removed && resolved && work.website === `https://${domain}`) {
+            const { plugin, token } = resolved;
             try {
                 if (plugin.lookupExistingDeployment) {
-                    const lookupContext = await getDeploymentContext();
+                    const lookupContext = await getDeploymentContext(plugin, token);
                     const lookup = await plugin.lookupExistingDeployment(
                         work.getWebsiteRepo(),
                         lookupContext.token,

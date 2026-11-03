@@ -5700,7 +5700,14 @@
                     "dnsTitle": "הגדר רשומות DNS אלו:",
                     "dnsName": "שם:",
                     "dnsValue": "ערך:",
-                    "copyButton": "העתק"
+                    "copyButton": "העתק",
+                    "removeDialog": {
+                        "title": "להסיר את {domain}?",
+                        "description": "הפעולה מנתקת את הדומיין מהפריסה שלך ומוחקת אותו מעבודה זו.",
+                        "hint": "מבקרים שמשתמשים בדומיין הזה יפסיקו להגיע לאתר שלך לאחר שהשינויים ב-DNS יתעדכנו. אפשר להוסיף אותו מחדש בכל עת.",
+                        "cancel": "ביטול",
+                        "confirm": "הסר דומיין"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

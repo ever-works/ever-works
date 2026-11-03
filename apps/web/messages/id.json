@@ -5632,7 +5632,14 @@
                     "dnsTitle": "Konfigurasi catatan DNS ini:",
                     "dnsName": "Nama:",
                     "dnsValue": "Nilai:",
-                    "copyButton": "Salin"
+                    "copyButton": "Salin",
+                    "removeDialog": {
+                        "title": "Hapus {domain}?",
+                        "description": "Ini melepaskan domain dari deployment Anda dan menghapusnya dari Work ini.",
+                        "hint": "Pengunjung yang memakai domain ini tidak akan lagi mencapai situs Anda setelah perubahan DNS tersebar. Anda dapat menambahkannya kembali kapan saja.",
+                        "cancel": "Batal",
+                        "confirm": "Hapus domain"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

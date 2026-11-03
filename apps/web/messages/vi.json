@@ -5632,7 +5632,14 @@
                     "dnsTitle": "Cấu hình các bản ghi DNS này:",
                     "dnsName": "Tên:",
                     "dnsValue": "Giá trị:",
-                    "copyButton": "Sao chép"
+                    "copyButton": "Sao chép",
+                    "removeDialog": {
+                        "title": "Xóa {domain}?",
+                        "description": "Thao tác này gỡ tên miền khỏi bản triển khai và xóa nó khỏi Work này.",
+                        "hint": "Khách truy cập dùng tên miền này sẽ không còn vào được trang của bạn sau khi thay đổi DNS lan truyền. Bạn có thể thêm lại bất cứ lúc nào.",
+                        "cancel": "Hủy",
+                        "confirm": "Xóa tên miền"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

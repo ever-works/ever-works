@@ -1154,4 +1154,168 @@ describe('DeployFacadeService', () => {
             expect(resolved.token).toBe(PLATFORM_MANAGED_KUBECONFIG_SENTINEL);
         });
     });
+    /**
+     * EW-611 — removing a custom domain must keep working after the Work has
+     * switched deploy providers. At that point the rows written by the old
+     * provider are stale: the old plugin may not be registered any more, its
+     * credentials may be gone, and the *new* provider has never heard of the
+     * hostname. The DB delete is the operation the user asked for, so it must
+     * survive every one of those states.
+     */
+    describe('EW-611 — removeDomain tolerates a disconnected / switched provider', () => {
+        const options = { userId: 'user-1', workId: 'work-1' };
+
+        it('deletes the stale row when the old provider plugin is no longer registered', async () => {
+            const removeDomain = jest.fn().mockResolvedValue(true);
+            const { service } = createService({
+                // The Work still points at Vercel, but only the k8s plugin is
+                // registered — `registry.get('vercel')` misses.
+                deployProvider: 'vercel',
+                pluginId: 'k8s',
+                domainRepository: {
+                    findOne: jest.fn().mockResolvedValue({ provider: 'vercel' }),
+                    removeDomain,
+                },
+            });
+
+            await expect(service.removeDomain('stale.example.com', options)).resolves.toBe(true);
+            expect(removeDomain).toHaveBeenCalledWith('work-1', 'stale.example.com');
+        });
+
+        it('deletes the stale row when the provider has no credentials configured', async () => {
+            const removeDomain = jest.fn().mockResolvedValue(true);
+            const { service, plugin } = createService({
+                deployProvider: 'vercel',
+                pluginId: 'vercel',
+                // No apiToken/kubeconfig/token/accessToken -> NoDeployCredentialsError.
+                settings: {},
+                pluginOverrides: { removeDomain: jest.fn().mockResolvedValue(true) },
+                domainRepository: {
+                    findOne: jest.fn().mockResolvedValue({ provider: 'vercel' }),
+                    removeDomain,
+                },
+            });
+
+            await expect(service.removeDomain('stale.example.com', options)).resolves.toBe(true);
+            expect(removeDomain).toHaveBeenCalledWith('work-1', 'stale.example.com');
+            expect((plugin as any).removeDomain).not.toHaveBeenCalled();
+        });
+
+        it('never asks the new provider to detach a host created by the old one', async () => {
+            const removeDomain = jest.fn().mockResolvedValue(true);
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                pluginOverrides: { removeDomain: jest.fn().mockResolvedValue(true) },
+                domainRepository: {
+                    // Row was written while the Work still deployed to Vercel.
+                    findOne: jest.fn().mockResolvedValue({ provider: 'vercel' }),
+                    removeDomain,
+                },
+            });
+
+            await expect(service.removeDomain('stale.example.com', options)).resolves.toBe(true);
+            expect((plugin as any).removeDomain).not.toHaveBeenCalled();
+            expect(removeDomain).toHaveBeenCalledWith('work-1', 'stale.example.com');
+        });
+
+        it('still deletes the row when the provider says the domain is already gone', async () => {
+            const removeDomain = jest.fn().mockResolvedValue(true);
+            const providerRemove = jest
+                .fn()
+                .mockRejectedValue(new Error('404 domain not found on project'));
+            const { service } = createService({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                // Cached project id so provider resolution reaches the detach
+                // call rather than short-circuiting on the lookup.
+                work: { deployProjectId: 'project-1' },
+                pluginOverrides: { removeDomain: providerRemove },
+                domainRepository: {
+                    findOne: jest.fn().mockResolvedValue({ provider: 'k8s' }),
+                    removeDomain,
+                },
+            });
+
+            await expect(service.removeDomain('gone.example.com', options)).resolves.toBe(true);
+            expect(providerRemove).toHaveBeenCalled();
+            expect(removeDomain).toHaveBeenCalledWith('work-1', 'gone.example.com');
+        });
+
+        it('still deletes the row when the provider project can no longer be resolved', async () => {
+            const removeDomain = jest.fn().mockResolvedValue(true);
+            const providerRemove = jest.fn().mockResolvedValue(true);
+            const { service } = createService({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                // No cached `deployProjectId` and the lookup finds nothing, so
+                // `resolveProjectId` throws — the project is gone provider-side.
+                pluginOverrides: {
+                    removeDomain: providerRemove,
+                    lookupExistingDeployment: jest.fn().mockResolvedValue({ found: false }),
+                },
+                domainRepository: {
+                    findOne: jest.fn().mockResolvedValue({ provider: 'k8s' }),
+                    removeDomain,
+                },
+            });
+
+            await expect(service.removeDomain('gone.example.com', options)).resolves.toBe(true);
+            expect(providerRemove).not.toHaveBeenCalled();
+            expect(removeDomain).toHaveBeenCalledWith('work-1', 'gone.example.com');
+        });
+
+        it('reports false without contacting the provider when there is no row to delete', async () => {
+            const removeDomain = jest.fn().mockResolvedValue(false);
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                pluginOverrides: { removeDomain: jest.fn().mockResolvedValue(true) },
+                domainRepository: {
+                    findOne: jest.fn().mockResolvedValue(null),
+                    removeDomain,
+                },
+            });
+
+            await expect(service.removeDomain('never-added.example.com', options)).resolves.toBe(
+                false,
+            );
+            expect((plugin as any).removeDomain).not.toHaveBeenCalled();
+        });
+
+        it('skips the website re-lookup when the provider is unreachable', async () => {
+            const { service, plugin, workRepository } = createService({
+                deployProvider: 'vercel',
+                pluginId: 'k8s',
+                work: { website: 'https://stale.example.com' },
+                domainRepository: {
+                    findOne: jest.fn().mockResolvedValue({ provider: 'vercel' }),
+                    removeDomain: jest.fn().mockResolvedValue(true),
+                },
+            });
+
+            await expect(service.removeDomain('stale.example.com', options)).resolves.toBe(true);
+            expect(plugin.lookupExistingDeployment).not.toHaveBeenCalled();
+            // The stale website URL is left alone rather than blanked: the
+            // domain endpoints gate on `work.website`, so clearing it would
+            // lock the user out of removing the remaining stale rows.
+            expect(workRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('still fails loudly when the Work itself does not exist', async () => {
+            const { service, workRepository } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+            });
+            workRepository.findById.mockResolvedValue(null);
+
+            await expect(service.removeDomain('example.com', options)).rejects.toThrow(
+                'Work not found: work-1',
+            );
+        });
+    });
 });

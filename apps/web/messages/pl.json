@@ -5632,7 +5632,14 @@
                     "dnsTitle": "Skonfiguruj te rekordy DNS:",
                     "dnsName": "Nazwa:",
                     "dnsValue": "Wartość:",
-                    "copyButton": "Kopiuj"
+                    "copyButton": "Kopiuj",
+                    "removeDialog": {
+                        "title": "Usunąć {domain}?",
+                        "description": "Spowoduje to odłączenie domeny od wdrożenia i usunięcie jej z tej pracy.",
+                        "hint": "Po rozpropagowaniu zmian DNS odwiedzający korzystający z tej domeny przestaną docierać do Twojej witryny. Możesz ją dodać ponownie w dowolnym momencie.",
+                        "cancel": "Anuluj",
+                        "confirm": "Usuń domenę"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

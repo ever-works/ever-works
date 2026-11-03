@@ -1485,6 +1485,87 @@ describe('DeployController', () => {
                 response: { message: 'Failed to remove domain' },
             });
         });
+
+        // EW-611 — detaching a domain rewrites provider DNS/ingress and can
+        // take a hostname offline, so it must land in the audit trail next to
+        // `work.deployed` / `work.managed-subdomain.updated`.
+        it('writes a work.custom-domain.removed activity log entry on success', async () => {
+            const work = buildWork({ user: { id: 'caller-1' } });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+            deployFacade.removeDomain.mockResolvedValue(true);
+
+            await controller.removeDomain(auth, 'work-1', 'example.com');
+
+            expect(activityLogService.log).toHaveBeenCalledWith({
+                userId: 'caller-1',
+                workId: 'work-1',
+                actionType: 'deployment',
+                action: 'work.custom-domain.removed',
+                status: 'completed',
+                summary: 'Removed custom domain example.com from My Site',
+                details: { domain: 'example.com', removed: true },
+            });
+        });
+
+        // The activity-log `userId` is ALWAYS the caller, even when the facade
+        // call runs against the owner's credentials — mirrors `deploy`.
+        it('logs the caller (not the owner) when a shared collaborator removes a domain', async () => {
+            const work = buildWork({ user: { id: 'owner-1' } });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: false });
+            deployFacade.removeDomain.mockResolvedValue(true);
+
+            await controller.removeDomain(auth, 'work-1', 'example.com');
+
+            expect(deployFacade.removeDomain).toHaveBeenCalledWith('example.com', {
+                userId: 'owner-1',
+                workId: 'work-1',
+            });
+            expect(activityLogService.log).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 'caller-1' }),
+            );
+        });
+
+        // Idempotent removal: the row was already gone, the request still
+        // succeeded, and the audit trail records that somebody asked.
+        it('records removed:false when the domain row was already gone', async () => {
+            const work = buildWork({ user: { id: 'caller-1' } });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+            deployFacade.removeDomain.mockResolvedValue(false);
+
+            const result = await controller.removeDomain(auth, 'work-1', 'example.com');
+
+            expect(result).toEqual({ status: 'success', removed: false });
+            expect(activityLogService.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'work.custom-domain.removed',
+                    details: { domain: 'example.com', removed: false },
+                }),
+            );
+        });
+
+        it('does not log when the facade rejects', async () => {
+            const work = buildWork({ user: { id: 'caller-1' } });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+            deployFacade.removeDomain.mockRejectedValue(new Error('boom'));
+
+            await expect(controller.removeDomain(auth, 'work-1', 'example.com')).rejects.toThrow(
+                BadRequestException,
+            );
+
+            expect(activityLogService.log).not.toHaveBeenCalled();
+        });
+
+        // Fire-and-forget: a logging outage must not fail the removal.
+        it('still resolves when the activity log rejects', async () => {
+            const work = buildWork({ user: { id: 'caller-1' } });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+            deployFacade.removeDomain.mockResolvedValue(true);
+            activityLogService.log.mockRejectedValue(new Error('log down'));
+
+            await expect(
+                controller.removeDomain(auth, 'work-1', 'example.com'),
+            ).resolves.toEqual({ status: 'success', removed: true });
+        });
     });
 
     describe('verifyDomain', () => {

@@ -5632,7 +5632,14 @@
                     "dnsTitle": "Configura questi record DNS:",
                     "dnsName": "Nome:",
                     "dnsValue": "Valore:",
-                    "copyButton": "Copia"
+                    "copyButton": "Copia",
+                    "removeDialog": {
+                        "title": "Rimuovere {domain}?",
+                        "description": "Il dominio verrà scollegato dal deployment ed eliminato da questo lavoro.",
+                        "hint": "I visitatori che usano questo dominio non raggiungeranno più il tuo sito una volta propagate le modifiche DNS. Puoi aggiungerlo di nuovo in qualsiasi momento.",
+                        "cancel": "Annulla",
+                        "confirm": "Rimuovi dominio"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

@@ -5632,7 +5632,14 @@
                     "dnsTitle": "Configureer deze DNS-records:",
                     "dnsName": "Naam:",
                     "dnsValue": "Waarde:",
-                    "copyButton": "Kopiëren"
+                    "copyButton": "Kopiëren",
+                    "removeDialog": {
+                        "title": "{domain} verwijderen?",
+                        "description": "Hiermee wordt het domein losgekoppeld van je deployment en uit dit werk verwijderd.",
+                        "hint": "Bezoekers die dit domein gebruiken bereiken je site niet meer zodra de DNS-wijzigingen zijn doorgevoerd. Je kunt het altijd opnieuw toevoegen.",
+                        "cancel": "Annuleren",
+                        "confirm": "Domein verwijderen"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

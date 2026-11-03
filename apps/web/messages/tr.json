@@ -5632,7 +5632,14 @@
                     "dnsTitle": "Bu DNS kayıtlarını yapılandırın:",
                     "dnsName": "Ad:",
                     "dnsValue": "Değer:",
-                    "copyButton": "Kopyala"
+                    "copyButton": "Kopyala",
+                    "removeDialog": {
+                        "title": "{domain} kaldırılsın mı?",
+                        "description": "Bu işlem alan adını dağıtımınızdan ayırır ve bu çalışmadan siler.",
+                        "hint": "DNS değişiklikleri yayıldıktan sonra bu alan adını kullanan ziyaretçiler sitenize ulaşamaz. İstediğiniz zaman yeniden ekleyebilirsiniz.",
+                        "cancel": "İptal",
+                        "confirm": "Alan adını kaldır"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

@@ -5700,7 +5700,14 @@
                     "dnsTitle": "Diese DNS-Einträge konfigurieren:",
                     "dnsName": "Name:",
                     "dnsValue": "Wert:",
-                    "copyButton": "Kopieren"
+                    "copyButton": "Kopieren",
+                    "removeDialog": {
+                        "title": "{domain} entfernen?",
+                        "description": "Damit wird die Domain von deinem Deployment getrennt und aus dieser Arbeit gelöscht.",
+                        "hint": "Besucher dieser Domain erreichen deine Website nicht mehr, sobald die DNS-Änderungen übernommen wurden. Du kannst sie jederzeit wieder hinzufügen.",
+                        "cancel": "Abbrechen",
+                        "confirm": "Domain entfernen"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

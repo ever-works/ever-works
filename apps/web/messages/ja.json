@@ -5632,7 +5632,14 @@
                     "dnsTitle": "以下のDNSレコードを設定：",
                     "dnsName": "名前：",
                     "dnsValue": "値：",
-                    "copyButton": "コピー"
+                    "copyButton": "コピー",
+                    "removeDialog": {
+                        "title": "{domain} を削除しますか？",
+                        "description": "デプロイからドメインを切り離し、この Work から削除します。",
+                        "hint": "DNS の変更が反映されると、このドメインからサイトにアクセスできなくなります。いつでも再度追加できます。",
+                        "cancel": "キャンセル",
+                        "confirm": "ドメインを削除"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

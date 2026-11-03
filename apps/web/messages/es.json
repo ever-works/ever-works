@@ -5700,7 +5700,14 @@
                     "dnsTitle": "Configura estos registros DNS:",
                     "dnsName": "Nombre:",
                     "dnsValue": "Valor:",
-                    "copyButton": "Copiar"
+                    "copyButton": "Copiar",
+                    "removeDialog": {
+                        "title": "¿Eliminar {domain}?",
+                        "description": "Esto desvincula el dominio de tu despliegue y lo elimina de este trabajo.",
+                        "hint": "Los visitantes que usen este dominio dejarán de llegar a tu sitio cuando se propaguen los cambios de DNS. Puedes volver a añadirlo en cualquier momento.",
+                        "cancel": "Cancelar",
+                        "confirm": "Eliminar dominio"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

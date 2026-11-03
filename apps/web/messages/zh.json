@@ -5632,7 +5632,14 @@
                     "dnsTitle": "配置这些 DNS 记录：",
                     "dnsName": "名称：",
                     "dnsValue": "值：",
-                    "copyButton": "复制"
+                    "copyButton": "复制",
+                    "removeDialog": {
+                        "title": "确定移除 {domain}？",
+                        "description": "此操作会将该域名从部署中解绑，并从当前 Work 中删除。",
+                        "hint": "DNS 变更生效后，使用该域名的访问者将无法再访问你的站点。你可以随时重新添加。",
+                        "cancel": "取消",
+                        "confirm": "移除域名"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",

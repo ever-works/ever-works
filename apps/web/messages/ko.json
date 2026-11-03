@@ -5632,7 +5632,14 @@
                     "dnsTitle": "이 DNS 레코드 구성:",
                     "dnsName": "이름:",
                     "dnsValue": "값:",
-                    "copyButton": "복사"
+                    "copyButton": "복사",
+                    "removeDialog": {
+                        "title": "{domain}을(를) 제거할까요?",
+                        "description": "배포에서 도메인 연결을 해제하고 이 Work에서 삭제합니다.",
+                        "hint": "DNS 변경이 전파되면 이 도메인으로 접속하는 방문자는 사이트에 도달할 수 없습니다. 언제든지 다시 추가할 수 있습니다.",
+                        "cancel": "취소",
+                        "confirm": "도메인 제거"
+                    }
                 },
                 "subdomain": {
                     "title": "Site URL / Subdomain",
