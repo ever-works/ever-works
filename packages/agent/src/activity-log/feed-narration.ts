@@ -117,6 +117,7 @@ export const FEED_NARRATORS: Readonly<Record<string, NarratorEntry>> = {
         params: { count: detailsCount('ideasCreated') },
     },
     [ActivityActionType.MISSION_TICK_CAPPED]: { key: 'missionTickCapped' },
+    [ActivityActionType.MISSION_NOTHING_TO_FILE]: { key: 'missionNothingToFile' },
 
     // Tasks
     [ActivityActionType.TASK_CREATED]: {

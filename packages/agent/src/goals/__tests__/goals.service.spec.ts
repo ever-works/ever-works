@@ -869,11 +869,111 @@ describe('GoalsService — the Goal’s Work (APW-08 T31)', () => {
     it('update: sets, changes and clears the Work while the loop is not running', async () => {
         const service = build();
         goalsRepo._rows.push(makeGoalRow({ id: 'g-paused', loopStatus: 'paused' } as never));
-        expect((await service.update('u1', 'g-paused', { workId: WORK })).workId).toBe(WORK);
-        expect((await service.update('u1', 'g-paused', { workId: null })).workId).toBeNull();
+        // Review of #3061 — the update answer names the Work, so the page's link keeps its name.
+        expect(await service.update('u1', 'g-paused', { workId: WORK })).toMatchObject({
+            workId: WORK,
+            workName: 'Bookings',
+        });
+        expect(await service.update('u1', 'g-paused', { workId: null })).toMatchObject({
+            workId: null,
+            workName: null,
+        });
         await expect(service.update('u1', 'g-paused', { workId: OTHER })).rejects.toBeInstanceOf(
             NotFoundException,
         );
+    });
+
+    // Review of #3061 — the edit is built on an unlocked read; the write re-reads the row in a
+    // transaction (locked on Postgres / MySQL) and takes every column the edit did not change from
+    // it, so neither a loop start nor an evaluation that committed in between is undone.
+    describe('update against concurrent writes', () => {
+        const startedAt = new Date('2026-11-03T00:00:00.000Z');
+        let committed: Map<string, AnyRow>;
+        let txRepo: { findOne: jest.Mock; save: jest.Mock };
+        let transaction: jest.Mock;
+
+        beforeEach(() => {
+            goalsRepo._rows.push(
+                makeGoalRow({ id: 'g-race-work', loopStatus: 'paused' } as never),
+                makeGoalRow({ id: 'g-race-title', loopStatus: 'paused' } as never),
+            );
+            // What committed after the edit read the rows: a loop start and an evaluation.
+            committed = new Map(
+                goalsRepo._rows.map(
+                    (row) =>
+                        [
+                            row.id as string,
+                            {
+                                ...row,
+                                loopStatus: 'running',
+                                loopStartedAt: startedAt,
+                                status: GoalStatus.COMPLETED,
+                                outcome: GoalOutcome.ACHIEVED,
+                                nextCheckAt: null,
+                                currentValue: 1200,
+                            },
+                        ] as [string, AnyRow],
+                ),
+            );
+            txRepo = {
+                findOne: jest.fn(async (opts: { where: { id: string } }) =>
+                    committed.get(opts.where.id),
+                ),
+                save: jest.fn(async (entity: AnyRow) => entity),
+            };
+            const tx = {
+                connection: { options: { type: 'postgres' } },
+                getRepository: () => txRepo,
+            };
+            transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work(tx));
+            (goalsRepo as unknown as { manager: unknown }).manager = { transaction };
+        });
+
+        it('re-reads the row FOR UPDATE inside a transaction, even without a domain-event publisher', async () => {
+            await build().update('u1', 'g-race-title', { title: 'Renamed' });
+            expect(transaction).toHaveBeenCalledTimes(1);
+            expect(txRepo.findOne).toHaveBeenCalledWith(
+                expect.objectContaining({ lock: { mode: 'pessimistic_write' } }),
+            );
+            expect(txRepo.save).toHaveBeenCalledTimes(1);
+            expect(goalsRepo.save).not.toHaveBeenCalled();
+        });
+
+        it('a loop started after the read refuses a Work change', async () => {
+            await expect(
+                build().update('u1', 'g-race-work', { workId: WORK }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(txRepo.save).not.toHaveBeenCalled();
+        });
+
+        it('writes only what the edit changed: the loop’s and the evaluator’s columns stay as committed', async () => {
+            await build().update('u1', 'g-race-title', { title: 'Renamed' });
+            expect(txRepo.save).toHaveBeenLastCalledWith(
+                expect.objectContaining({
+                    id: 'g-race-title',
+                    title: 'Renamed',
+                    loopStatus: 'running',
+                    loopStartedAt: startedAt,
+                    status: GoalStatus.COMPLETED,
+                    outcome: GoalOutcome.ACHIEVED,
+                    nextCheckAt: null,
+                    currentValue: 1200,
+                }),
+            );
+        });
+    });
+
+    // Review of #3061 — a failed Work read is not "no name": the answer leaves `workName` out.
+    it('a failed Work read leaves workName out of the answer; a Work that is gone answers null', async () => {
+        goalsRepo._rows.push(makeGoalRow({ id: 'g-name', loopStatus: 'paused' } as never));
+        const service = build();
+        await service.update('u1', 'g-name', { workId: WORK });
+        worksRepo.findOne.mockRejectedValueOnce(new Error('db down'));
+        const glitch = await service.update('u1', 'g-name', { title: 'Renamed' });
+        expect(glitch).not.toHaveProperty('workName');
+        worksRepo.findOne.mockResolvedValueOnce(null);
+        const gone = await service.update('u1', 'g-name', { title: 'Renamed again' });
+        expect(gone).toMatchObject({ workName: null });
     });
 
     it('update: a change while the loop runs is 409 loopRunning; resending the same Work is not a change', async () => {

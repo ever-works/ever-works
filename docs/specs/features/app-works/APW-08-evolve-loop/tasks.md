@@ -388,8 +388,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       **Status (2026-10-30, lane L9, branch `test/apw08-app-checks-golden`): golden and assertions green locally, not merged.**
       `golden/app-checks-two.yml` plus a 9-case block in `generator.spec.ts` (84/84). **One drift was found and
       fixed in `checks-job.ts`, as the cross-epic request above describes.** APW-05's job-level `if:` guard
-      had only the pull-request leg. It now reads `(<pull-request leg, unchanged>) || (github.event_name ==
-    'push' && github.ref == 'refs/heads/<tracked>')`. APW-05's `checks-job.spec.ts` trigger pin is re-pinned
+      had only the pull-request leg. It now reads `(<pull-request leg, unchanged>) || (github.event_name == 'push' && github.ref == 'refs/heads/<tracked>')`. APW-05's `checks-job.spec.ts` trigger pin is re-pinned
       to both legs, just as strictly (17/17), and `golden/checks.yml` changed on that one line only. Every other
       leg matched the contract: `EW_CHECK_COMMAND_B64`, `contents: read` only, `fail-fast: false`,
       `max-parallel: 5`, the per-leg name, `persist-credentials: false`, and `continue-on-error` on the
@@ -805,8 +804,8 @@ are recorded as `app.change.progressed` so FR-35's timeline has every change.
       PR ran its own specs, type-checks and builds locally instead (recorded in each PR). The ACC walk is covered
       in part by the Playwright lanes run green locally on a SQLite stack: - `app-works-evolve-chat`: ACC-08-24; - `app-works-delivery-chips`: ACC-08-17, ‑21, ‑22; - `app-works-guard-refusals`: ACC-08-08, ‑11, ‑12, ‑14, and FR-9/FR-12; - `app-works-a11y`: ACC-08-35.
 
-        ACC-08-10 needs a Fleet node, and ACC-08-31 needs a Fleet producer of `rail_refusals`. Closing T30 is an
-        owner-run step: the root gate on a CI-sized runner, then the walk on stage.
+    ACC-08-10 needs a Fleet node, and ACC-08-31 needs a Fleet producer of `rail_refusals`. Closing T30 is an
+    owner-run step: the root gate on a CI-sized runner, then the walk on stage.
 
 ---
 
@@ -834,7 +833,7 @@ _Delivers FR-45…FR-55._
       the same scope. A missing Work, another account's Work, or one in another scope all get the same
       `404 workNotFound`. Without a Work repository a `workId` is refused, never stored unchecked. - A change while `loopStatus = 'running'` is `409 loopRunning`; resending the current Work is not a change. - The single read adds `workName`. - DTOs: `workId?: uuid | null`.
 
-        Specs: migration 3/3; DTO 35/35; service 60/60, with both rules bite-proven; controller 30/30 (3 new).
+    Specs: migration 3/3; DTO 35/35; service 60/60, with both rules bite-proven; controller 30/30 (3 new).
 
 - [ ] **T32. Orchestrator.**
       **Modify** `packages/agent/src/goals/goal-orchestrator.service.ts` — `applyDispatch` passes
@@ -853,26 +852,26 @@ _Delivers FR-45…FR-55._
       It is checked after "finished" and before the ceilings. A failed Work READ does not pause. - The rules take optional `pullRequestsAwaitingMerge`, `awaitingMergeIterations` and `workUnavailable`; the
       existing decision table is unchanged.
 
-        **Independent review (2026-10-31), fixed:**
-        - **High:** `GoalsModule` did not register `Work`, so the `@Optional()` repository was `undefined` in
-          production. Every `workId` was refused and the loop never checked its Work. Now registered, and pinned by
-          `goals.module.work-repository.spec`.
-        - "Open pull request" now uses the workspace's own rule (`openPullRequestOf`) instead of
-          `in_review` + `prState = 'open'`. An unknown state (before the PR sweep first runs) and a draft count as
-          open, and so does a BLOCKED change whose PR is still open.
-        - It counts only this Work's unfinished Tasks, through their own query, so the Goal's 500-Task window can
-          never hide one.
-        - The S10 wait line is logged once, when the wait begins.
-        - A Work read failure waits (`work-unreadable`) rather than dispatching.
-        - `startLoop` refuses a Work that is gone (`422 workUnavailable`).
-        - A teammate reading a shared Goal never sees the owner's Work name.
+    **Independent review (2026-10-31), fixed:**
+    - **High:** `GoalsModule` did not register `Work`, so the `@Optional()` repository was `undefined` in
+      production. Every `workId` was refused and the loop never checked its Work. Now registered, and pinned by
+      `goals.module.work-repository.spec`.
+    - "Open pull request" now uses the workspace's own rule (`openPullRequestOf`) instead of
+      `in_review` + `prState = 'open'`. An unknown state (before the PR sweep first runs) and a draft count as
+      open, and so does a BLOCKED change whose PR is still open.
+    - It counts only this Work's unfinished Tasks, through their own query, so the Goal's 500-Task window can
+      never hide one.
+    - The S10 wait line is logged once, when the wait begins.
+    - A Work read failure waits (`work-unreadable`) rather than dispatching.
+    - `startLoop` refuses a Work that is gone (`422 workUnavailable`).
+    - A teammate reading a shared Goal never sees the owner's Work name.
 
-        Specs:
-        - `goal-orchestrator-rules.awaiting-merge` 9/9 (new);
-        - `goal-orchestrator-rules` 43/43, unchanged;
-        - `goal-orchestrator.service` 91/91 (the T32 cases live there rather than in a separate
-          `work-scope` spec; the new rules are bite-proven);
-        - the run-order integration spec 8/8.
+    Specs:
+    - `goal-orchestrator-rules.awaiting-merge` 9/9 (new);
+    - `goal-orchestrator-rules` 43/43, unchanged;
+    - `goal-orchestrator.service` 91/91 (the T32 cases live there rather than in a separate
+      `work-scope` spec; the new rules are bite-proven);
+    - the run-order integration spec 8/8.
 
 - [ ] **T33 (parallel with T32). Goal form.**
       **Modify** `apps/web/src/components/goals/GoalForm.tsx`, `apps/web/src/components/goals/goal-form-payload.ts`,
@@ -882,6 +881,19 @@ _Delivers FR-45…FR-55._
       **Test**: extend `apps/web/src/components/goals/GoalForm.unit.spec.tsx` — the Work select sends `workId`, is
       disabled while the loop runs, and clears to `null`. Run: `pnpm --filter ever-works-web test GoalForm`.
       **Done when**: the spec is green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-form-work`, stacked on T32): built.**
+    - **Create form:** an optional Work picker (`WorkSelect`, "No Work" by default) sends `workId` only when one
+      is picked.
+    - **Goal page:** a new `GoalWorkSection` links the Work by name and changes it. "No Work" clears it to
+      `null`. The control is locked while the loop runs, with "Pause the loop to change its Work." (the API's
+      `409 loopRunning`).
+    - **Web types:** `Goal.workId` / `workName` and `workId` on create/update.
+    - **Copy:** `dashboard.goalNew.work` and `dashboard.goalDetail.work`, in all 21 locales.
+    - The loop's log lines come from the orchestrator's own `reasoning` (S10 / S26 copy), so no extra keys
+      were needed.
+
+    Specs: `GoalForm.unit.spec` (3 new), `GoalWorkSection.unit.spec` (4, new); `components/goals` 33/33;
+    `src/lib/__tests__` 15/15; web `tsc` clean.
 
 - [ ] **T34. Mission output — schema and API.**
       **Modify** `packages/agent/src/entities/mission.entity.ts` — append `outputMode`, `taskOutput`,
@@ -897,6 +909,26 @@ _Delivers FR-45…FR-55._
       Run: `cd apps/api && pnpm test AddMissionTaskOutput mission` and
       `pnpm --filter @ever-works/agent test mission-task-output`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-task-output`, stacked on T33):
+      built.**
+    - **Columns.** `missions.outputMode` (varchar(8), NOT NULL, default `'ideas'`), `taskOutput` (simple-json) and
+      `taskOutputNoticeAt`, via migration `1792360000000-AddMissionTaskOutput`. That is the next free slot after
+      T31's; the plan's `1792080200000` predates the block's later stamps.
+    - **Normalizer.** `mission-task-output.ts` holds `normalizeMissionTaskOutput` (`tasksPerTick` 1..3, default 1;
+      `openTasksCap` 1..10, default 3; `agentId` kept only as a uuid; garbage gives the defaults) and
+      `normalizeMissionOutputMode`, where anything unknown is `ideas`.
+    - **Service.** `MissionsService` refuses an unknown mode with `400` and stores Task output normalized
+      (`null` resets it). A Mission that files Tasks with no App Work attached as Improves or Operates is
+      accepted, with `warnings: ['noAppWorkRelation']`.
+    - **Supporting changes.** `MissionWorkRepository.listForMissionWithWork` now also selects the Work's kind.
+      The API DTOs validate the mode and the bounds.
+
+    Specs:
+    - `mission-task-output` 13/13;
+    - `missions.service` 51/51 (5 new; the warning is bite-proven);
+    - migration 3/3;
+    - `mission.dto` 22/22;
+    - `missions.controller` 2/2 (new).
 
 - [ ] **T35. Planner and tick branch.**
       **Create** `packages/agent/src/missions/mission-task-planner.service.ts` (new) — `AiFacadeService.askJson` with
@@ -929,6 +961,54 @@ _Delivers FR-45…FR-55._
       plan carries `maxBudgetUsd` rounded down** (APW08-G15); the existing `mission-tick.service.spec.ts` passes
       unchanged. Run: `pnpm --filter @ever-works/agent test mission-tick`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-task-tick`, stacked on T34):
+      part 1 built — the planner and the tick branch; the per-run budget (APW08-G15) is part 2.**
+    - **Planner.** `MissionTaskPlannerService` uses `AiFacadeService.askJson`, schema-checked (title ≤ 120,
+      description ≤ 4000). It is given the Mission, the Work, its 20 latest Task titles and the relation
+      (Improves → product changes, Operates → maintenance). The Work description and the titles are fenced as
+      untrusted data.
+    - **Tick branch.** `MissionTickService` branches on `outputMode`: `ideas` is unchanged, `tasks` files Tasks,
+      `both` files Ideas then Tasks.
+        - It covers at most 5 App Works attached as Improves or Operates.
+        - The open-Tasks cap counts this Mission's open Tasks on that Work. Each tick files at most
+          `tasksPerTick`, within the cap.
+        - A proposal whose normalised title matches an open Task on that Work is dropped.
+        - Tasks are filed with the Mission, the Work and the `mission-task` label: in Backlog when
+          `requireApprovalBeforeCreate` is set; otherwise in To do, and started through `TasksService.runTask`
+          with the Mission's Agent (else the Work's default).
+        - The work is per Work and best-effort: one Work failing never stops the others.
+
+    - **Notice.** "Nothing to file" (FR-54, S27) is at most one `mission_nothing_to_file` Activity per Mission
+      per UTC day, stamped on `taskOutputNoticeAt`. The feed narration copy is in `en`, the only locale with a
+      feed tree.
+    - **Telemetry.** `mission.task_output.tick` and `mission.task_output.nothing_to_file` are emitted (the rest of
+      T43).
+    - **Wiring.** `MissionsModule` registers `Task` and imports `FacadesModule`; `missions.module.task-output.spec`
+      pins it. `TasksService` is resolved lazily, so there is no module cycle.
+
+    Specs:
+    - `mission-tick.task-output` 9/9 (cap and duplicate rules bite-proven);
+    - `mission-task-planner` 4/4;
+    - module wiring 2/2;
+    - `mission-tick.service` 28/28 and `missions.service` 51/51, unchanged.
+      **Part 2, the per-run budget (APW08-G15), branch `feat/apw08-run-budget-cap`: built.**
+
+    - `agent_runs.budgetCapCents` (int, NULL = no cap), via migration `1792370000000-AddAgentRunBudgetCap`.
+    - `dispatchAgentRun` / `runTask` take `maxBudgetCents` (a positive whole number, otherwise no cap) and store
+      it on the run row, so a parked, drained or resumed run keeps it.
+    - The Mission tick passes `guardrailsOverride.maxBudgetCentsPerRun`.
+    - The Fleet planner maps the cap to `execution.maxBudgetUsd` as `floor(cents) / 100`, never above the
+      Agent's own cap.
+
+    **Known limit:** the cloud loop has no per-run cost accounting (it counts tokens only), so on the cloud path
+    the cap is recorded but not enforced. Cloud App Work runs are refused today (T12, `noIsolatedRuntime`), so
+    every Mission-filed App Work Task runs on a Fleet node, where the cap applies.
+
+    Specs:
+    - `task-transition` 34/34;
+    - `mission-tick.task-output` 10/10;
+    - planner `app-work-policy` 16/16 (the mapping is bite-proven);
+    - `AddAgentRunBudgetCap` 2/2.
 
 - [ ] **T36. Mission web.**
       **Create** `apps/web/src/components/missions/MissionOutputCard.tsx`,
@@ -939,6 +1019,21 @@ _Delivers FR-45…FR-55._
       no-App-Work notice, 20 rows per page; `MissionDetailClient.unit.spec.tsx` passes unchanged. Run:
       `pnpm --filter ever-works-web test Mission`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-web`, stacked on T35): built.**
+    - **`MissionOutputCard`** (in the Mission page's right rail): three radios. When the Mission files Tasks it
+      shows the Tasks-per-tick (1..3) and open-cap (1..10) inputs, clamped like the API. The no-App-Work notice
+      shows when no App Work is attached as Improves or Operates, and after the API answers `noAppWorkRelation`.
+    - **`MissionTasksOnWorksPanel`** (in the content column, only while the Mission files Tasks): the
+      `mission-task` Tasks, 20 per page, via the new `listMissionTasksOnWorksAction`. They are sorted by the list
+      API's own order, most recent activity first.
+    - **Web types:** `Mission.outputMode` / `taskOutput` / `warnings`, and `MissionWorkRelationDto.workKind`.
+    - **Copy:** `dashboard.missionDetail.output` in all 21 locales.
+
+    Specs:
+    - `MissionOutputCard.unit` 4/4;
+    - `MissionTasksOnWorksPanel.unit` 3/3;
+    - `components/missions` 77/77, with `MissionDetailClient.unit` unchanged;
+    - web `tsc` clean.
 
 - [ ] **T37. P2 i18n, e2e, gate.**
       **Modify** `apps/web/messages/en.json` — `dashboard.goalNew.work`, `dashboard.missionDetail.output`; mirror into
@@ -948,6 +1043,22 @@ _Delivers FR-45…FR-55._
       **Test**: `pnpm --filter ever-works-web test app-works-evolve-messages` and
       `cd apps/web && pnpm exec playwright test goals-work-scope missions-task-output flow-goal-lifecycle flow-goals-lifecycle-deep flow-mission-crud-schedule flow-mission-guardrails`.
       **Done when**: all pass (the four pre-existing flows unchanged) and ACC-08-25/26 are walked.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-p2-i18n-e2e`, stacked on T36):
+      written; the local Playwright run is pending.**
+    - **Copy.** `dashboard.goalNew.work`, `dashboard.goalDetail.work` and `dashboard.missionDetail.output` are in
+      all 21 locales (T33 / T36). The Run-now toasts `tasks-filed` / `no-tasks` are in 21 locales (T35).
+    - **Messages spec.** `app-works-evolve-messages` now covers the three sub-trees (every leaf in 21 bundles,
+      camelCase, valid ICU, the plan's copy verbatim): 7/7 with the P2 case.
+    - **e2e specs:**
+        - `goals-work-scope.spec.ts`: a Goal names a reachable Work, the Goal page links it, an unreachable Work
+          is `404 workNotFound`, and `null` clears it;
+        - `missions-task-output.spec.ts`: `noAppWorkRelation` until an App Work is attached, the API's bounds,
+          and the Output card plus the "Tasks on attached Works" panel on the Mission page.
+    - **Not exercised in the e2e lane** (no agent or AI provider there): the loop's iterations and awaiting-merge
+      wait, and the tick's planning. Both are unit-covered (`goal-orchestrator.service.spec`,
+      `mission-tick.task-output.spec`).
+    - **Pending:** the local Playwright run of the two new files plus the four pre-existing flows. It was
+      deferred because a parallel session held this PC's ports and memory for its own e2e stack.
 
 ---
 
@@ -1070,8 +1181,8 @@ _Delivers FR-56…FR-60._
       refuses (cloud loop). The properties are `{ workId, taskId, group }`, attributed to the App Work through the
       new `AppWorkRunClassifier.appWorkIdOf`.
 
-        Specs: planner `app-work-policy` 12/12, `app-work-tool-policy` 25/25, both emitters bite-proven. Still
-        missing: `mission.task_output.*` (comes with P2 T35).
+    Specs: planner `app-work-policy` 12/12, `app-work-tool-policy` 25/25, both emitters bite-proven. Still
+    missing: `mission.task_output.*` (comes with P2 T35).
 
 - [ ] **T44. Docs.**
       **Create** `docs/features/app-works-evolve.md` (behaviour: delivery states, rules, follow-ups, Goals/Missions

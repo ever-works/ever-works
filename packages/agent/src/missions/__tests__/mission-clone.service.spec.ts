@@ -230,6 +230,27 @@ describe('MissionCloneService', () => {
             expect(result.ideasSkipped).toBe(0);
         });
 
+        // APW-08 T34 (review of #3061) — the clone files what the source files.
+        it('copies the output mode and the Task output, normalised', async () => {
+            const AGENT = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+            const source = store.seedMission({
+                userId: 'u1',
+                outputMode: 'both',
+                taskOutput: { tasksPerTick: 2, openTasksCap: 99, agentId: AGENT },
+            } as Partial<Mission> & { userId: string });
+            await service.cloneForUser('u1', source.id);
+            const cloned = store.missions[1];
+            expect(cloned.outputMode).toBe('both');
+            // Out of bounds falls back to the default (3); the Agent is kept.
+            expect(cloned.taskOutput).toEqual({ tasksPerTick: 2, openTasksCap: 3, agentId: AGENT });
+
+            const plain = store.seedMission({ userId: 'u1' });
+            await service.cloneForUser('u1', plain.id);
+            const plainClone = store.missions[store.missions.length - 1];
+            expect(plainClone.outputMode).toBe('ideas');
+            expect(plainClone.taskOutput).toBeNull();
+        });
+
         it('honors the optional title override and clips to 200 chars', async () => {
             const source = store.seedMission({ userId: 'u1' });
             const customTitle = 'My Custom Clone Title';

@@ -176,6 +176,9 @@ export enum ActivityActionType {
     MISSION_FAILED = 'mission_failed',
     MISSION_DELETED = 'mission_deleted',
     MISSION_TICK_CAPPED = 'mission_tick_capped',
+    // APW-08 T35 (FR-54, APW08-G21) — a Task-output tick that had nothing to file, at most
+    // once per Mission per day (`missions.taskOutputNoticeAt`).
+    MISSION_NOTHING_TO_FILE = 'mission_nothing_to_file',
     // Autonomy layer — Goal execution loop. Additive members only
     // (activity_log.actionType is a plain varchar, so no migration):
     //   - GOAL_LOOP_STARTED / _PAUSED / _RESUMED / _CANCELLED are the

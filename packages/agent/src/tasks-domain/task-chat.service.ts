@@ -7,6 +7,8 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import {
     TaskChatMessageRepository,
     TaskKbMentionRepository,
@@ -30,6 +32,8 @@ import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
 import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { toTaskCommentDto } from '../domain-events/domain-event-snapshots';
 import { RecordAccessPolicy } from '../record-visibility/record-access-policy.service';
+import { Mission } from '../entities/mission.entity';
+import { resolveTaskRunBudgetCapCents } from './run-budget-cap';
 
 /**
  * Tasks feature — Phase 13.2.
@@ -127,6 +131,13 @@ export class TaskChatService {
         // (spec §4). Appended LAST + @Optional() per the positional-spec arity rule;
         // absent means comments stay owner-only, exactly as before.
         @Optional() private readonly accessPolicy?: RecordAccessPolicy,
+        // APW-08 T35 (FR-53, review of #3061) — an @agent mention on a Mission's Task starts a
+        // run of that Task like any other, so it carries the Mission's per-run cap too.
+        // `Mission` is in TasksDomainModule's `forFeature`. Appended LAST + @Optional()
+        // (positional-spec arity rule); absent, a mention run has no cap, as before.
+        @Optional()
+        @InjectRepository(Mission)
+        private readonly missionRows?: Repository<Mission>,
     ) {}
 
     async list(
@@ -270,6 +281,12 @@ export class TaskChatService {
                     }
                     let run: { id: string } | null = null;
                     try {
+                        const budgetCapCents = await resolveTaskRunBudgetCapCents(
+                            this.missionRows,
+                            task,
+                            undefined,
+                            this.logger,
+                        );
                         // Run orchestration — admit + reserve as ONE
                         // critical section, exactly like the task fan-out.
                         // Over-limit parks the row (queuedReason set, no
@@ -297,6 +314,7 @@ export class TaskChatService {
                                       queuedReason: verdict.admitted
                                           ? null
                                           : (verdict.queuedReason ?? null),
+                                      ...(budgetCapCents !== null ? { budgetCapCents } : {}),
                                   })
                                 : null;
                         };

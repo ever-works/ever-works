@@ -2330,7 +2330,10 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "บันทึกงานลงใน App Works ของภารกิจแล้ว",
+                    "no-tasks": "ไม่มีอะไรใหม่ให้บันทึกใน App Works ของภารกิจ",
+                    "spawned-and-tasks-filed": "สร้างไอเดียใหม่และบันทึกงานลงใน App Works ของภารกิจแล้ว"
                 }
             },
             "goals": {
@@ -2362,6 +2365,26 @@
                     "detached": "ยกเลิกการแนบเป้าหมายแล้ว",
                     "detachError": "ไม่สามารถยกเลิกการแนบเป้าหมายได้"
                 }
+            },
+            "output": {
+                "title": "ผลลัพธ์",
+                "ideas": "ไอเดีย",
+                "tasks": "งานใน App Works ที่แนบไว้",
+                "both": "ทั้งสองอย่าง",
+                "tasksPerTick": "งานต่อรอบ",
+                "openCap": "จำนวนงานที่เปิดอยู่สูงสุดต่อ Work",
+                "appliesTo": "ใช้กับ Works ที่แนบในฐานะ “ปรับปรุง” หรือ “ดูแล”",
+                "noAppWork": "แนบ App Work ในฐานะ “ปรับปรุง” หรือ “ดูแล” เพื่อบันทึกงานลงไป",
+                "tasksOnWorks": "งานใน Works ที่แนบไว้",
+                "nothingToFile": "ไม่มี App Work ที่แนบไว้สำหรับบันทึกงาน",
+                "tasksOnWorksEmpty": "ยังไม่มีงานที่บันทึก",
+                "save": "บันทึก",
+                "saved": "บันทึกผลลัพธ์แล้ว",
+                "saveError": "บันทึกผลลัพธ์ไม่สำเร็จ",
+                "loading": "กำลังโหลด…",
+                "unavailable": "โหลดงานไม่สำเร็จ",
+                "previous": "ก่อนหน้า",
+                "next": "ถัดไป"
             }
         },
         "ideasPage": {
@@ -2728,6 +2751,11 @@
             "viewToggle": {
                 "log": "บันทึก",
                 "schedules": "กำหนดการ"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> ไม่พบสิ่งใหม่ที่จะบันทึกลงใน App Works ของภารกิจในวันนี้"
             }
         },
         "works": {
@@ -9074,6 +9102,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "ไม่มี Work",
+                "hint": "ไม่บังคับ ลูปจะบันทึกทุกรอบไว้ใน Work นี้ สำหรับ App Work แต่ละรอบจะได้ branch และ pull request ของตัวเอง"
             }
         },
         "goalDetail": {
@@ -9316,6 +9349,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "ไม่มี Work",
+                "unnamed": "Work ที่คุณเปิดไม่ได้แล้ว",
+                "changeLabel": "เปลี่ยน Work",
+                "hint": "ลูปจะบันทึกทุกรอบไว้ใน Work นี้",
+                "lockedWhileRunning": "หยุดลูปชั่วคราวเพื่อเปลี่ยน Work",
+                "saved": "บันทึก Work แล้ว",
+                "saveError": "เปลี่ยน Work ไม่สำเร็จ"
             }
         },
         "sidebar": {

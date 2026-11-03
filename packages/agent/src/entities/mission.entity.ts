@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import type { RecordVisibility } from '@ever-works/contracts';
 import { User } from './user.entity';
-import { PortableDateColumn } from './_types';
+import { PortableDateColumn, TimestampColumn } from './_types';
 import type { WorkAgentGuardrails } from './work-agent-preference.entity';
 
 /**
@@ -301,6 +301,41 @@ export class Mission {
 
     @Column({ type: 'varchar', length: 64, nullable: true })
     createdById?: string | null;
+
+    /**
+     * APW-08 T34 (FR-51) — what the Mission's tick files: `ideas` (every Mission before P2),
+     * `tasks` (Tasks on its attached App Works) or `both`. Read through
+     * `normalizeMissionOutputMode` (`missions/mission-task-output.ts`); migration
+     * 1792360000000-AddMissionTaskOutput.
+     */
+    @Column({ type: 'varchar', length: 8, default: 'ideas' })
+    outputMode: 'ideas' | 'tasks' | 'both';
+
+    /**
+     * APW-08 T34 — the bounds of the Task output: `{ tasksPerTick 1..3, openTasksCap 1..10,
+     * agentId? }`. Read through `normalizeMissionTaskOutput` on every use (fails toward the
+     * defaults). NULL = the defaults.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    taskOutput?: { tasksPerTick?: number; openTasksCap?: number; agentId?: string } | null;
+
+    /**
+     * APW-08 T34 (FR-54, APW08-G21) — when the once-per-day "No attached App Work to file Tasks
+     * on." notice was last recorded. NULL = never.
+     */
+    @PortableDateColumn({ nullable: true })
+    taskOutputNoticeAt?: Date | null;
+
+    /**
+     * APW-08 T35 (review of #3061) — the Task branch's lease. A tick claims it with a
+     * compare-and-set (`WHERE taskOutputLeaseUntil IS NULL OR taskOutputLeaseUntil < :now`)
+     * before it counts the open Tasks and asks the planner, and clears it when done, so a
+     * scheduled tick and a Run now (or two API pods) never both file up to the open-Tasks cap. A
+     * portable epoch-millis `bigint`, compared as a number on every driver. NULL = free; a tick
+     * that died mid-run leaves it to expire. Migration 1792380000000-AddMissionTaskOutputLease.
+     */
+    @TimestampColumn({ nullable: true })
+    taskOutputLeaseUntil?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;
