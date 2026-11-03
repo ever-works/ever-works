@@ -163,6 +163,8 @@ export class EverIdLoginHandler implements OnModuleDestroy {
         try {
             await client.call('instanceRequestOidcClient', { body: this.clientAddresses() });
         } catch (error) {
+            // `ever_id_login` ended while this was asked: nothing is retried for it.
+            if (generation !== this.generation) return this.status;
             const failure = platformFailure(error);
             if (failure.kind === 'problem' && failure.status === 409) {
                 // A client is pending or ready already: read it.
@@ -206,6 +208,8 @@ export class EverIdLoginHandler implements OnModuleDestroy {
         try {
             answer = (await client.call('instanceGetOidcClient')) as typeof answer;
         } catch (error) {
+            // `ever_id_login` ended while this was read: nothing is retried for it.
+            if (generation !== this.generation) return this.status;
             const failure = platformFailure(error);
             if (failure.kind === 'problem' && failure.status === 404) {
                 // Nothing was asked for (or it was forgotten): ask again.
@@ -215,10 +219,8 @@ export class EverIdLoginHandler implements OnModuleDestroy {
             if (failure.kind === 'problem' && failure.status === 403) {
                 // `ever_id_login` ended or the installation was disconnected: Ever
                 // Platform has revoked the client, so the stored copy is dead.
-                if (generation === this.generation) {
-                    await this.integration.clearClient();
-                    this.settings.invalidate();
-                }
+                await this.integration.clearClient();
+                this.settings.invalidate();
                 return this.set('off');
             }
             this.logger.warn(`Ever ID client read will be retried: ${describeFailure(failure)}`);

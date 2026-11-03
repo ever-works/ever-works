@@ -224,6 +224,29 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
         expect(await platformSettings.read(EVER_ID_SIGN_IN_PLUGIN_ID)).toEqual({});
     });
 
+    it.each([
+        ['the request', 'instanceRequestOidcClient', problem(503, 'unavailable')],
+        ['the read', 'instanceGetOidcClient', problem(404, 'oidc_client_not_found')],
+    ])(
+        '%s failing after end() schedules nothing and leaves the status off',
+        async (_, id, error) => {
+            let fail!: (reason: unknown) => void;
+            const failing = () => new Promise((_resolve, reject) => (fail = reject));
+            platform
+                .answer('instanceRequestOidcClient', { status: 'pending' })
+                .answer('instanceGetOidcClient', { status: 'pending' })
+                .answer(id, failing);
+            const started = handler.start();
+            await jest.advanceTimersByTimeAsync(0);
+            integration.enabled = false;
+            await handler.end();
+            fail(error);
+            expect(await started).toBe('off');
+            expect(handler.getStatus()).toBe('off');
+            expect(jest.getTimerCount()).toBe(0);
+        },
+    );
+
     it('an installation configured by hand keeps its configuration (env wins)', async () => {
         integration.stored = { issuer: ISSUER, clientId: 'inst-x', clientSecret: 's' };
         process.env.EVER_ID_CLIENT_ID = 'hand-made-client';
