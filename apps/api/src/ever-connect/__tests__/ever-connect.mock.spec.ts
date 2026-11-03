@@ -41,8 +41,11 @@ import { createIdentityDataSource, insertIdentity } from '../identity/__tests__/
  * (`ever-mock-platform` from the `@ever-co/connect-tools` pinned in
  * `tools/egress-audit`): the module's own services on a real database, the
  * SDK client over real HTTP, the mock's integration gate and its call record.
- * The mock is started from the installed package (or reached at
- * `EVER_CONNECT_MOCK_URL`).
+ * The mock is started from the installed package with {@link MOCK_CONFIG}, or
+ * reached at `EVER_CONNECT_MOCK_URL`: a mock reached there must have been
+ * started with `EVER_MOCK_CONFIG_JSON` set to `MOCK_CONFIG` as JSON, so that
+ * `sub-ada` is a person it knows (otherwise the link answers `422
+ * subject_unknown`).
  *
  * 1. Connect with a connect code: redeem with a new connect key (stored
  *    wrapped), then the integration states are read.
