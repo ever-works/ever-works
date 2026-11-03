@@ -156,13 +156,6 @@ export class PluginSettingsService {
         const adminSecrets = effectiveOptions?.includeSecrets
             ? this.decryptSecrets(adminEntity?.secretSettings) // C-08
             : {};
-        // Every key an operator stored at a level that counts for this read,
-        // secrets included even when they are not decrypted (see the platform
-        // level below: it is offered only when none of its keys is set).
-        const storedKeys = new Set<string>([
-            ...Object.keys(adminSettings),
-            ...Object.keys(adminEntity?.secretSettings || {}),
-        ]);
 
         let userSettings: Record<string, unknown> = {};
         let userSecrets: Record<string, unknown> = {};
@@ -175,8 +168,6 @@ export class PluginSettingsService {
             userSecrets = effectiveOptions?.includeSecrets
                 ? this.decryptSecrets(userEntity?.secretSettings) // C-08
                 : {};
-            for (const key of Object.keys(userSettings)) storedKeys.add(key);
-            for (const key of Object.keys(userEntity?.secretSettings || {})) storedKeys.add(key);
         }
 
         let workSettings: Record<string, unknown> = {};
@@ -192,8 +183,6 @@ export class PluginSettingsService {
             workSecrets = effectiveOptions?.includeSecrets
                 ? this.decryptSecrets(dirEntity?.secretSettings) // C-08
                 : {};
-            for (const key of Object.keys(workSettings)) storedKeys.add(key);
-            for (const key of Object.keys(dirEntity?.secretSettings || {})) storedKeys.add(key);
         }
 
         // Resolve each setting
@@ -216,20 +205,21 @@ export class PluginSettingsService {
                 : {};
         }
 
+        const operatorSources = {
+            work: { ...workSettings, ...workSecrets },
+            user: { ...userSettings, ...userSecrets },
+            admin: { ...adminSettings, ...adminSecrets },
+        };
         const platform = this.platformOfferUnlessConfigured(
             definitions,
             this.platformSettings ? await this.platformSettings.read(pluginId) : {},
-            storedKeys,
+            operatorSources,
+            effectiveOptions,
         );
         for (const def of definitions) {
             resolved[def.key] = this.resolveSetting(
                 def,
-                {
-                    work: { ...workSettings, ...workSecrets },
-                    user: { ...userSettings, ...userSecrets },
-                    admin: { ...adminSettings, ...adminSecrets },
-                    platform,
-                },
+                { ...operatorSources, platform },
                 effectiveOptions,
             );
         }
@@ -910,23 +900,30 @@ export class PluginSettingsService {
     /**
      * The values Ever Platform handed over are one set (for Ever ID: issuer,
      * client id and client secret of ONE client), so they are used whole or not
-     * at all. Once an operator set any of those keys, by a stored value at any
-     * level or by its environment variable, the whole set is dropped: resolving
+     * at all. Once any of those keys resolves from an operator's level (work,
+     * user, admin or its environment variable), the whole set is dropped: resolving
      * field by field would send the platform's secret to the operator's issuer.
      */
     private platformOfferUnlessConfigured(
         definitions: SettingDefinition[],
         offer: Readonly<Record<string, unknown>>,
-        storedKeys: ReadonlySet<string>,
+        sources: {
+            work: Record<string, unknown>;
+            user: Record<string, unknown>;
+            admin: Record<string, unknown>;
+        },
+        options: SettingsResolutionOptions | undefined,
     ): Readonly<Record<string, unknown>> {
-        const offered = Object.keys(offer).filter((key) => offer[key] !== undefined);
+        const offered = definitions.filter((def) => offer[def.key] !== undefined);
         if (offered.length === 0) return offer;
-        const configured = offered.some((key) => {
-            if (storedKeys.has(key)) return true;
-            const definition = definitions.find((def) => def.key === key);
-            const raw = definition?.envVar ? process.env[definition.envVar] : undefined;
-            return typeof raw === 'string' && raw.trim() !== '';
-        });
+        // "Set by an operator" = what the cascade would actually use without
+        // this level, so a value the plugin's configurationMode ignores (an
+        // admin-only plugin's stored secret, a user value) does not count.
+        const configured = offered.some(
+            (def) =>
+                this.resolveSetting(def, { ...sources, platform: {} }, options).source !==
+                'default',
+        );
         return configured ? {} : offer;
     }
 

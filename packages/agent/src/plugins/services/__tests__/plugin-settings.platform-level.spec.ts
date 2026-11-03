@@ -34,12 +34,23 @@ const SCHEMA: JsonSchema = {
 function build(
     platform: PluginPlatformSettingsService | undefined,
     admin: Record<string, unknown> = {},
+    extra: { adminSecrets?: Record<string, unknown>; configurationMode?: string } = {},
 ) {
     const registry = {
-        get: jest.fn(() => ({ plugin: { id: PLUGIN, settingsSchema: SCHEMA }, state: 'loaded' })),
+        get: jest.fn(() => ({
+            plugin: {
+                id: PLUGIN,
+                settingsSchema: SCHEMA,
+                configurationMode: extra.configurationMode,
+            },
+            state: 'loaded',
+        })),
     } as unknown as PluginRegistryService;
     const pluginRepository = {
-        findByPluginId: jest.fn(async () => ({ settings: admin, secretSettings: {} })),
+        findByPluginId: jest.fn(async () => ({
+            settings: admin,
+            secretSettings: extra.adminSecrets ?? {},
+        })),
     } as unknown as PluginRepository;
     const userPluginRepository = {
         findByUserAndPlugin: jest.fn(async () => null),
@@ -117,6 +128,25 @@ describe('PluginSettingsService — values Ever Platform handed the installation
         expect(byEnv.clientId).toMatchObject({ source: 'env', value: 'hand-made-client' });
         expect(byEnv.issuerUrl).toMatchObject({ source: 'default', value: undefined });
         expect(byEnv.clientSecret).toMatchObject({ source: 'default', value: undefined });
+    });
+
+    it('a stored value the cascade would not use does not count as set', async () => {
+        // An admin-only plugin never reads a stored secret (secrets come from the
+        // environment or the platform), so a leftover `clientSecret` row must not
+        // drop the platform's client.
+        const platform = new PluginPlatformSettingsService();
+        platform.register(PLUGIN, async () => handedOver);
+        const resolved = await build(
+            platform,
+            {},
+            { adminSecrets: { clientSecret: 'stale' }, configurationMode: 'admin-only' },
+        ).getResolvedSettings(PLUGIN, { includeSecrets: true });
+
+        expect(resolved.issuerUrl).toMatchObject({
+            source: 'platform',
+            value: handedOver.issuerUrl,
+        });
+        expect(resolved.clientId).toMatchObject({ source: 'platform', value: handedOver.clientId });
     });
 
     it('an off-pattern value is ignored, like an env value', async () => {
