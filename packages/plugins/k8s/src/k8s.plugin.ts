@@ -316,6 +316,14 @@ interface DeployOptions {
 	imagePullPolicy?: 'Always' | 'IfNotPresent' | 'Never';
 	/** Full commit SHA — used only as a pod annotation to force a rollout, never as the image tag. */
 	revision?: string;
+	/**
+	 * The site image's NUMERIC uid / gid, passed only when the caller knows it — the platform does for
+	 * Works built from the Next.js templates (`USER node` = 1000:1000). Set, the pod enforces
+	 * runAsNonRoot as that user and drops ALL capabilities; unset, no user is forced, because the
+	 * minimal templates' stock nginx starts as root and would crash-loop (see `buildDeployment`).
+	 */
+	runAsUser?: number;
+	runAsGroup?: number;
 }
 
 const REGISTRY_SCHEMA: JsonSchema = {
@@ -1241,6 +1249,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				pullSecretName,
 				envFromSecretName: runtimeEnvSecretName,
 				imagePullPolicy: opts.imagePullPolicy,
+				runAsUser: opts.runAsUser,
+				runAsGroup: opts.runAsGroup,
 				// Per-Work sizing, resolved through the same settings merge as the
 				// rest (settingsOverride layers the work tier over the plugin's own).
 				cpuRequest: settings.cpuRequest,

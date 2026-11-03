@@ -67,6 +67,8 @@ import { DeployService } from './deploy.service';
 describe('DeployService — server-side deploy for managed cluster tiers', () => {
     const buildService = (overrides: {
         plugin: Record<string, unknown>;
+        /** What `websiteTemplateResolver.resolveForWork` answers. Defaults to `{ branch: 'main' }`. */
+        template?: Record<string, unknown>;
         token?: string;
         settings?: Record<string, unknown>;
         settingSources?: Record<string, string>;
@@ -156,7 +158,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         };
 
         const websiteTemplateResolver = {
-            resolveForWork: jest.fn().mockResolvedValue({ branch: 'main' }),
+            resolveForWork: jest.fn().mockResolvedValue(overrides.template ?? { branch: 'main' }),
         };
 
         const eventEmitter = {
@@ -398,6 +400,48 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         const runtimeEnv = config.options.runtimeEnv as Record<string, string>;
         expect(runtimeEnv.TENANT_ID).toBe('work-1');
         expect(runtimeEnv.STRIPE_SECRET_KEY).toBeUndefined();
+    });
+
+    it.each([
+        ['ever-works', 'directory-web-template'],
+        ['ever-works', 'web-template'],
+    ])(
+        'managed tier → a Work on %s/%s (`USER node`) deploys with non-root enforced as 1000:1000',
+        async (owner, repo) => {
+            const plugin = managedPlugin();
+            const { service } = buildService({
+                plugin,
+                settings: { clusterSource: 'k8s-works-shared' },
+                template: { branch: 'main', owner, repo },
+            });
+
+            await service.deploy('work-1', 'user-1');
+
+            const [config] = plugin.deploy.mock.calls[0];
+            expect(config.options.runAsUser).toBe(1000);
+            expect(config.options.runAsGroup).toBe(1000);
+        },
+    );
+
+    // Stock nginx (the minimal Astro templates) starts as root and crash-loops under a forced uid
+    // or with ALL capabilities dropped, so the plugin must not be told any user for it.
+    it.each([
+        ['ever-works', 'directory-web-minimal-template'],
+        ['ever-works', 'web-minimal-template'],
+        ['someone-else', 'custom-template'],
+    ])('managed tier → a Work on %s/%s deploys with no forced user', async (owner, repo) => {
+        const plugin = managedPlugin();
+        const { service } = buildService({
+            plugin,
+            settings: { clusterSource: 'k8s-works-shared' },
+            template: { branch: 'main', owner, repo },
+        });
+
+        await service.deploy('work-1', 'user-1');
+
+        const [config] = plugin.deploy.mock.calls[0];
+        expect(config.options).not.toHaveProperty('runAsUser');
+        expect(config.options).not.toHaveProperty('runAsGroup');
     });
 
     it('managed tier → branch alias image tag (main → prod)', async () => {

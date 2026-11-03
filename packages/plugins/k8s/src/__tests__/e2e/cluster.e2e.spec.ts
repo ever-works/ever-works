@@ -97,8 +97,9 @@ describeE2E('k8s plugin e2e — against real cluster', () => {
 			// This suite side-loads its image with `kind load docker-image` and
 			// there is no registry to pull from, so it opts back out explicitly.
 			imagePullPolicy: 'IfNotPresent',
-			// nginx-unprivileged runs as uid / gid 101 (a numeric USER in its image). Pin that, so
-			// runAsNonRoot verifies this image's own user rather than the template's 1000.
+			// nginx-unprivileged runs as uid / gid 101 (a numeric USER in its image). Naming it
+			// exercises the enforced path (runAsNonRoot as 101, ALL capabilities dropped) against a
+			// real kubelet; without a user the renderer would force none.
 			runAsUser: 101,
 			runAsGroup: 101
 		});

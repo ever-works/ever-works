@@ -57,6 +57,7 @@ import type {
     SettingSource,
 } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
+import { resolveWebsiteImageUser } from './website-image-user';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
@@ -454,6 +455,7 @@ export class DeployService {
                   kubeContextOverride: effectiveContext.lookupContext?.kubeContextOverride ?? null,
                   deploymentId: deployment.id,
                   targetBranch,
+                  template,
               })
             : await this.dispatchWithRetry(
                   work,
@@ -1266,6 +1268,8 @@ export class DeployService {
         deploymentId: string;
         targetBranch: string;
         revision?: string;
+        /** The Work's resolved website template: decides whether a non-root user can be enforced. */
+        template?: { owner?: string | null; repo?: string | null } | null;
     }): Promise<boolean> {
         const {
             work,
@@ -1278,6 +1282,7 @@ export class DeployService {
             deploymentId,
             targetBranch,
             revision,
+            template,
         } = args;
         try {
             // ALWAYS the branch alias — never a commit SHA. `k8s-build.yml`
@@ -1310,6 +1315,11 @@ export class DeployService {
 
             const ghcrReadToken = await this.resolveGhcrReadToken(work, userId, gitToken);
             const runtimeEnv = await this.collectServerSideRuntimeEnv(work, hosts[0], gitToken);
+
+            const imageUser = resolveWebsiteImageUser(template);
+            const imageUserOptions = imageUser
+                ? { runAsUser: imageUser.uid, runAsGroup: imageUser.gid }
+                : {};
 
             const namespace =
                 typeof deploySettings.namespace === 'string' && deploySettings.namespace.trim()
@@ -1364,6 +1374,11 @@ export class DeployService {
                         // unscoped, so getSettings() resolves admin -> env ->
                         // schema default and silently discards what the Work set.
                         settingsOverride: deploySettings,
+                        // Enforce non-root (+ drop ALL capabilities) ONLY for templates known to
+                        // run as `USER node`. The minimal (Astro) templates serve with stock nginx,
+                        // which starts as root and crash-loops under a forced uid; each Work repo has
+                        // its own Dockerfile copy, so a template fix cannot reach existing Works.
+                        ...imageUserOptions,
                     },
                 },
                 kubeconfig,
