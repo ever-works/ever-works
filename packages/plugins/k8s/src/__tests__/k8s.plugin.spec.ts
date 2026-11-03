@@ -1501,7 +1501,10 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 					websiteRepoIsPrivate: false,
 					// The pod annotation is otherwise `t<Date.now()>`; pinning it keeps this
 					// snapshot a statement about what `deploy()` renders, not about the clock.
-					revision: 'rev-abc1234'
+					revision: 'rev-abc1234',
+					// What the platform passes for a Work built from a Next.js template (`USER node`).
+					runAsUser: 1000,
+					runAsGroup: 1000
 				}
 			},
 			VALID
@@ -1554,6 +1557,7 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			          },
 			        },
 			        "spec": {
+			          "automountServiceAccountToken": false,
 			          "containers": [
 			            {
 			              "image": "ghcr.io/acme/work-1:abc1234",
@@ -1593,6 +1597,14 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			                  "memory": "256Mi",
 			                },
 			              },
+			              "securityContext": {
+			                "allowPrivilegeEscalation": false,
+			                "capabilities": {
+			                  "drop": [
+			                    "ALL",
+			                  ],
+			                },
+			              },
 			              "startupProbe": {
 			                "failureThreshold": 30,
 			                "httpGet": {
@@ -1604,6 +1616,14 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			              },
 			            },
 			          ],
+			          "securityContext": {
+			            "runAsGroup": 1000,
+			            "runAsNonRoot": true,
+			            "runAsUser": 1000,
+			            "seccompProfile": {
+			              "type": "RuntimeDefault",
+			            },
+			          },
 			          "topologySpreadConstraints": [
 			            {
 			              "labelSelector": {
@@ -1701,5 +1721,36 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			  },
 			}
 		`);
+	});
+
+	// The minimal (Astro) templates' stock nginx starts as root: the platform passes no user for
+	// them, and the rendered pod must then force none (no runAsNonRoot / uid, no capability drop),
+	// while keeping what is safe for a root process.
+	it('forces no user or capability drop when the deploy does not name the image user', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(
+			createMockContext({
+				kubeconfig: VALID,
+				namespace: 'ever-works',
+				ingressHost: 'work-1.example.com',
+				registry: { kind: 'github', visibility: 'auto' }
+			})
+		);
+
+		const result = await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: false }
+			},
+			VALID
+		);
+
+		expect(result.status).toBe('deploying');
+		const pod = (vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>).spec.template.spec;
+		expect(pod.automountServiceAccountToken).toBe(false);
+		expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });
+		expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false });
 	});
 });
