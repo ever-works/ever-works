@@ -44,6 +44,12 @@ export const DOMAIN_EVENT_ROUTE_COVERAGE: Readonly<Record<string, RouteCoverage>
     'POST /api/tasks/:id/attachments': { events: ['task.attachment.added'] },
     'DELETE /api/tasks/:id/attachments/:attachmentId': { events: ['task.attachment.removed'] },
     'POST /api/tasks/:id/relations': { events: ['task.relation.added'] },
+    // APW-08 delivery chain (#3031): Close anyway moves the Task to Done through the transition
+    // service; Try once more files the follow-up Task (TasksService.create) and resolves the
+    // delivery-failed escalation like the escalation route; Create a fix Task files the follow-up.
+    'POST /api/tasks/:id/delivery/close': { events: ['task.transitioned'] },
+    'POST /api/tasks/:id/delivery/follow-up': { events: ['task.created', 'inbox.item.answered'] },
+    'POST /api/tasks/:id/delivery/fix-task': { events: ['task.created'] },
     'POST /api/tasks/:id/chat': { events: ['task.comment.created'] },
 
     // ── Task chat (`api/task-chat-messages`) ─────────────────────────────────
