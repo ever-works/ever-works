@@ -316,7 +316,7 @@ describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on a
 
     function makeSvc(
         permissions: Record<string, boolean> | undefined,
-        extras: { agentReviews?: unknown; sessionSchedules?: unknown } = {},
+        extras: { agentReviews?: unknown; sessionSchedules?: unknown; missionRows?: unknown } = {},
     ): TaskTransitionService {
         runs = {
             createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
@@ -352,6 +352,8 @@ describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on a
             extras.agentReviews,
             undefined, // domainEvents
             extras.sessionSchedules,
+            undefined, // appWorkRunAdmission
+            extras.missionRows,
         );
     }
 
@@ -426,6 +428,62 @@ describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on a
         expect(result.error).toContain(FR9);
         expect(sessionSchedules.dispatch).not.toHaveBeenCalled();
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    // APW-08 T35 (FR-53, APW08-G15) — the run's own spend cap is stored on the run row at dispatch.
+    it('stores a per-run budget cap on the run row; a non-positive or fractional one is no cap', async () => {
+        const svc = makeSvc({ canCommitToRepo: true });
+        await svc.dispatchAgentRun(makeTask({ workId: 'w-site' }), 'agent-a', {
+            maxBudgetCents: 1500,
+        });
+        expect(runs.createQueued.mock.calls[0][0]).toMatchObject({ budgetCapCents: 1500 });
+        for (const maxBudgetCents of [0, -5, 12.5]) {
+            await svc.dispatchAgentRun(makeTask({ workId: 'w-site' }), 'agent-a', {
+                maxBudgetCents,
+            });
+        }
+        await svc.dispatchAgentRun(makeTask({ workId: 'w-site' }), 'agent-a');
+        for (const [args] of runs.createQueued.mock.calls.slice(1)) {
+            expect(args).not.toHaveProperty('budgetCapCents');
+        }
+    });
+
+    // Review of #3061 (FR-53) — the Mission's per-run cap is resolved HERE for every run of a
+    // Mission's Task, whichever surface started it (board drag, Run, retry, review, recurrence).
+    it('resolves the Mission’s per-run cap for a Mission Task with no explicit cap; the lower one wins', async () => {
+        const missionRows = {
+            findOne: jest.fn(async () => ({
+                id: 'm1',
+                guardrailsOverride: { maxBudgetCentsPerRun: 2500 },
+            })),
+        };
+        const svc = makeSvc({ canCommitToRepo: true }, { missionRows });
+        await svc.dispatchAgentRun(makeTask({ workId: 'w-site', missionId: 'm1' }), 'agent-a');
+        expect(missionRows.findOne).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: 'm1' } }),
+        );
+        expect(runs.createQueued.mock.calls[0][0]).toMatchObject({ budgetCapCents: 2500 });
+
+        await svc.dispatchAgentRun(makeTask({ workId: 'w-site', missionId: 'm1' }), 'agent-a', {
+            maxBudgetCents: 900,
+        });
+        expect(runs.createQueued.mock.calls[1][0]).toMatchObject({ budgetCapCents: 900 });
+        await svc.dispatchAgentRun(makeTask({ workId: 'w-site', missionId: 'm1' }), 'agent-a', {
+            maxBudgetCents: 9000,
+        });
+        expect(runs.createQueued.mock.calls[2][0]).toMatchObject({ budgetCapCents: 2500 });
+    });
+
+    it('a Task with no Mission reads no Mission; an unreadable Mission dispatches without its cap', async () => {
+        const missionRows = { findOne: jest.fn().mockRejectedValue(new Error('db down')) };
+        const svc = makeSvc({ canCommitToRepo: true }, { missionRows });
+        await svc.dispatchAgentRun(makeTask({ workId: 'w-site' }), 'agent-a');
+        expect(missionRows.findOne).not.toHaveBeenCalled();
+        await svc.dispatchAgentRun(makeTask({ workId: 'w-site', missionId: 'm1' }), 'agent-a');
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(2);
+        for (const [args] of runs.createQueued.mock.calls) {
+            expect(args).not.toHaveProperty('budgetCapCents');
+        }
     });
 
     it('an Agent-session schedule whose Agent may commit (or on another kind) still starts its session', async () => {

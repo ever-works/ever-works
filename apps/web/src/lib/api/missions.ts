@@ -29,6 +29,16 @@ export type MissionOutcome =
     | 'cancelled'
     | 'superseded';
 
+/** APW-08 T34/T36 — `ideas` (every Mission before P2), `tasks` or `both`. */
+export type MissionOutputMode = 'ideas' | 'tasks' | 'both';
+
+/** APW-08 T34/T36 — `{ tasksPerTick 1..3, openTasksCap 1..10, agentId? }`. */
+export interface MissionTaskOutput {
+    tasksPerTick: number;
+    openTasksCap: number;
+    agentId?: string;
+}
+
 export interface Mission {
     id: string;
     title: string;
@@ -52,6 +62,13 @@ export interface Mission {
     sourceMissionId: string | null;
     createdAt: string;
     updatedAt: string;
+    /** APW-08 T34 (FR-51) — what the tick files. */
+    outputMode?: MissionOutputMode;
+    /** APW-08 T34 — the Task output's bounds (normalized by the API). */
+    taskOutput?: MissionTaskOutput;
+    taskOutputNoticeAt?: string | null;
+    /** APW-08 T34 — on a write's answer only: `noAppWorkRelation`. */
+    warnings?: string[];
 }
 
 export interface CreateMissionInput {
@@ -74,6 +91,10 @@ export interface UpdateMissionInput {
     outstandingIdeasCap?: number | null;
     guardrailsOverride?: Record<string, unknown> | null;
     missionTemplateRepo?: string | null;
+    /** APW-08 T36 (FR-51). */
+    outputMode?: MissionOutputMode;
+    /** APW-08 T36 — `null` resets to the defaults. */
+    taskOutput?: Partial<MissionTaskOutput> | null;
 }
 
 export interface CloneMissionResult {
@@ -111,11 +132,15 @@ export interface MissionRunNowResponse {
         | 'spawned'
         | 'cap-hit'
         | 'no-ideas'
+        | 'tasks-filed'
+        | 'no-tasks'
         | 'failed'
         | 'cron-no-match';
     missionId: string;
     ideasCreated?: number;
     ideasQueued?: number;
+    /** APW-08 T35 — Tasks filed on the Mission's App Works. */
+    tasksFiled?: number;
     message?: string;
 }
 
@@ -415,6 +440,8 @@ export interface MissionWorkRelationDto {
     readonly createdAt: string;
     readonly workName: string | null;
     readonly workSlug: string | null;
+    /** APW-08 T34 — the Work's kind (`app` lets a Mission file Tasks on it). */
+    readonly workKind?: string | null;
 }
 
 /**

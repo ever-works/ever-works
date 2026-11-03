@@ -1,3 +1,9 @@
+import {
+    normalizeMissionOutputMode,
+    normalizeMissionTaskOutput,
+    type MissionOutputMode,
+    type MissionTaskOutput,
+} from './mission-task-output';
 import type {
     Mission,
     MissionGuardrailsOverride,
@@ -33,6 +39,17 @@ export interface MissionDto {
     /** Self-FK for Mission Clone traceability (Phase 0 PR 0.10,
      *  Decision A25). NULL for direct-created Missions. */
     sourceMissionId: string | null;
+    /** APW-08 T34 (FR-51) — `ideas` / `tasks` / `both`. */
+    outputMode: MissionOutputMode;
+    /** APW-08 T34 — the Task output's bounds, normalized (defaults when unset). */
+    taskOutput: MissionTaskOutput;
+    /** APW-08 T34 (FR-54) — when the "nothing to file" notice was last recorded. */
+    taskOutputNoticeAt: Date | null;
+    /**
+     * APW-08 T34 — set on a write's answer only: `noAppWorkRelation` when the Mission files Tasks
+     * but has no App Work attached as Improves or Operates (accepted all the same, S27).
+     */
+    warnings?: string[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -60,6 +77,9 @@ export function toMissionDto(mission: Mission): MissionDto {
         missionTemplateRepo: mission.missionTemplateRepo ?? null,
         missionRepo: mission.missionRepo ?? null,
         sourceMissionId: mission.sourceMissionId ?? null,
+        outputMode: normalizeMissionOutputMode(mission.outputMode),
+        taskOutput: normalizeMissionTaskOutput(mission.taskOutput),
+        taskOutputNoticeAt: mission.taskOutputNoticeAt ?? null,
         createdAt: mission.createdAt,
         updatedAt: mission.updatedAt,
     };

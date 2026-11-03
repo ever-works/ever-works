@@ -52,6 +52,10 @@ const SUBTREES = [
     'dashboard.aiChat.changeCard',
     'dashboard.tasksPage.appRules.containmentDowngrade',
     'dashboard.tasksPage.appRules.allowOnThisMachine',
+    // APW-08 P2 T37 — the Goal's Work (T33) and the Mission's Output (T36).
+    'dashboard.goalNew.work',
+    'dashboard.goalDetail.work',
+    'dashboard.missionDetail.output',
 ] as const;
 
 type Tree = { [key: string]: string | Tree };
@@ -148,6 +152,56 @@ describe('APW-08 evolve copy (T28)', () => {
             '{agent} will work on it. An agent run will start; runs are billed to your workspace.',
         );
         expect(at(en, 'dashboard.tasksPage.deliveryPosts.live')).toBe('Live at {url}.');
+    });
+
+    it('carries the APW-08 P2 copy: the Goal’s Work and the Mission’s Output (T37)', () => {
+        for (const path of [
+            'dashboard.goalNew.work.label',
+            'dashboard.goalDetail.work.lockedWhileRunning',
+            'dashboard.missionDetail.output.tasksPerTick',
+            'dashboard.missionDetail.output.openCap',
+            'dashboard.missionDetail.output.noAppWork',
+            'dashboard.missionDetail.output.tasksOnWorks',
+        ]) {
+            expect(enLeaves).toContain(path);
+        }
+        const en = bundle('en');
+        // Plan §6 copy, verbatim.
+        expect(at(en, 'dashboard.missionDetail.output.tasks')).toBe('Tasks on attached App Works');
+        expect(at(en, 'dashboard.missionDetail.output.nothingToFile')).toBe(
+            'No attached App Work to file Tasks on.',
+        );
+        expect(at(en, 'dashboard.missionDetail.output.appliesTo')).toBe(
+            'Applies to Works attached as Improves or Operates.',
+        );
+    });
+
+    // Review of #3061 — two leaves outside the sub-trees above: the Activity feed's line for a
+    // tick that had nothing to file, and the Run-now toast for a `both` Mission that did both.
+    it('carries the review-of-#3061 leaves in all 21 bundles, placeholders and tags intact', () => {
+        const paths = [
+            'dashboard.feed.narration.missionNothingToFile',
+            'dashboard.missionDetail.toasts.runNow.spawned-and-tasks-filed',
+        ];
+        const problems: string[] = [];
+        for (const locale of locales()) {
+            const json = bundle(locale);
+            for (const path of paths) {
+                const value = at(json, path);
+                const english = at(en, path) as string;
+                if (typeof value !== 'string' || value.trim().length === 0) {
+                    problems.push(`${locale}: ${path} missing`);
+                    continue;
+                }
+                if (placeholders(value).join(',') !== placeholders(english).join(',')) {
+                    problems.push(`${locale}: ${path} placeholders differ`);
+                }
+                if (english.includes('<b>') && !(value.includes('<b>') && value.includes('</b>'))) {
+                    problems.push(`${locale}: ${path} lost its <b> tag`);
+                }
+            }
+        }
+        expect(problems).toEqual([]);
     });
 
     it('every leaf exists, non-empty, in all 21 bundles', () => {

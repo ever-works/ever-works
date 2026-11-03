@@ -123,3 +123,46 @@ describe('missions UpdateMissionDto.missionTemplateRepo (SSRF defense-in-depth)'
         expect(constraintsFor(errs, 'missionTemplateRepo').isMissionTemplateRepo).toBeDefined();
     });
 });
+
+/** APW-08 T34 (FR-51) — the output mode and the bounds of the Task output. */
+describe('missions outputMode and taskOutput (APW-08 T34)', () => {
+    const errorsOf = async (cls: typeof CreateMissionDto | typeof UpdateMissionDto, body: object) =>
+        validate(plainToInstance(cls, body) as object);
+
+    it('accepts the three modes, and bounded Task output on create and update', async () => {
+        for (const outputMode of ['ideas', 'tasks', 'both']) {
+            expect(await errorsOf(CreateMissionDto, { ...baseCreate, outputMode })).toHaveLength(0);
+        }
+        expect(
+            await errorsOf(UpdateMissionDto, {
+                outputMode: 'tasks',
+                taskOutput: {
+                    tasksPerTick: 3,
+                    openTasksCap: 10,
+                    agentId: '11111111-1111-4111-8111-111111111111',
+                },
+            }),
+        ).toHaveLength(0);
+        expect(await errorsOf(UpdateMissionDto, { taskOutput: null })).toHaveLength(0);
+        expect(await errorsOf(UpdateMissionDto, { taskOutput: {} })).toHaveLength(0);
+    });
+
+    it('rejects an unknown mode', async () => {
+        const errs = await errorsOf(CreateMissionDto, { ...baseCreate, outputMode: 'all' });
+        expect(Object.keys(constraintsFor(errs, 'outputMode'))).toContain('isIn');
+    });
+
+    it('rejects Task output out of bounds and a non-uuid Agent', async () => {
+        for (const taskOutput of [
+            { tasksPerTick: 0 },
+            { tasksPerTick: 4 },
+            { openTasksCap: 0 },
+            { openTasksCap: 11 },
+            { tasksPerTick: 1.5 },
+            { agentId: 'agent-1' },
+        ]) {
+            const errs = await errorsOf(UpdateMissionDto, { taskOutput });
+            expect(errs.find((e) => e.property === 'taskOutput')).toBeDefined();
+        }
+    });
+});

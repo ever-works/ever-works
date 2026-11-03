@@ -869,8 +869,15 @@ describe('GoalsService — the Goal’s Work (APW-08 T31)', () => {
     it('update: sets, changes and clears the Work while the loop is not running', async () => {
         const service = build();
         goalsRepo._rows.push(makeGoalRow({ id: 'g-paused', loopStatus: 'paused' } as never));
-        expect((await service.update('u1', 'g-paused', { workId: WORK })).workId).toBe(WORK);
-        expect((await service.update('u1', 'g-paused', { workId: null })).workId).toBeNull();
+        // Review of #3061 — the update answer names the Work, so the page's link keeps its name.
+        expect(await service.update('u1', 'g-paused', { workId: WORK })).toMatchObject({
+            workId: WORK,
+            workName: 'Bookings',
+        });
+        expect(await service.update('u1', 'g-paused', { workId: null })).toMatchObject({
+            workId: null,
+            workName: null,
+        });
         await expect(service.update('u1', 'g-paused', { workId: OTHER })).rejects.toBeInstanceOf(
             NotFoundException,
         );

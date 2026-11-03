@@ -2330,7 +2330,10 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Завдання створено в App Works місії.",
+                    "no-tasks": "Нічого нового для створення в App Works місії.",
+                    "spawned-and-tasks-filed": "Створено нові ідеї та завдання в App Works місії."
                 }
             },
             "goals": {
@@ -2362,6 +2365,26 @@
                     "detached": "Ціль від'єднано",
                     "detachError": "Не вдалося від'єднати Ціль"
                 }
+            },
+            "output": {
+                "title": "Результат",
+                "ideas": "Ідеї",
+                "tasks": "Завдання в прикріплених App Works",
+                "both": "Обидва",
+                "tasksPerTick": "Завдань за цикл",
+                "openCap": "Ліміт відкритих завдань на Work",
+                "appliesTo": "Стосується Works, прикріплених як «Покращує» або «Обслуговує».",
+                "noAppWork": "Прикріпіть App Work як «Покращує» або «Обслуговує», щоб створювати в ньому завдання.",
+                "tasksOnWorks": "Завдання в прикріплених Works",
+                "nothingToFile": "Немає прикріпленого App Work для створення завдань.",
+                "tasksOnWorksEmpty": "Завдань ще немає.",
+                "save": "Зберегти",
+                "saved": "Результат збережено",
+                "saveError": "Не вдалося зберегти результат",
+                "loading": "Завантаження…",
+                "unavailable": "Не вдалося завантажити завдання.",
+                "previous": "Назад",
+                "next": "Далі"
             }
         },
         "ideasPage": {
@@ -2728,6 +2751,11 @@
             "viewToggle": {
                 "log": "Журнал",
                 "schedules": "Розклади"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> сьогодні не знайшов нічого нового для створення в App Works місії"
             }
         },
         "works": {
@@ -9074,6 +9102,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Без Work",
+                "hint": "Необов’язково. Цикл створює кожну ітерацію в цьому Work. В App Work кожна ітерація має власну гілку й пул-реквест."
             }
         },
         "goalDetail": {
@@ -9316,6 +9349,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Без Work",
+                "unnamed": "Work, який ви більше не можете відкрити",
+                "changeLabel": "Змінити Work",
+                "hint": "Цикл створює кожну ітерацію в цьому Work.",
+                "lockedWhileRunning": "Призупиніть цикл, щоб змінити його Work.",
+                "saved": "Work збережено",
+                "saveError": "Не вдалося змінити Work"
             }
         },
         "sidebar": {
