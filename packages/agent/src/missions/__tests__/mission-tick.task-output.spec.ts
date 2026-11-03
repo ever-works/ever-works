@@ -1,5 +1,5 @@
 import type { Repository } from 'typeorm';
-import { MissionTickService } from '../mission-tick.service';
+import { combineBothOutcomes, MissionTickService } from '../mission-tick.service';
 import { Mission, MissionStatus, MissionType } from '../../entities/mission.entity';
 import { ActivityActionType } from '../../entities/activity-log.types';
 
@@ -53,12 +53,52 @@ function build(
         organizationId: null,
         ...missionOver,
     } as unknown as Mission;
+    // The Task-output lease (review of #3061): a compare-and-set on
+    // `taskOutputLeaseUntil`, modelled on the one Mission row.
+    const leaseWrites: Array<{ set: Row; params: Row }> = [];
+    const createQueryBuilder = jest.fn(() => {
+        const state: { set: Row; params: Row } = { set: {}, params: {} };
+        const qb = {
+            update: () => qb,
+            set: (patch: Row) => {
+                state.set = patch;
+                return qb;
+            },
+            where: (_clause: string, params: Row = {}) => {
+                Object.assign(state.params, params);
+                return qb;
+            },
+            andWhere: (_clause: string, params: Row = {}) => {
+                Object.assign(state.params, params);
+                return qb;
+            },
+            execute: jest.fn(async () => {
+                leaseWrites.push({ set: { ...state.set }, params: { ...state.params } });
+                const held = (mission as unknown as Row).taskOutputLeaseUntil as Date | null;
+                const next = state.set.taskOutputLeaseUntil as Date | null;
+                if (next instanceof Date) {
+                    const now = state.params.now as number;
+                    if (held && held.getTime() >= now) return { affected: 0 };
+                    (mission as unknown as Row).taskOutputLeaseUntil = next;
+                    return { affected: 1 };
+                }
+                if (held && held.getTime() === state.params.held) {
+                    (mission as unknown as Row).taskOutputLeaseUntil = null;
+                    return { affected: 1 };
+                }
+                return { affected: 0 };
+            }),
+        };
+        return qb;
+    });
     const missionRepo = {
         findOne: jest.fn(async () => mission),
         update: jest.fn(async (_where: Row, patch: Row) => {
             Object.assign(mission, patch);
             return { affected: 1 };
         }),
+        createQueryBuilder,
+        manager: { connection: { driver: { escape: (name: string) => `"${name}"` } } },
     };
     const proposals = { generate: jest.fn(async () => ({ status: 'generated', proposals: [] })) };
     const proposalRepo = { countOutstandingByMission: jest.fn(async () => 0) };
@@ -72,11 +112,13 @@ function build(
     };
     const taskRows: Row[] = [];
     const taskRepo = {
-        find: jest.fn(async (opts: { where: Row; take?: number; order?: Row }) => {
-            let rows = taskRows.filter((row) => matches(row, opts.where));
-            if (opts.order) rows = [...rows].reverse();
-            return rows.slice(0, opts.take ?? rows.length);
+        find: jest.fn(async () => {
+            throw new Error('the tick must not read Task rows past the visibility predicate');
         }),
+        count: jest.fn(
+            async (opts: { where: Row }) =>
+                taskRows.filter((row) => matches(row, opts.where)).length,
+        ),
     };
     const planner = {
         plan: jest.fn(async (input: { count: number; work: { id: string } }) =>
@@ -94,6 +136,23 @@ function build(
             return task;
         }),
         runTask: jest.fn(async () => ({ dispatched: true })),
+        // The Tasks list's visibility predicate, modelled: the owner's own rows, and other
+        // people's rows unless they are private.
+        list: jest.fn(
+            async (
+                userId: string,
+                filter: { workId?: string; status?: string[]; orderBy?: string; limit?: number },
+            ) => {
+                let rows = taskRows.filter(
+                    (row) =>
+                        row.workId === filter.workId &&
+                        (!filter.status || filter.status.includes(row.status as string)) &&
+                        ((row.userId ?? userId) === userId || row.visibility !== 'private'),
+                );
+                if (filter.orderBy === 'createdAt') rows = [...rows].reverse();
+                return { rows: rows.slice(0, filter.limit ?? 50), total: rows.length };
+            },
+        ),
     };
     const moduleRef = { get: jest.fn(() => tasksService) };
     const sink = { track: jest.fn() };
@@ -127,6 +186,8 @@ function build(
         taskRows,
         sink,
         missionWorks,
+        taskRepo,
+        leaseWrites,
     };
 }
 
@@ -179,15 +240,120 @@ describe('MissionTickService — Task output (APW-08 T35)', () => {
         );
     });
 
-    it('starts each Task capped by the Mission’s per-run budget (FR-53)', async () => {
+    // Review of #3061 — the per-run cap is resolved by `dispatchAgentRun` from the Task's Mission
+    // for EVERY run of it, so the tick passes none of its own (pinned in the transition spec).
+    it('leaves the Mission’s per-run budget to the dispatch path (FR-53)', async () => {
         const t = build({ guardrailsOverride: { maxBudgetCentsPerRun: 1500 } } as Partial<Mission>);
         await t.service.runOnce('m1', 'u1');
         expect(t.tasksService.runTask).toHaveBeenCalledWith(
             'u1',
             't-1',
-            { agentId: null, maxBudgetCents: 1500 },
+            { agentId: null },
             undefined,
         );
+    });
+
+    it('counts the Mission’s open Tasks on the Work in SQL, never by reading rows', async () => {
+        const t = build();
+        await t.service.runOnce('m1', 'u1');
+        expect(t.taskRepo.count).toHaveBeenCalledWith({
+            where: expect.objectContaining({ workId: 'w-1', missionId: 'm1' }),
+        });
+        expect(t.taskRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('never puts a colleague’s private Task in the planner prompt (review of #3061)', async () => {
+        const t = build({ taskOutput: { tasksPerTick: 2, openTasksCap: 10 } } as Partial<Mission>);
+        t.taskRows.push(
+            { id: 'mine', workId: 'w-1', userId: 'u1', status: 'todo', title: 'My own Task' },
+            {
+                id: 'secret',
+                workId: 'w-1',
+                userId: 'u2',
+                visibility: 'private',
+                status: 'todo',
+                title: 'Colleague secret plan',
+            },
+            {
+                id: 'shared',
+                workId: 'w-1',
+                userId: 'u3',
+                visibility: 'organization',
+                status: 'todo',
+                title: 'Shared roadmap item',
+            },
+        );
+        await t.service.runOnce('m1', 'u1');
+        const titles = (
+            t.planner.plan.mock.calls[0][0] as unknown as { recentTaskTitles: string[] }
+        ).recentTaskTitles;
+        expect(titles).toEqual(expect.arrayContaining(['My own Task', 'Shared roadmap item']));
+        expect(titles).not.toContain('Colleague secret plan');
+        for (const [userId, filter] of t.tasksService.list.mock.calls) {
+            expect(userId).toBe('u1');
+            expect(filter).toMatchObject({ workId: 'w-1', view: 'organization' });
+        }
+    });
+
+    it('while App changes are paused (T49) it asks no planner and files nothing', async () => {
+        const previous = process.env.EVER_WORKS_APP_CHANGES_ENABLED;
+        process.env.EVER_WORKS_APP_CHANGES_ENABLED = 'false';
+        try {
+            const t = build();
+            const result = await t.service.runOnce('m1', 'u1');
+            expect(result).toMatchObject({
+                outcome: 'no-tasks',
+                tasksFiled: 0,
+                message: 'app-changes-paused',
+            });
+            expect(t.planner.plan).not.toHaveBeenCalled();
+            expect(t.tasksService.create).not.toHaveBeenCalled();
+            expect(nothingToFile(t.activityLog)).toHaveLength(0);
+        } finally {
+            if (previous === undefined) delete process.env.EVER_WORKS_APP_CHANGES_ENABLED;
+            else process.env.EVER_WORKS_APP_CHANGES_ENABLED = previous;
+        }
+    });
+
+    it('holds the Mission’s lease while it files and gives it back after', async () => {
+        const t = build();
+        await t.service.runOnce('m1', 'u1');
+        expect(t.leaseWrites).toHaveLength(2);
+        expect(t.leaseWrites[0].set.taskOutputLeaseUntil).toBeInstanceOf(Date);
+        // A tick is not an edit: `updatedAt` keeps its value.
+        expect(typeof t.leaseWrites[0].set.updatedAt).toBe('function');
+        expect(t.leaseWrites[1].set.taskOutputLeaseUntil).toBeNull();
+        expect((t.mission as unknown as Row).taskOutputLeaseUntil).toBeNull();
+    });
+
+    it('a tick that finds the lease held files nothing and asks no planner', async () => {
+        const t = build();
+        (t.mission as unknown as Row).taskOutputLeaseUntil = new Date(Date.now() + 60_000);
+        const result = await t.service.runOnce('m1', 'u1');
+        expect(result).toMatchObject({ outcome: 'no-tasks', message: 'task-output-busy' });
+        expect(t.planner.plan).not.toHaveBeenCalled();
+        expect(t.tasksService.create).not.toHaveBeenCalled();
+    });
+
+    it('two overlapping ticks (Run now + the schedule) never both file up to the cap', async () => {
+        const t = build({ taskOutput: { tasksPerTick: 3, openTasksCap: 3 } } as Partial<Mission>);
+        const [first, second] = await Promise.all([
+            t.service.runOnce('m1', 'u1'),
+            t.service.runOnce('m1', 'u1'),
+        ]);
+        expect([first.tasksFiled, second.tasksFiled].sort()).toEqual([0, 3]);
+        expect(t.tasksService.create).toHaveBeenCalledTimes(3);
+        expect(t.planner.plan).toHaveBeenCalledTimes(1);
+    });
+
+    it('a lease that cannot be written files nothing (fail closed)', async () => {
+        const t = build();
+        t.missionRepo.createQueryBuilder.mockImplementation(() => {
+            throw new Error('db down');
+        });
+        const result = await t.service.runOnce('m1', 'u1');
+        expect(result).toMatchObject({ outcome: 'no-tasks', message: 'task-output-busy' });
+        expect(t.planner.plan).not.toHaveBeenCalled();
     });
 
     it('requires approval before creating: filed in Backlog, never started (ACC-08-26)', async () => {
@@ -305,10 +471,38 @@ describe('MissionTickService — Task output (APW-08 T35)', () => {
         ).toHaveLength(2);
     });
 
-    it('a `both` Mission runs the Ideas branch, then files Tasks', async () => {
+    it('a `both` Mission runs the Ideas branch, then files Tasks — and reports both halves', async () => {
         const t = build({ outputMode: 'both' } as Partial<Mission>);
         const result = await t.service.runOnce('m1', 'u1');
         expect(t.proposals.generate).toHaveBeenCalledTimes(1);
         expect(result.tasksFiled).toBe(1);
+        // Review of #3061 — "generated no Ideas" no longer hides the Tasks that were filed.
+        expect(result.outcome).toBe('tasks-filed');
+        expect(result.message).toMatch(/^ideas: .*; tasks: /);
+    });
+
+    it('combineBothOutcomes: Ideas spawned wins; Tasks filed beats an empty Ideas half; else the Ideas outcome', () => {
+        expect(
+            combineBothOutcomes(
+                { outcome: 'spawned', ideasCreated: 2 },
+                { outcome: 'tasks-filed', tasksFiled: 1 },
+            ),
+        ).toMatchObject({ outcome: 'spawned', ideasCreated: 2, tasksFiled: 1 });
+        expect(
+            combineBothOutcomes(
+                { outcome: 'cap-hit', outstanding: 5, cap: 5 },
+                { outcome: 'tasks-filed', tasksFiled: 2 },
+            ),
+        ).toMatchObject({ outcome: 'tasks-filed', tasksFiled: 2, cap: 5 });
+        expect(
+            combineBothOutcomes(
+                { outcome: 'no-ideas', message: 'none' },
+                { outcome: 'no-tasks', tasksFiled: 0, message: 'works=1 filed=0' },
+            ),
+        ).toMatchObject({
+            outcome: 'no-ideas',
+            tasksFiled: 0,
+            message: 'ideas: none; tasks: works=1 filed=0',
+        });
     });
 });

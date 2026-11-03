@@ -31,6 +31,8 @@ import {
     type OwnershipScope,
 } from '../database/ownership-scope';
 import { AppChangeTelemetry } from '../app-works/app-change.telemetry';
+import { readAppWorkSwitches } from '../app-works/app-work-switches';
+import type { ListTasksFilter } from '../database/repositories/task.repository';
 import {
     APP_WORKS_TELEMETRY_SINK,
     type AppWorksTelemetrySink,
@@ -52,6 +54,41 @@ export const MISSION_TASK_OUTPUT_MAX_WORKS = 5;
 
 /** APW-08 T35 (FR-52) — the label every Mission-filed Task carries. */
 export const MISSION_TASK_LABEL = 'mission-task';
+
+/**
+ * Review of #3061 — how long one tick holds a Mission's Task-output lease
+ * (`missions.taskOutputLeaseUntil`). Far above one tick's planner calls (at most five Works);
+ * a tick that dies mid-run leaves the lease to expire on its own after this.
+ */
+export const MISSION_TASK_OUTPUT_LEASE_MS = 10 * 60_000;
+
+/** Review of #3061 — at most this many open Work Tasks are read for the duplicate-title check. */
+export const MISSION_TASK_OUTPUT_OPEN_TITLES = 500;
+
+/**
+ * Review of #3061 (FR-51) — a `both` Mission's tick outcome, from its Ideas half and its Tasks
+ * half: `spawned` when Ideas were spawned (Tasks counted in `tasksFiled`), else `tasks-filed`
+ * when Tasks were filed (so an Ideas `no-ideas` / `cap-hit` no longer hides them), else the
+ * Ideas outcome. The message carries both halves.
+ */
+export function combineBothOutcomes(
+    ideas: MissionTickOutcome,
+    tasks: MissionTickOutcome,
+): MissionTickOutcome {
+    const tasksFiled = tasks.tasksFiled ?? 0;
+    const outcome =
+        ideas.outcome !== 'spawned' && tasksFiled > 0 ? ('tasks-filed' as const) : ideas.outcome;
+    const message = [
+        `ideas: ${ideas.message ?? ideas.outcome}`,
+        `tasks: ${tasks.message ?? tasks.outcome}`,
+    ].join('; ');
+    return { ...ideas, outcome, tasksFiled, message };
+}
+
+/** The Task statuses that count as open (everything but Done and Cancelled). */
+const OPEN_TASK_STATUSES: TaskStatus[] = Object.values(TaskStatus).filter(
+    (status) => status !== TaskStatus.DONE && status !== TaskStatus.CANCELLED,
+);
 
 /**
  * Outcome of running a single Mission tick (either via the
@@ -370,7 +407,7 @@ export class MissionTickService {
         const ideas = await this.runIdeaOutput(mission);
         if (mode === 'ideas' || ideas.outcome === 'failed') return ideas;
         const tasks = await this.runTaskOutput(mission, now);
-        return { ...ideas, tasksFiled: tasks.tasksFiled ?? 0 };
+        return combineBothOutcomes(ideas, tasks);
     }
 
     /** The Ideas branch — what every Mission's tick did before APW-08 P2 (unchanged). */
@@ -627,6 +664,11 @@ export class MissionTickService {
      * Best-effort per Work: one Work's failure never stops the others or fails the Mission.
      */
     private async runTaskOutput(mission: Mission, now: Date): Promise<MissionTickOutcome> {
+        // APW-08 T49 (R-30, review of #3061) — while the operator has paused App changes, the
+        // Task branch neither pays for a planner call nor files anything. Read now, never cached.
+        if (!readAppWorkSwitches().changesEnabled) {
+            return { outcome: 'no-tasks', tasksFiled: 0, message: 'app-changes-paused' };
+        }
         const tasksService = this.tasksService();
         if (!this.taskPlanner || !this.missionWorks || !this.taskRows || !tasksService) {
             this.logger.warn(
@@ -634,6 +676,82 @@ export class MissionTickService {
             );
             return { outcome: 'no-tasks', tasksFiled: 0, message: 'task-output-unavailable' };
         }
+        // Review of #3061 — a scheduled tick and a Run now (or two pods) must not both count the
+        // open Tasks, wait on the planner, then both file up to the cap: one holds the lease.
+        const lease = await this.claimTaskOutputLease(mission.id);
+        if (lease === null) {
+            return { outcome: 'no-tasks', tasksFiled: 0, message: 'task-output-busy' };
+        }
+        try {
+            return await this.fileTaskOutput(mission, now, tasksService);
+        } finally {
+            await this.releaseTaskOutputLease(mission.id, lease);
+        }
+    }
+
+    /**
+     * Review of #3061 — claim the Mission's Task-output lease with a compare-and-set:
+     * `SET taskOutputLeaseUntil = :until WHERE id = :id AND (taskOutputLeaseUntil IS NULL OR
+     * taskOutputLeaseUntil < :now)`, both instants bound as epoch milliseconds (the column is a
+     * portable `bigint`), the pattern of `WorkAppDependencyRepository.claimLease`. `updatedAt`
+     * keeps its value: a tick is not an edit of the Mission. Returns the instant held (for the
+     * compare-and-clear release), or `null` when another tick holds the lease or the claim could
+     * not be written (fail closed: nothing is filed this tick).
+     */
+    private async claimTaskOutputLease(missionId: string): Promise<number | null> {
+        const nowMs = Date.now();
+        const untilMs = nowMs + MISSION_TASK_OUTPUT_LEASE_MS;
+        try {
+            const driver = this.missions.manager.connection.driver;
+            const column = driver.escape('taskOutputLeaseUntil');
+            const keepUpdatedAt = driver.escape('updatedAt');
+            const result = await this.missions
+                .createQueryBuilder()
+                .update(Mission)
+                .set({ taskOutputLeaseUntil: new Date(untilMs), updatedAt: () => keepUpdatedAt })
+                .where('id = :id', { id: missionId })
+                .andWhere(`(${column} IS NULL OR ${column} < :now)`, { now: nowMs })
+                .execute();
+            return (result.affected ?? 0) === 1 ? untilMs : null;
+        } catch (err) {
+            this.logger.warn(
+                `Mission ${missionId}: the Task-output lease could not be claimed (${
+                    err instanceof Error ? err.message : String(err)
+                }); nothing filed this tick.`,
+            );
+            return null;
+        }
+    }
+
+    /** Compare-and-clear: only the instant THIS tick set, so a later holder is never released. */
+    private async releaseTaskOutputLease(missionId: string, heldUntilMs: number): Promise<void> {
+        try {
+            const driver = this.missions.manager.connection.driver;
+            const keepUpdatedAt = driver.escape('updatedAt');
+            await this.missions
+                .createQueryBuilder()
+                .update(Mission)
+                .set({ taskOutputLeaseUntil: null, updatedAt: () => keepUpdatedAt })
+                .where('id = :id', { id: missionId })
+                .andWhere(`${driver.escape('taskOutputLeaseUntil')} = :held`, {
+                    held: heldUntilMs,
+                })
+                .execute();
+        } catch (err) {
+            this.logger.warn(
+                `Mission ${missionId}: the Task-output lease could not be released (${
+                    err instanceof Error ? err.message : String(err)
+                }); it expires on its own.`,
+            );
+        }
+    }
+
+    /** The Task branch's body, run while this tick holds the Mission's lease. */
+    private async fileTaskOutput(
+        mission: Mission,
+        now: Date,
+        tasksService: TasksService,
+    ): Promise<MissionTickOutcome> {
         const scope = ownershipRelationScopeOf(mission) ?? undefined;
         let relations: Awaited<ReturnType<MissionWorkRepository['listForMissionWithWork']>> = [];
         try {
@@ -681,6 +799,7 @@ export class MissionTickService {
                     output,
                     requireApproval,
                     scope,
+                    tasksService,
                 );
                 tasksFiled += result.filed;
                 skippedCap += result.cappedOut ? 1 : 0;
@@ -719,27 +838,32 @@ export class MissionTickService {
         output: MissionTaskOutput,
         requireApproval: boolean,
         scope: OwnershipScope | undefined,
+        tasksService: TasksService,
     ): Promise<{ filed: number; cappedOut: boolean; duplicates: number }> {
-        const taskRows = this.taskRows!;
-        const tasksService = this.tasksService()!;
-        const open = await taskRows.find({
+        // Review of #3061 — the cap counts this Mission's open Tasks on the Work in SQL (a count
+        // carries no title, so it needs no visibility filter).
+        const openForMission = await this.taskRows!.count({
             where: {
                 workId: target.workId,
+                missionId: mission.id,
                 status: Not(In([TaskStatus.DONE, TaskStatus.CANCELLED])),
             },
-            select: ['id', 'title', 'missionId'],
-            take: 500,
         });
-        const openForMission = open.filter((task) => task.missionId === mission.id).length;
         if (openForMission >= output.openTasksCap) {
             return { filed: 0, cappedOut: true, duplicates: 0 };
         }
         const count = Math.min(output.tasksPerTick, output.openTasksCap - openForMission);
-        const recent = await taskRows.find({
-            where: { workId: target.workId },
-            order: { createdAt: 'DESC' },
-            select: ['id', 'title'],
-            take: MISSION_PLANNER_RECENT_TASKS,
+        // Review of #3061 (privacy) — every title the tick reads (the planner prompt's recent
+        // Tasks, the duplicate check's open ones) comes through the Tasks list's own visibility
+        // predicate as the Mission's owner (`view: 'organization'` = every Task they may read,
+        // their own included), so a colleague's private Task never reaches the planner prompt.
+        const recent = await this.visibleWorkTasks(mission, target.workId, scope, tasksService, {
+            orderBy: 'createdAt',
+            limit: MISSION_PLANNER_RECENT_TASKS,
+        });
+        const open = await this.visibleWorkTasks(mission, target.workId, scope, tasksService, {
+            status: OPEN_TASK_STATUSES,
+            limit: MISSION_TASK_OUTPUT_OPEN_TITLES,
         });
         const work = this.works ? await this.works.findById(target.workId).catch(() => null) : null;
         const proposals = await this.taskPlanner!.plan({
@@ -785,17 +909,13 @@ export class MissionTickService {
                 // FR-52 — started with the Mission's Agent (its own, else the Work's default).
                 // A Task with no Agent to run it stays in To do: filed, not lost.
                 try {
-                    // FR-53 (APW08-G15) — the run is capped by the Mission's per-run budget.
-                    const maxBudgetCents = mission.guardrailsOverride?.maxBudgetCentsPerRun;
+                    // FR-53 (APW08-G15) — the run is capped by the Mission's per-run budget, which
+                    // `TaskTransitionService.dispatchAgentRun` resolves from the Task's Mission for
+                    // every run of it (review of #3061), so the tick passes nothing of its own.
                     await tasksService.runTask(
                         mission.userId,
                         task.id,
-                        {
-                            agentId: output.agentId ?? null,
-                            ...(typeof maxBudgetCents === 'number' && maxBudgetCents > 0
-                                ? { maxBudgetCents: Math.trunc(maxBudgetCents) }
-                                : {}),
-                        },
+                        { agentId: output.agentId ?? null },
                         scope,
                     );
                 } catch (err) {
@@ -808,6 +928,23 @@ export class MissionTickService {
             }
         }
         return { filed, cappedOut: false, duplicates };
+    }
+
+    /** The Work's Tasks the Mission's owner may read (see {@link fileOnWork}). */
+    private async visibleWorkTasks(
+        mission: Mission,
+        workId: string,
+        scope: OwnershipScope | undefined,
+        tasksService: TasksService,
+        filter: Pick<ListTasksFilter, 'status' | 'orderBy' | 'limit'>,
+    ): Promise<Task[]> {
+        const { rows } = await tasksService.list(
+            mission.userId,
+            { ...filter, workId, view: 'organization', includeHidden: true },
+            {},
+            scope,
+        );
+        return rows;
     }
 
     /**

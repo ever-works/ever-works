@@ -84,8 +84,11 @@ export interface ListTasksFilter {
      *   - `'stalledThenPriority'` — stalled `in_progress` Tasks first (see
      *     `stallCutoff`), then priority, then oldest update first. The
      *     Task board's order.
+     *   - `'createdAt'` — newest first (`createdAt DESC`): a list whose rows agents keep
+     *     updating, so `updatedAt` paging would skip or repeat rows (APW-08 FR-55, the
+     *     Mission's "Tasks on attached Works").
      */
-    orderBy?: 'updatedAt' | 'priorityThenUpdated' | 'stalledThenPriority';
+    orderBy?: 'updatedAt' | 'priorityThenUpdated' | 'stalledThenPriority' | 'createdAt';
     /**
      * Only read with `orderBy: 'stalledThenPriority'`: an `in_progress` Task
      * with nothing running whose `updatedAt` is before this instant sorts
@@ -456,6 +459,9 @@ export class TaskRepository {
                 qb.addOrderBy('task.updatedAt', 'ASC');
                 return;
             }
+            case 'createdAt':
+                qb.orderBy('task.createdAt', 'DESC');
+                return;
             case 'updatedAt':
             case undefined:
             default:

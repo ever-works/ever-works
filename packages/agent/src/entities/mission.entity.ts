@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import type { RecordVisibility } from '@ever-works/contracts';
 import { User } from './user.entity';
-import { PortableDateColumn } from './_types';
+import { PortableDateColumn, TimestampColumn } from './_types';
 import type { WorkAgentGuardrails } from './work-agent-preference.entity';
 
 /**
@@ -325,6 +325,17 @@ export class Mission {
      */
     @PortableDateColumn({ nullable: true })
     taskOutputNoticeAt?: Date | null;
+
+    /**
+     * APW-08 T35 (review of #3061) — the Task branch's lease. A tick claims it with a
+     * compare-and-set (`WHERE taskOutputLeaseUntil IS NULL OR taskOutputLeaseUntil < :now`)
+     * before it counts the open Tasks and asks the planner, and clears it when done, so a
+     * scheduled tick and a Run now (or two API pods) never both file up to the open-Tasks cap. A
+     * portable epoch-millis `bigint`, compared as a number on every driver. NULL = free; a tick
+     * that died mid-run leaves it to expire. Migration 1792380000000-AddMissionTaskOutputLease.
+     */
+    @TimestampColumn({ nullable: true })
+    taskOutputLeaseUntil?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;
