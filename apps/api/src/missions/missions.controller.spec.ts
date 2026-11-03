@@ -71,11 +71,15 @@ describe('MissionsController — output mode (APW-08 T34)', () => {
             taskOutput: null,
         } as never);
         await controller.update(session, MISSION, { title: 'Renamed' } as never);
-        expect(service.update.mock.calls[0][2]).toMatchObject({
+        // The double is declared without parameters, so its recorded calls are typed `[]`.
+        const calls = service.update.mock.calls as unknown as Array<
+            [string, string, Record<string, unknown>]
+        >;
+        expect(calls[0][2]).toMatchObject({
             outputMode: 'both',
             taskOutput: null,
         });
-        expect(service.update.mock.calls[1][2].outputMode).toBeUndefined();
-        expect(service.update.mock.calls[1][2].taskOutput).toBeUndefined();
+        expect(calls[1][2].outputMode).toBeUndefined();
+        expect(calls[1][2].taskOutput).toBeUndefined();
     });
 });

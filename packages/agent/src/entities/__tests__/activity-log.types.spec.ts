@@ -522,7 +522,9 @@ describe('activity-log.types', () => {
             //    family), with its `feed-kind.ts` row in the same change -> 222. Nothing existing moves.
             // +1 app_change (APW-08 T7/T21, lane L3 — the evolve loop's delivery family), with its
             //    `feed-kind.ts` row in the same change -> 223. Nothing existing moves.
-            expect(literals).toHaveLength(223);
+            // +1 mission_nothing_to_file (APW-08 T35, FR-54 — a Task-output tick that had nothing
+            //    to file, once per Mission per day) -> 224. Nothing existing moves.
+            expect(literals).toHaveLength(224);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {
