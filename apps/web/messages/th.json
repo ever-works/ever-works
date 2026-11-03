@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "บันทึกงานลงใน App Works ของภารกิจแล้ว",
-                    "no-tasks": "ไม่มีอะไรใหม่ให้บันทึกใน App Works ของภารกิจ"
+                    "no-tasks": "ไม่มีอะไรใหม่ให้บันทึกใน App Works ของภารกิจ",
+                    "spawned-and-tasks-filed": "สร้างไอเดียใหม่และบันทึกงานลงใน App Works ของภารกิจแล้ว"
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "บันทึก",
                 "schedules": "กำหนดการ"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> ไม่พบสิ่งใหม่ที่จะบันทึกลงใน App Works ของภารกิจในวันนี้"
             }
         },
         "works": {

@@ -2363,7 +2363,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "משימות תויקו ב-App Works של המשימה.",
-                    "no-tasks": "אין שום דבר חדש לתייק ב-App Works של המשימה."
+                    "no-tasks": "אין שום דבר חדש לתייק ב-App Works של המשימה.",
+                    "spawned-and-tasks-filed": "נוצרו רעיונות חדשים ומשימות תויקו ב-App Works של המשימה."
                 }
             },
             "goals": {
@@ -2819,6 +2820,11 @@
                     "failed": "נכשל",
                     "cancelled": "בוטל"
                 }
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> לא מצא היום שום דבר חדש לתייק ב-App Works של משימה"
             }
         },
         "works": {

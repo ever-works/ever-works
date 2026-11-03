@@ -3690,7 +3690,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Tasks filed on the Mission’s App Works.",
-                    "no-tasks": "Nothing new to file on the Mission’s App Works."
+                    "no-tasks": "Nothing new to file on the Mission’s App Works.",
+                    "spawned-and-tasks-filed": "New Ideas spawned and Tasks filed on the Mission’s App Works."
                 }
             },
             "goals": {

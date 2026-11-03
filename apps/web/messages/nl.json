@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Taken aangemaakt op de App Works van de Missie.",
-                    "no-tasks": "Niets nieuws om aan te maken op de App Works van de Missie."
+                    "no-tasks": "Niets nieuws om aan te maken op de App Works van de Missie.",
+                    "spawned-and-tasks-filed": "Nieuwe Ideeën gegenereerd en Taken aangemaakt op de App Works van de Missie."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Logboek",
                 "schedules": "Planningen"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> vond vandaag niets nieuws om aan te maken op de App Works van een Missie"
             }
         },
         "works": {

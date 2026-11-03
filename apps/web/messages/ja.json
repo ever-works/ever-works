@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "ミッションの App Works にタスクを登録しました。",
-                    "no-tasks": "ミッションの App Works に登録する新しいものはありません。"
+                    "no-tasks": "ミッションの App Works に登録する新しいものはありません。",
+                    "spawned-and-tasks-filed": "新しいアイデアを生成し、ミッションの App Works にタスクを登録しました。"
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "ログ",
                 "schedules": "スケジュール"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> は今日、ミッションの App Works に登録する新しいものを見つけませんでした"
             }
         },
         "works": {

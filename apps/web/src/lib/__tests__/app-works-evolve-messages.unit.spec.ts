@@ -176,6 +176,34 @@ describe('APW-08 evolve copy (T28)', () => {
         );
     });
 
+    // Review of #3061 — two leaves outside the sub-trees above: the Activity feed's line for a
+    // tick that had nothing to file, and the Run-now toast for a `both` Mission that did both.
+    it('carries the review-of-#3061 leaves in all 21 bundles, placeholders and tags intact', () => {
+        const paths = [
+            'dashboard.feed.narration.missionNothingToFile',
+            'dashboard.missionDetail.toasts.runNow.spawned-and-tasks-filed',
+        ];
+        const problems: string[] = [];
+        for (const locale of locales()) {
+            const json = bundle(locale);
+            for (const path of paths) {
+                const value = at(json, path);
+                const english = at(en, path) as string;
+                if (typeof value !== 'string' || value.trim().length === 0) {
+                    problems.push(`${locale}: ${path} missing`);
+                    continue;
+                }
+                if (placeholders(value).join(',') !== placeholders(english).join(',')) {
+                    problems.push(`${locale}: ${path} placeholders differ`);
+                }
+                if (english.includes('<b>') && !(value.includes('<b>') && value.includes('</b>'))) {
+                    problems.push(`${locale}: ${path} lost its <b> tag`);
+                }
+            }
+        }
+        expect(problems).toEqual([]);
+    });
+
     it('every leaf exists, non-empty, in all 21 bundles', () => {
         const missing: string[] = [];
         for (const locale of locales()) {

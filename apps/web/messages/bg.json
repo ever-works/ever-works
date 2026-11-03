@@ -2363,7 +2363,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Задачите са заведени в App Works на мисията.",
-                    "no-tasks": "Няма нищо ново за завеждане в App Works на мисията."
+                    "no-tasks": "Няма нищо ново за завеждане в App Works на мисията.",
+                    "spawned-and-tasks-filed": "Създадени са нови идеи и задачите са заведени в App Works на мисията."
                 }
             },
             "goals": {
@@ -2819,6 +2820,11 @@
                     "failed": "Неуспешно",
                     "cancelled": "Отменено"
                 }
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> не намери днес нищо ново за завеждане в App Works на мисия"
             }
         },
         "works": {

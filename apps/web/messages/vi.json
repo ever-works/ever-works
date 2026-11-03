@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Đã ghi các tác vụ vào App Works của Nhiệm vụ.",
-                    "no-tasks": "Không có gì mới để ghi vào App Works của Nhiệm vụ."
+                    "no-tasks": "Không có gì mới để ghi vào App Works của Nhiệm vụ.",
+                    "spawned-and-tasks-filed": "Đã tạo Ý tưởng mới và ghi các tác vụ vào App Works của Nhiệm vụ."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Nhật ký",
                 "schedules": "Lịch trình"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> hôm nay không tìm thấy gì mới để ghi vào App Works của một Nhiệm vụ"
             }
         },
         "works": {

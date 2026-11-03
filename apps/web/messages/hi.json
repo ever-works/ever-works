@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Mission के App Works पर Tasks दर्ज किए गए।",
-                    "no-tasks": "Mission के App Works पर दर्ज करने के लिए कुछ नया नहीं है।"
+                    "no-tasks": "Mission के App Works पर दर्ज करने के लिए कुछ नया नहीं है।",
+                    "spawned-and-tasks-filed": "नए Ideas बनाए गए और Mission के App Works पर Tasks दर्ज किए गए।"
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "लॉग",
                 "schedules": "शेड्यूल"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> को आज किसी Mission के App Works पर दर्ज करने के लिए कुछ नया नहीं मिला"
             }
         },
         "works": {

@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Завдання створено в App Works місії.",
-                    "no-tasks": "Нічого нового для створення в App Works місії."
+                    "no-tasks": "Нічого нового для створення в App Works місії.",
+                    "spawned-and-tasks-filed": "Створено нові ідеї та завдання в App Works місії."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Журнал",
                 "schedules": "Розклади"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> сьогодні не знайшов нічого нового для створення в App Works місії"
             }
         },
         "works": {

@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "已在该任务的 App Works 上录入任务。",
-                    "no-tasks": "该任务的 App Works 上没有可录入的新内容。"
+                    "no-tasks": "该任务的 App Works 上没有可录入的新内容。",
+                    "spawned-and-tasks-filed": "已生成新的创意，并在该任务的 App Works 上录入任务。"
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "日志",
                 "schedules": "计划任务"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> 今天在某个任务的 App Works 上没有发现可录入的新内容"
             }
         },
         "works": {

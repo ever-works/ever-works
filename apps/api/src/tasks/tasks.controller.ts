@@ -501,6 +501,13 @@ export class TasksController {
         description:
             "APW-08 — 'true' attaches each row's `delivery: { state, liveUrl, outcome, liveWithWarnings, carriedByLaterChange }`, null for a Task the delivery chain does not track",
     })
+    @ApiQuery({
+        name: 'orderBy',
+        required: false,
+        enum: ['updatedAt', 'createdAt'],
+        description:
+            "Row order: 'updatedAt' (default) = most recently updated first; 'createdAt' = newest first. Unknown = default.",
+    })
     @HttpCode(HttpStatus.OK)
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -530,6 +537,9 @@ export class TasksController {
         // Appended LAST so every positional caller (specs) keeps its meaning.
         @Query('deliveryState') deliveryState?: string,
         @Query('includeDelivery') includeDelivery?: string,
+        // APW-08 T36 (FR-55, review of #3061) — `createdAt` = newest first, for a list whose
+        // rows agents keep updating. Appended LAST (positional specs); anything else = default.
+        @Query('orderBy') orderBy?: string,
     ) {
         const deliveryStates = this.parseDeliveryStateList(deliveryState);
         const filter: ListTasksFilter = {
@@ -547,6 +557,7 @@ export class TasksController {
             search,
             includeHidden: includeHidden === 'true',
             ...(deliveryStates ? { deliveryState: deliveryStates } : {}),
+            ...(orderBy === 'createdAt' ? { orderBy: 'createdAt' as const } : {}),
             limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
             offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
         };

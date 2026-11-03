@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Görevin App Works’üne işler kaydedildi.",
-                    "no-tasks": "Görevin App Works’üne kaydedilecek yeni bir şey yok."
+                    "no-tasks": "Görevin App Works’üne kaydedilecek yeni bir şey yok.",
+                    "spawned-and-tasks-filed": "Yeni Fikirler oluşturuldu ve Görevin App Works’üne işler kaydedildi."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Günlük",
                 "schedules": "Zamanlamalar"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> bugün bir Görevin App Works’üne kaydedecek yeni bir şey bulamadı"
             }
         },
         "works": {

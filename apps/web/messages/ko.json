@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "미션의 App Works에 작업을 등록했습니다.",
-                    "no-tasks": "미션의 App Works에 등록할 새 항목이 없습니다."
+                    "no-tasks": "미션의 App Works에 등록할 새 항목이 없습니다.",
+                    "spawned-and-tasks-filed": "새 아이디어를 생성하고 미션의 App Works에 작업을 등록했습니다."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "로그",
                 "schedules": "일정"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b>이(가) 오늘 미션의 App Works에 등록할 새 항목을 찾지 못했습니다"
             }
         },
         "works": {

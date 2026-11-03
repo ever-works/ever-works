@@ -2363,7 +2363,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Tasks in den App Works der Mission angelegt.",
-                    "no-tasks": "Nichts Neues für die App Works der Mission."
+                    "no-tasks": "Nichts Neues für die App Works der Mission.",
+                    "spawned-and-tasks-filed": "Neue Ideen erzeugt und Tasks in den App Works der Mission angelegt."
                 }
             },
             "goals": {
@@ -2819,6 +2820,11 @@
                     "failed": "Fehlgeschlagen",
                     "cancelled": "Abgebrochen"
                 }
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> fand heute nichts Neues, das in den App Works einer Mission anzulegen wäre"
             }
         },
         "works": {

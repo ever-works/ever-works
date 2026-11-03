@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Zadania zapisane w App Works misji.",
-                    "no-tasks": "Brak nowych zadań do zapisania w App Works misji."
+                    "no-tasks": "Brak nowych zadań do zapisania w App Works misji.",
+                    "spawned-and-tasks-filed": "Utworzono nowe pomysły i zapisano zadania w App Works misji."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Dziennik",
                 "schedules": "Harmonogramy"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> nie znalazł dziś niczego nowego do zapisania w App Works misji"
             }
         },
         "works": {

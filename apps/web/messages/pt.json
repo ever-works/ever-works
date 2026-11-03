@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Tarefas registradas nos App Works da Missão.",
-                    "no-tasks": "Nada novo para registrar nos App Works da Missão."
+                    "no-tasks": "Nada novo para registrar nos App Works da Missão.",
+                    "spawned-and-tasks-filed": "Novas Ideias geradas e Tarefas registradas nos App Works da Missão."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Registro",
                 "schedules": "Agendamentos"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> não encontrou hoje nada de novo para registrar nos App Works de uma Missão"
             }
         },
         "works": {

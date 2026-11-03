@@ -122,7 +122,7 @@ export async function detachMissionAttachmentAction(missionId: string, attachmen
 
 /**
  * APW-08 T36 (FR-55) — one page of the Tasks a Mission filed on its App Works (the
- * `mission-task` label), 20 per page.
+ * `mission-task` label), newest first, 20 per page.
  */
 export async function listMissionTasksOnWorksAction(
     missionId: string,
@@ -135,6 +135,9 @@ export async function listMissionTasksOnWorksAction(
     const page = await tasksAPI.list({
         missionId,
         label: 'mission-task',
+        // FR-55 — newest first; `updatedAt` (the default) would skip or repeat rows across pages
+        // while agents keep updating the Tasks.
+        orderBy: 'createdAt',
         limit: 20,
         offset: Math.max(0, Math.trunc(offset)),
     });

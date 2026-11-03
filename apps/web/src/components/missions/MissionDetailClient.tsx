@@ -309,7 +309,13 @@ export function MissionDetailClient({
         startRunNow(async () => {
             try {
                 const result = await runMissionNowAction(mission.id);
-                const key = `toasts.runNow.${result.status}` as const;
+                // APW-08 (review of #3061) — a `both` Mission that spawned Ideas AND filed Tasks
+                // says so, instead of naming only the Ideas half.
+                const toastStatus =
+                    result.status === 'spawned' && (result.tasksFiled ?? 0) > 0
+                        ? 'spawned-and-tasks-filed'
+                        : result.status;
+                const key = `toasts.runNow.${toastStatus}` as const;
                 try {
                     toast.success(t(key));
                 } catch {

@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Task registrati sugli App Works della Missione.",
-                    "no-tasks": "Niente di nuovo da registrare sugli App Works della Missione."
+                    "no-tasks": "Niente di nuovo da registrare sugli App Works della Missione.",
+                    "spawned-and-tasks-filed": "Nuove Idee generate e Task registrati sugli App Works della Missione."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Log",
                 "schedules": "Pianificazioni"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> non ha trovato oggi nulla di nuovo da registrare sugli App Works di una Missione"
             }
         },
         "works": {

@@ -323,6 +323,8 @@ export interface ListTasksQuery {
     deliveryState?: TaskDeliveryStateFilter | readonly TaskDeliveryStateFilter[];
     /** APW-08 T24 — attach each row's `delivery` (the board chips' inputs). */
     includeDelivery?: boolean;
+    /** Row order: `updatedAt` (the API default — omitted) or `createdAt` (newest first). */
+    orderBy?: 'updatedAt' | 'createdAt';
 }
 
 function buildQuery(q: ListTasksQuery = {}): string {
@@ -345,6 +347,7 @@ function buildQuery(q: ListTasksQuery = {}): string {
     }
     if (q.includeDelivery) params.set('includeDelivery', 'true');
     if (q.view && q.view !== 'mine') params.set('view', q.view);
+    if (q.orderBy === 'createdAt') params.set('orderBy', 'createdAt');
     const s = params.toString();
     return s ? `?${s}` : '';
 }

@@ -2332,7 +2332,8 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)",
                     "tasks-filed": "Tugas dicatat di App Works Misi.",
-                    "no-tasks": "Tidak ada hal baru untuk dicatat di App Works Misi."
+                    "no-tasks": "Tidak ada hal baru untuk dicatat di App Works Misi.",
+                    "spawned-and-tasks-filed": "Ide baru dibuat dan Tugas dicatat di App Works Misi."
                 }
             },
             "goals": {
@@ -2750,6 +2751,11 @@
             "viewToggle": {
                 "log": "Log",
                 "schedules": "Jadwal"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> tidak menemukan hal baru untuk dicatat di App Works sebuah Misi hari ini"
             }
         },
         "works": {
