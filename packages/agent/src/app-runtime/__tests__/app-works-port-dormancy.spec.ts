@@ -471,6 +471,9 @@ const UNBOUND: readonly string[] = [
     // `@Global()` `AgentsModule` to `AppRunBriefService` (read by `AgentRunService` and the fleet
     // planner). No module in `packages/agent` provides it.
     'APP_RUN_BRIEF_SOURCE',
+    // APW-08 telemetry REST (#3027): bound in `apps/api` by the `@Global()`
+    // `AppWorksTelemetryBindingModule`, like `APP_WORKS_TELEMETRY_SINK` below.
+    'APP_SPEC_TELEMETRY_SINK',
     'APP_TARGET_UPDATED_PORT',
     'APP_UPSTREAM_PRIVATE_COPY_PORT',
     'APP_UPSTREAM_STATE_READER',
@@ -484,10 +487,16 @@ const UNBOUND: readonly string[] = [
     'APP_WORKS_TELEMETRY_SINK',
     'APP_WORK_DELETION_COMPLETION',
     'APP_WORK_DELETION_PORT',
+    // APW-08 run admission (#3040): the isolated-run admission and its two `useExisting` faces,
+    // bound OUTSIDE this package by `apps/api/src/tasks/isolated-run-admission.providers.ts`. No
+    // module in `packages/agent` provides them.
+    'APP_WORK_RUN_ADMISSION',
     // APW-08 T47 (cf9f1075e) — "is this run an App Work run?", bound OUTSIDE this package by
     // `apps/api`'s `@Global()` `AgentsModule` (a factory over the Task and Work repositories),
     // where every agent run executes. No module in `packages/agent` provides it.
     'APP_WORK_RUN_CLASSIFIER',
+    'APP_WORK_RUN_CONTAINMENT_RECORDER',
+    'APP_WORK_TASK_CONTAINMENT_READER',
 ];
 
 /**
@@ -618,7 +627,10 @@ describe('App Works port dormancy register (§5.10)', () => {
         // 27/49 → 29/49 the same day: `APP_RUN_BRIEF_SOURCE` (APW-08 T18, 7c1ce7ff4) and
         // `APP_WORK_RUN_CLASSIFIER` (APW-08 T47, cf9f1075e) are new ports, both bound by the API's
         // `AgentsModule` and by no module here — nothing moved.
-        expect(UNBOUND).toHaveLength(29);
+        // 29/49 → 33/49 on 2026-11-03: `APP_WORK_RUN_ADMISSION`, `APP_WORK_RUN_CONTAINMENT_RECORDER`,
+        // `APP_WORK_TASK_CONTAINMENT_READER` (#3040) and `APP_SPEC_TELEMETRY_SINK` (#3027) are new ports,
+        // all bound by `apps/api` and by no module here — nothing moved. They had been classified nowhere.
+        expect(UNBOUND).toHaveLength(33);
         expect(BOUND).toHaveLength(49);
     });
 
