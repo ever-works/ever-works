@@ -6,6 +6,7 @@ import { ROUTES } from '@/lib/constants';
 import { tasksAPI, type TaskPriority, type TaskStatus } from '@/lib/api/tasks';
 import { TasksFilterSelects } from '@/components/tasks/TasksFilterSelects';
 import { TasksList } from '@/components/tasks/TasksList';
+import { TasksTabsNav } from '@/components/tasks/TasksTabsNav';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Link } from '@/i18n/navigation';
 
@@ -123,6 +124,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                     </>
                 }
             />
+            <TasksTabsNav active="tasks" />
             <form className="mb-4 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
                 <label className="flex-1 min-w-0">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">

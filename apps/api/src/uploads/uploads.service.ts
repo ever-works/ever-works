@@ -480,6 +480,29 @@ export class UploadsService {
      * the **declared** MIME (since text formats can't be sniffed); the
      * `key` field is the backend-opaque storage key.
      */
+    /**
+     * Whether `saveFile` would accept this declared Content-Type at all
+     * (either branch: magic-byte binary, or text-like by declaration).
+     *
+     * Exposed because callers that synthesize an upload on a user's
+     * behalf — e.g. skill companion files, whose browser-declared MIMEs
+     * include long-tail values like `text/x-python` for a `.py` — need
+     * to know whether to substitute `text/plain` BEFORE calling. A
+     * caller cannot infer this from "does it start with `text/`": the
+     * accepted text set is the explicit `TEXT_LIKE_MIMES` map, because
+     * each entry also pins the extension the bytes are stored under.
+     *
+     * Matches `saveFile`'s own comparison EXACTLY — whole lowercased
+     * string, parameters included. A `text/plain; charset=utf-8` is
+     * therefore reported as not accepted, which is the truth: `saveFile`
+     * looks the full string up in the map and would reject it.
+     */
+    acceptsSaveFileMime(mimetype: string | null | undefined): boolean {
+        const declared = (mimetype || '').toLowerCase();
+        if (!declared) return false;
+        return ALLOWED_FILE_BINARY_MIME.has(declared) || TEXT_LIKE_MIMES.has(declared);
+    }
+
     async saveFile(
         userId: string,
         file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'size' | 'originalname'>,

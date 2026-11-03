@@ -2,10 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FleetNode } from '../entities/fleet-node.entity';
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { FleetJobRepository } from './fleet-job.repository';
 import { FleetService } from './fleet.service';
 import { FleetJobService } from './fleet-job.service';
+import { FleetExecutionPreferenceRepository } from './fleet-execution-preference.repository';
+import { FleetExecutionPreferenceService } from './fleet-execution-preference.service';
 
 /**
  * Fleet (Wave 12, slice 1 + Desktop PRD M4) — agent-side module owning
@@ -16,6 +19,10 @@ import { FleetJobService } from './fleet-job.service';
  *     (constant-time, fail-closed) and the owner-scoped node list with
  *     the piggybacked offline sweep + the best-effort merge of the
  *     user's own configured-cluster nodes.
+ *   - `FleetExecutionPreferenceService` — the per Work / Goal / account
+ *     choice of local runner vs cloud that `FleetRunRouterService` reads
+ *     on every dispatch (the RULE itself is the pure
+ *     `resolveFleetExecutionMode` in `@ever-works/contracts`).
  *   - `FleetJobService` — the lease protocol backing the
  *     `job-runtime-node` provider: atomic CAS claim, capability-tag
  *     filtering, lease TTL + extension, terminal transitions, and the
@@ -37,8 +44,22 @@ import { FleetJobService } from './fleet-job.service';
  * EntityMetadataNotFoundError on first query.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([FleetNode, FleetJob])],
-    providers: [FleetNodeRepository, FleetJobRepository, FleetService, FleetJobService],
-    exports: [FleetNodeRepository, FleetJobRepository, FleetService, FleetJobService],
+    imports: [TypeOrmModule.forFeature([FleetNode, FleetJob, FleetExecutionPreference])],
+    providers: [
+        FleetNodeRepository,
+        FleetJobRepository,
+        FleetExecutionPreferenceRepository,
+        FleetService,
+        FleetJobService,
+        FleetExecutionPreferenceService,
+    ],
+    exports: [
+        FleetNodeRepository,
+        FleetJobRepository,
+        FleetExecutionPreferenceRepository,
+        FleetService,
+        FleetJobService,
+        FleetExecutionPreferenceService,
+    ],
 })
 export class FleetModule {}

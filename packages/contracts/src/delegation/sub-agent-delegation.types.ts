@@ -51,7 +51,10 @@ export type SubAgentDelegationRefusalCode =
 	| 'scope-not-subset'
 	| 'scope-empty'
 	| 'budget-exceeded'
-	| 'no-runner';
+	| 'no-runner'
+	// Agent Collaborators — the named child is not an enabled collaborator
+	// of the parent agent. Appended (persisted tokens are append-only).
+	| 'collaborator-not-allowed';
 
 export const SUB_AGENT_DELEGATION_REFUSAL_CODES: readonly SubAgentDelegationRefusalCode[] = [
 	'invalid-request',
@@ -60,7 +63,8 @@ export const SUB_AGENT_DELEGATION_REFUSAL_CODES: readonly SubAgentDelegationRefu
 	'scope-not-subset',
 	'scope-empty',
 	'budget-exceeded',
-	'no-runner'
+	'no-runner',
+	'collaborator-not-allowed'
 ];
 
 /** Default fan-out bounds. Operator knobs, not product limits. */
@@ -384,4 +388,67 @@ export function refuseSubAgentDelegation(
 /** True when the parent may consume `result.output` as a real answer. */
 export function isSubAgentDelegationSuccessful(result: SubAgentDelegationResult): boolean {
 	return result.status === 'completed';
+}
+
+/**
+ * Agent Collaborators — one allow-list entry of a parent agent: "this
+ * agent may spawn `collaboratorAgentId` as a sub-agent". Mirrors the
+ * persisted `agent_collaborators` row shape without dragging any ORM
+ * type into the contracts package.
+ */
+export interface SubAgentCollaboratorRule {
+	readonly collaboratorAgentId: string;
+	readonly enabled: boolean;
+}
+
+export type SubAgentCollaboratorDecision =
+	| { readonly allowed: true }
+	| {
+			readonly allowed: false;
+			readonly refusalCode: 'collaborator-not-allowed';
+			readonly message: string;
+	  };
+
+/**
+ * Decide whether a delegation naming `childAgentId` is admissible under
+ * the parent's collaborator allow-list.
+ *
+ * Semantics (Agent Collaborators feature):
+ *
+ *  - Delegation to SELF is always allowed: an empty/absent `childAgentId`
+ *    or one equal to the parent is exactly today's default behaviour and
+ *    needs no configuration.
+ *  - Delegating to a DIFFERENT agent requires an `enabled` collaborator
+ *    rule for that agent. No rules configured ⇒ only self-delegation —
+ *    the allow-list is opt-in, never implicit.
+ *  - A rule that exists but is disabled refuses with the same code but a
+ *    message that says "disabled", so an operator reading a refusal knows
+ *    whether to CREATE the collaborator or RE-ENABLE it.
+ *
+ * Pure and synchronous on purpose: the runner (the enforcement choke
+ * point) loads the rows and hands them here, so the decision logic stays
+ * unit-testable without a database and can never drift between callers.
+ *
+ * This helper does NOT check ownership — cross-owner children are refused
+ * by the runner's own same-owner check before this runs.
+ */
+export function evaluateCollaboratorDelegation(
+	parentAgentId: string,
+	childAgentId: string | null | undefined,
+	rules: readonly SubAgentCollaboratorRule[]
+): SubAgentCollaboratorDecision {
+	if (!childAgentId || childAgentId === parentAgentId) {
+		return { allowed: true };
+	}
+	const rule = rules.find((entry) => entry.collaboratorAgentId === childAgentId);
+	if (rule && rule.enabled) {
+		return { allowed: true };
+	}
+	return {
+		allowed: false,
+		refusalCode: 'collaborator-not-allowed',
+		message: rule
+			? `agent ${childAgentId} is a collaborator of ${parentAgentId} but is currently disabled`
+			: `agent ${childAgentId} is not an enabled collaborator of ${parentAgentId}`
+	};
 }

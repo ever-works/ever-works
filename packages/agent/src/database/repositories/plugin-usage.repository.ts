@@ -19,6 +19,16 @@ export type DailySpendBucket = {
     costCents: number;
 };
 
+/**
+ * Costs dashboard — one (day, agent) cell of the stacked daily chart.
+ * `agentId` is `null` for usage recorded outside an Agent run.
+ */
+export type DailyAgentSpendBucket = {
+    day: string;
+    agentId: string | null;
+    costCents: number;
+};
+
 export type CrossUserSpendRow = {
     userId: string;
     workId: string;
@@ -401,6 +411,103 @@ export class PluginUsageRepository {
     }
 
     /**
+     * Costs dashboard — the stacked daily chart's input: one row per
+     * (day, agent) with non-zero events for this user in the window.
+     *
+     * Bucketed in JS, not SQL, for the same reason as
+     * {@link getDailySpendForUser}: `to_char`/`date_trunc` are
+     * PostgreSQL-only and the CI + e2e stacks run better-sqlite3. The
+     * scan is narrowed by the `(userId, occurredAt)` index and projects
+     * three columns only, so a 90-day window of a heavy account reads
+     * three ints/dates per event rather than whole rows.
+     *
+     * `agentId` is `null` for usage that never ran inside an Agent (the
+     * Work-generator flow, ad-hoc facade calls) — surfaced honestly as
+     * its own bucket, never dropped.
+     */
+    async getDailySpendByAgentForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<DailyAgentSpendBucket[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.occurredAt', 'occurredAt')
+            .addSelect('e.agentId', 'agentId')
+            .addSelect('e.costCents', 'costCents')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .getRawMany<{ occurredAt: Date | string; agentId: string | null; costCents: number }>();
+
+        // Composite map key: the day and the agent id can never collide
+        // because the day segment is a fixed-width `YYYY-MM-DD`.
+        const byDayAgent = new Map<string, number>();
+        for (const row of rows) {
+            const occurredAt =
+                row.occurredAt instanceof Date ? row.occurredAt : new Date(row.occurredAt);
+            const day = occurredAt.toISOString().slice(0, 10);
+            const key = `${day} ${row.agentId ?? ''}`;
+            byDayAgent.set(key, (byDayAgent.get(key) ?? 0) + Number(row.costCents ?? 0));
+        }
+
+        return Array.from(byDayAgent.entries())
+            .map(([key, costCents]) => {
+                const [day, agentId] = key.split(' ');
+                return { day, agentId: agentId === '' ? null : agentId, costCents };
+            })
+            .sort((a, b) => a.day.localeCompare(b.day));
+    }
+
+    /**
+     * Costs dashboard — the dominant model of each run in `runIds`, for
+     * the top-runs table's "model" column.
+     *
+     * ONE grouped query over `(runId, modelId)` rather than a lookup per
+     * run: a run can call several models (escalation, a cheap
+     * summarizer), so "the model" is defined as the one that accounts
+     * for the most spend, with the highest unit count breaking a tie.
+     * Runs whose events carry no model id (or that predate per-run
+     * tagging) are simply absent from the map.
+     */
+    async getDominantModelByRun(runIds: string[]): Promise<Map<string, string>> {
+        if (runIds.length === 0) {
+            return new Map();
+        }
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.runId', 'runId')
+            .addSelect('e.modelId', 'modelId')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .addSelect('COALESCE(SUM(e.units), 0)', 'units')
+            .where('e.runId IN (:...runIds)', { runIds })
+            .andWhere('e.modelId IS NOT NULL')
+            .groupBy('e.runId')
+            .addGroupBy('e.modelId')
+            .getRawMany<{
+                runId: string;
+                modelId: string;
+                costCents: string;
+                units: string;
+            }>();
+
+        const best = new Map<string, { modelId: string; costCents: number; units: number }>();
+        for (const row of rows) {
+            const costCents = Number(row.costCents ?? 0);
+            const units = Number(row.units ?? 0);
+            const current = best.get(row.runId);
+            if (
+                !current ||
+                costCents > current.costCents ||
+                (costCents === current.costCents && units > current.units)
+            ) {
+                best.set(row.runId, { modelId: row.modelId, costCents, units });
+            }
+        }
+        return new Map(Array.from(best.entries()).map(([runId, v]) => [runId, v.modelId]));
+    }
+
+    /**
      * Wave 13 — display-name resolution for grouped rows: ONE `IN`
      * query per entity type (never per row). Unknown/deleted ids are
      * simply absent from the map; callers label them honestly.
@@ -426,6 +533,23 @@ export class PluginUsageRepository {
             select: ['id', 'name'],
         });
         return new Map(works.map((w) => [w.id, w.name]));
+    }
+
+    /**
+     * Costs dashboard — Task titles for the top-runs table (one `IN`
+     * query, never per row). Sibling of `getAgentNames`/`getWorkNames`;
+     * lives here because this repository already reaches `Task` through
+     * `repository.manager` for the §4.2 counts.
+     */
+    async getTaskTitles(ids: string[]): Promise<Map<string, string>> {
+        if (ids.length === 0) {
+            return new Map();
+        }
+        const tasks = await this.repository.manager.find(Task, {
+            where: { id: In(ids) },
+            select: ['id', 'title'],
+        });
+        return new Map(tasks.map((task) => [task.id, task.title]));
     }
 
     /**

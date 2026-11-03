@@ -398,6 +398,18 @@ export class Agent {
     @Column({ type: 'varchar', length: 64, nullable: true })
     contentHash?: string | null;
 
+    // ── Init script (Capabilities tab) ──
+    // Per-Agent bootstrap script, edited on the Capabilities tab.
+    // ADVISORY in v1: persisted + surfaced through the capabilities
+    // payload; execution paths consume it as they gain a session/
+    // workspace bootstrap seam (the claude-managed-agent pipeline is the
+    // first candidate — see docs/internal/feat-capabilities-tab-notes.md).
+    // Capped at 16 KB and secret-scanned on write (same posture as the
+    // five canonical Agent files) in `AgentsService.update`.
+
+    @Column({ type: 'text', nullable: true })
+    initScript?: string | null;
+
     // ── FU-13 — git committer identity ──
     // When an Agent commits to a Work's git repo via `AGENT_GIT_FACADE`,
     // these columns populate the commit author. Both nullable: when

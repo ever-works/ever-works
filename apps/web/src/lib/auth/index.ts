@@ -33,7 +33,24 @@ async function clearAuthCookieOnUnauthorized(error: unknown): Promise<boolean> {
         console.warn(
             'Auth session rejected by API; clearing auth cookie. Verify web/API AUTH_SECRET values and session storage if this happens after login.',
         );
-        await removeAuthAccessCookies();
+        // Best-effort. These helpers are `cache()`d and run during Server
+        // Component RENDER, where Next.js refuses cookie mutation and throws
+        // "Cookies can only be modified in a Server Action or Route Handler."
+        // That throw used to escape from inside this catch handler and take
+        // the whole render down: a session the API rejects turned EVERY
+        // authenticated page — and /login itself — into a hard 500, leaving
+        // the user with no way back in through the UI. Reporting the session
+        // as unauthenticated is the part that matters; the redirect to login
+        // follows, and the stale cookie is cleared by the next Server Action
+        // or route handler (login POST, /logout) where the write is legal.
+        try {
+            await removeAuthAccessCookies();
+        } catch (clearError) {
+            console.warn(
+                'Could not clear the auth cookie from this context (expected during a Server Component render); treating the session as unauthenticated anyway.',
+                clearError,
+            );
+        }
         return true;
     }
     return false;

@@ -144,13 +144,37 @@ the root `package.json`. The bar is both of:
 2. The vulnerable code path is not reachable with attacker-controlled
    input in our usage.
 
-Current entries — both `image-size`, reached via
-`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`:
+Current entries. The first two are `image-size`, reached via
+`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`; the third is
+`extract-zip`, reached via `packages/plugins/opencode`:
 
-| GHSA                  | Issue                                          | Why it's ignored                                                               |
-| --------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)     | Runs only while **building** the docs site, over images committed to this repo |
-| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS) | Same path — no request-time, attacker-supplied image ever reaches it           |
+| GHSA                  | Issue                                          | Why it's ignored                                                                                                  |
+| --------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)     | Runs only while **building** the docs site, over images committed to this repo                                    |
+| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS) | Same path — no request-time, attacker-supplied image ever reaches it                                              |
+| `GHSA-jmr9-qjv8-65gv` | `extract-zip` unvalidated symlink traversal    | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below |
+
+**On `GHSA-jmr9-qjv8-65gv` specifically.** The only consumer is
+`packages/plugins/opencode/src/utils/binary-manager.ts`, which downloads an
+OpenCode release archive and unpacks the binary. Three things make the
+vulnerable path unreachable in our usage:
+
+1. The archive is fetched from a pinned GitHub release and its **sha256 is
+   verified** against the release's published checksum before extraction, so
+   the bytes are not attacker-controlled without compromising the release
+   itself.
+2. `onEntry` rejects any entry whose resolved destination escapes the
+   extraction root (the zip-slip guard, which predates this advisory).
+3. `onEntry` now **refuses symlink entries outright**. That is the advisory's
+   actual vector — an entry name can be perfectly benign while its link target
+   points outside the tree, so the path check alone does not cover it. An
+   OpenCode archive is a binary plus data files and never legitimately
+   contains a symlink.
+
+**Re-check trigger:** drop this entry the moment `extract-zip` publishes a
+release above 2.0.1, or if the plugin ever extracts an archive whose source is
+not checksum-pinned. Review at the next dependency sweep and no later than
+**2027-02-15**.
 
 Ignores are a bigger hammer than overrides: they silence the advisory
 everywhere in the workspace, including a future path where the package

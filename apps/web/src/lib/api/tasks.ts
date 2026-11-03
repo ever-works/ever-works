@@ -165,6 +165,14 @@ export interface Task {
      * dispatch without asking which Agent to use.
      */
     agentId: string | null;
+    /**
+     * The remaining two owner columns. Present on every API response and
+     * part of the tuple a sub-task must agree with its parent on, so the
+     * client type must carry them — a create that silently omits an owner
+     * the parent has is rejected with a scope-mismatch 400.
+     */
+    teamId: string | null;
+    goalId: string | null;
     parentTaskId: string | null;
     createdByType: TaskActorType;
     createdById: string;
@@ -173,12 +181,18 @@ export interface Task {
     completedAt: string | null;
     isRecurring: boolean;
     recurrenceRule: string | null;
+    /** Alternative recurring cadence — 5-field cron (XOR with recurrenceRule). */
+    recurrenceCron?: string | null;
     recurrenceTimezone: string | null;
     nextOccurrenceAt: string | null;
     recurrenceEndsAt: string | null;
     recurrenceMaxOccurrences: number | null;
     recurrenceOccurredCount: number;
     parentRecurringTaskId: string | null;
+    /** Schedule mode "Scheduled" — run once at this instant. */
+    scheduledAt?: string | null;
+    /** Set once the dispatcher claimed + fired the one-shot. */
+    scheduleClaimedAt?: string | null;
     // Wave 2 M7 — worktree-per-Task isolation surface. All null when the
     // Task runs without an isolated branch.
     isolationMode: TaskIsolationMode | null;
@@ -269,6 +283,15 @@ export const tasksAPI = {
         missionId?: string | null;
         ideaId?: string | null;
         workId?: string | null;
+        /**
+         * The non-exclusive owners the API also accepts. A sub-task must
+         * agree with its parent on the WHOLE owner tuple, so a caller
+         * creating a child under an Agent/Team/Goal-owned parent has to be
+         * able to send these three too.
+         */
+        teamId?: string | null;
+        agentId?: string | null;
+        goalId?: string | null;
         parentTaskId?: string | null;
         requireAllApprovers?: boolean;
         isolationMode?: TaskIsolationMode | null;
@@ -471,7 +494,9 @@ export const tasksAPI = {
     async setRecurring(
         id: string,
         input: {
-            recurrenceRule: string;
+            recurrenceRule?: string;
+            /** 5-field cron — XOR with recurrenceRule. */
+            recurrenceCron?: string;
             recurrenceTimezone?: string;
             recurrenceEndsAt?: string;
             recurrenceMaxOccurrences?: number;
@@ -498,15 +523,65 @@ export const tasksAPI = {
         });
     },
 
+    // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
+
+    /** Schedule this Task to run once at `runAt` (ISO, future). */
+    async schedule(id: string, runAt: string) {
+        return serverMutation<Task>({
+            endpoint: `/tasks/${id}/schedule`,
+            data: { runAt },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Remove the one-shot schedule (back to Run Once). */
+    async unschedule(id: string) {
+        return serverMutation<Task>({
+            endpoint: `/tasks/${id}/schedule`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Sub-tasks of a Task with their agent assignees + approval-gate
+     * state — ONE call for the whole checklist (the API batches the two
+     * side tables), so the section never fans out per row.
+     */
+    async listSubtasks(id: string) {
+        return serverFetch<{ data: TaskSubtaskRow[]; meta: TaskSubtasksMeta }>(
+            `/tasks/${id}/subtasks`,
+            { method: 'GET' },
+        );
+    },
+
+    /** Per-Task activity feed (rows stamped resourceType='task'). */
+    async listActivity(id: string, opts: { limit?: number; offset?: number } = {}) {
+        const params = new URLSearchParams();
+        if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+        if (opts.offset !== undefined) params.set('offset', String(opts.offset));
+        const qs = params.toString();
+        return serverFetch<{ data: TaskActivityRow[]; meta: { total: number } }>(
+            `/tasks/${id}/activity${qs ? `?${qs}` : ''}`,
+            { method: 'GET' },
+        );
+    },
+
     // FU-5 — attachments.
     async listAttachments(id: string): Promise<TaskAttachmentRow[]> {
         return serverFetch<TaskAttachmentRow[]>(`/tasks/${id}/attachments`, { method: 'GET' });
     },
 
-    async addAttachment(id: string, uploadId: string): Promise<TaskAttachmentRow> {
+    async addAttachment(
+        id: string,
+        uploadId: string,
+        role: TaskAttachmentRole = 'initial',
+    ): Promise<TaskAttachmentRow> {
         return serverMutation<TaskAttachmentRow>({
             endpoint: `/tasks/${id}/attachments`,
-            data: { uploadId },
+            data: { uploadId, role },
             method: 'POST',
             wrapInData: false,
         });
@@ -528,10 +603,46 @@ export const tasksAPI = {
  * entity columns + the joined upload metadata the service returns so
  * the UI doesn't need a second hop.
  */
+/** Attachment role — input material vs worked output. */
+export type TaskAttachmentRole = 'initial' | 'result';
+
+/**
+ * One row of the Task-detail Subtasks checklist
+ * (`GET /api/tasks/:id/subtasks`) — the Task row plus the side-table
+ * facts the checklist renders (agent chips + approval badge).
+ */
+export interface TaskSubtaskRow extends Task {
+    agentAssigneeIds: string[];
+    userAssigneeIds: string[];
+    approverCount: number;
+    approvedCount: number;
+    requiresApproval: boolean;
+    approvalCleared: boolean;
+}
+
+export interface TaskSubtasksMeta {
+    total: number;
+    /** Checklist numerator — children already in `done`. */
+    doneCount: number;
+}
+
+/** One row of the per-Task activity feed (`GET /api/tasks/:id/activity`). */
+export interface TaskActivityRow {
+    id: string;
+    actionType: string;
+    action: string;
+    status: string;
+    summary: string;
+    details?: Record<string, unknown> | null;
+    createdAt: string;
+}
+
 export interface TaskAttachmentRow {
     id: string;
     taskId: string;
     uploadId: string;
+    /** `initial` (input, default) | `result` (agent/human output). */
+    role?: TaskAttachmentRole;
     createdAt: string;
     upload?: {
         id: string;

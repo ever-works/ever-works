@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { fleetAPI, type FleetEnrollmentTokenView, type FleetNodeView } from '@/lib/api/fleet';
+import {
+    fleetAPI,
+    type FleetEnrollmentTokenView,
+    type FleetExecutionPreferenceView,
+    type FleetNodeView,
+} from '@/lib/api/fleet';
 import { FleetSettings } from '@/components/settings/FleetSettings';
 import {
     isFleetEnabled,
@@ -39,10 +44,17 @@ export default async function FleetSettingsPage() {
     let loadError: string | null = null;
     let initialTokens: FleetEnrollmentTokenView[] = [];
     let tokensError: string | null = null;
+    let initialPreferences: FleetExecutionPreferenceView[] = [];
+    let preferencesError: string | null = null;
 
-    const [nodesResult, tokensResult] = await Promise.allSettled([
+    // `allSettled`, not `all`: each read fails INDEPENDENTLY and the page
+    // still renders with a per-section banner. A routing-preference
+    // hiccup must not take down the node list, which is the page's whole
+    // reason to exist.
+    const [nodesResult, tokensResult, preferencesResult] = await Promise.allSettled([
         fleetAPI.listNodes(),
         fleetAPI.listOutstandingTokens(),
+        fleetAPI.listExecutionPreferences(),
     ]);
 
     if (nodesResult.status === 'fulfilled') {
@@ -63,6 +75,15 @@ export default async function FleetSettingsPage() {
                 : 'Failed to load outstanding enrollment tokens';
     }
 
+    if (preferencesResult.status === 'fulfilled') {
+        initialPreferences = preferencesResult.value;
+    } else {
+        preferencesError =
+            preferencesResult.reason instanceof Error
+                ? preferencesResult.reason.message
+                : 'Failed to load execution preferences';
+    }
+
     const downloads = resolveFleetDownloadUrls();
 
     return (
@@ -74,6 +95,8 @@ export default async function FleetSettingsPage() {
             apiBaseUrl={resolvePublicApiBaseUrl()}
             desktopDownloadUrl={downloads.desktop}
             nodeDownloadUrl={downloads.node}
+            initialPreferences={initialPreferences}
+            preferencesError={preferencesError}
         />
     );
 }

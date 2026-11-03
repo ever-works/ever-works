@@ -1,8 +1,13 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { TaskRepository } from '../database/repositories/task.repository';
-import { UserTaskCounterRepository } from '../database/repositories/task-side.repositories';
-import { computeNextOccurrence, cloneRecurringTaskAsInstance } from './recurrence';
+import {
+    TaskAssigneeRepository,
+    UserTaskCounterRepository,
+} from '../database/repositories/task-side.repositories';
+import { computeNextTemplateOccurrence, cloneRecurringTaskAsInstance } from './recurrence';
 import { TaskNotificationService } from './task-notification.service';
+import { TaskTransitionService } from './task-transition.service';
+import { TaskStatus, type Task } from '../entities/task.entity';
 
 export interface RecurrenceDispatchEntry {
     templateId: string;
@@ -12,6 +17,8 @@ export interface RecurrenceDispatchEntry {
     instanceId?: string;
     instanceSlug?: string;
     nextOccurrenceAt?: string | null;
+    /** How the spawned instance's agent dispatch went. */
+    dispatch?: 'dispatched' | 'no-agent' | 'not-attempted';
     message?: string;
 }
 
@@ -24,20 +31,49 @@ export interface RecurrenceDispatchSummary {
     entries: RecurrenceDispatchEntry[];
 }
 
+export interface ScheduleDispatchEntry {
+    taskId: string;
+    taskSlug: string;
+    scheduledFor: string;
+    outcome: 'dispatched' | 'no-agent' | 'skipped' | 'failed';
+    message?: string;
+}
+
+export interface ScheduleDispatchSummary {
+    limit: number;
+    dueCount: number;
+    dispatched: number;
+    noAgent: number;
+    skipped: number;
+    failed: number;
+    entries: ScheduleDispatchEntry[];
+}
+
 /**
- * Tasks feature — Phase 17.6.
+ * Tasks feature — Phase 17.6 + schedule-modes upgrade.
  *
- * Cron-fed dispatcher that walks recurring Task templates whose
- * `nextOccurrenceAt <= now`, CAS-claims each one, clones a fresh
- * instance into the `tasks` table, and advances
- * `nextOccurrenceAt` to the next computed slot. The CAS guard is
- * what stops two concurrent dispatcher workers from spawning two
- * instances at the same recurrence boundary.
+ * Cron-fed dispatcher with two due-scans:
  *
- * Mirrors `AgentScheduleDispatcherService.dispatchDue` posture
- * end to end — same CAS-claim pattern, same per-entry summary,
- * same error containment (one template's failure does not
- * cascade).
+ *  1. `dispatchDue` — recurring Task templates whose
+ *     `nextOccurrenceAt <= now` (RRULE or cron cadence). CAS-claims each
+ *     one, clones a fresh instance (KEEPING the owner tuple incl.
+ *     agentId/teamId/goalId), COPIES the template's assignee rows, and
+ *     dispatches the instance through the same gated path a board "Run"
+ *     uses. Previously spawned instances carried no agent binding at all
+ *     and sat inert — that is the defect this upgrade fixes.
+ *
+ *  2. `dispatchDueScheduled` — one-shot Tasks whose `scheduledAt <= now`
+ *     and are unclaimed. CAS-claims via `scheduleClaimedAt`, then
+ *     dispatches the Task itself (no clone).
+ *
+ * Both paths resolve the run agent as: agent assignees (fan-out, one run
+ * per agent) → the Task's own `agentId`. When nothing resolves, the
+ * `task_run_no_agent` notification fires instead of a silent skip — the
+ * Task stays visibly queued (`todo`) for a human to pick up.
+ *
+ * The CAS guards are what stop two concurrent dispatcher workers from
+ * double-spawning / double-dispatching at the same boundary. Mirrors
+ * `AgentScheduleDispatcherService.dispatchDue` posture end to end.
  */
 @Injectable()
 export class TaskRecurrenceDispatcherService {
@@ -51,6 +87,12 @@ export class TaskRecurrenceDispatcherService {
         // actually reachable. Optional() — when unbound (unit tests),
         // spawn still completes.
         @Optional() private readonly notifications?: TaskNotificationService,
+        // Schedule-modes upgrade — assignee copy + agent dispatch.
+        // Appended LAST + Optional so every positional construction in
+        // the existing specs keeps compiling; graphs without them spawn
+        // instances exactly as before (inert), never crash.
+        @Optional() private readonly assignees?: TaskAssigneeRepository,
+        @Optional() private readonly transitions?: TaskTransitionService,
     ) {}
 
     async dispatchDue(limit = 50, now: Date = new Date()): Promise<RecurrenceDispatchSummary> {
@@ -67,8 +109,9 @@ export class TaskRecurrenceDispatcherService {
         for (const template of templates) {
             const scheduledFor = template.nextOccurrenceAt!;
             try {
-                const nextSlot = computeNextOccurrence({
-                    rule: template.recurrenceRule!,
+                const nextSlot = computeNextTemplateOccurrence({
+                    rule: template.recurrenceRule ?? null,
+                    cron: template.recurrenceCron ?? null,
                     from: scheduledFor,
                     recurrenceEndsAt: template.recurrenceEndsAt ?? null,
                     recurrenceMaxOccurrences: template.recurrenceMaxOccurrences ?? null,
@@ -102,6 +145,15 @@ export class TaskRecurrenceDispatcherService {
                 };
                 const instance = await this.tasks.create(instanceData);
 
+                // Copy the template's assignee rows so the instance is
+                // runnable by the same actors. Best-effort: a copy failure
+                // must not fail the spawn (the instance still exists).
+                await this.copyAssignees(template.id, instance.id);
+
+                // Dispatch through THE gated path (concurrency valve,
+                // credits precheck, denorm — all apply unchanged).
+                const dispatchOutcome = await this.dispatchInstance(instance);
+
                 summary.spawned += 1;
                 summary.entries.push({
                     templateId: template.id,
@@ -111,6 +163,7 @@ export class TaskRecurrenceDispatcherService {
                     instanceId: instance.id,
                     instanceSlug: instance.slug,
                     nextOccurrenceAt: nextSlot?.toISOString() ?? null,
+                    dispatch: dispatchOutcome,
                 });
 
                 // Third-pass fix: in-app notification for the spawned
@@ -149,5 +202,168 @@ export class TaskRecurrenceDispatcherService {
         }
 
         return summary;
+    }
+
+    /**
+     * Schedule-modes upgrade — the one-shot half of the cron tick.
+     * Walks due `scheduledAt` Tasks, CAS-claims each, and dispatches
+     * the Task itself.
+     */
+    async dispatchDueScheduled(
+        limit = 50,
+        now: Date = new Date(),
+    ): Promise<ScheduleDispatchSummary> {
+        const due = await this.tasks.findDueScheduledTasks(limit, now);
+        const summary: ScheduleDispatchSummary = {
+            limit,
+            dueCount: due.length,
+            dispatched: 0,
+            noAgent: 0,
+            skipped: 0,
+            failed: 0,
+            entries: [],
+        };
+
+        for (const task of due) {
+            const scheduledFor = task.scheduledAt!;
+            try {
+                const claimed = await this.tasks.casClaimSchedule(task.id, scheduledFor, now);
+                if (!claimed) {
+                    summary.skipped += 1;
+                    summary.entries.push({
+                        taskId: task.id,
+                        taskSlug: task.slug,
+                        scheduledFor: scheduledFor.toISOString(),
+                        outcome: 'skipped',
+                        message: 'CAS lost — another dispatcher claimed first',
+                    });
+                    continue;
+                }
+
+                // Make the fire visible on the board: a backlog one-shot
+                // becomes actionable `todo`. Best-effort CAS — a Task
+                // already moved by its owner is left alone.
+                if (task.status === TaskStatus.BACKLOG) {
+                    await this.tasks
+                        .casUpdateStatus(task.id, TaskStatus.BACKLOG, {
+                            status: TaskStatus.TODO,
+                        })
+                        .catch(() => false);
+                }
+
+                const outcome = await this.dispatchInstance(task);
+                if (outcome === 'dispatched') {
+                    summary.dispatched += 1;
+                } else {
+                    summary.noAgent += 1;
+                }
+                summary.entries.push({
+                    taskId: task.id,
+                    taskSlug: task.slug,
+                    scheduledFor: scheduledFor.toISOString(),
+                    outcome: outcome === 'dispatched' ? 'dispatched' : 'no-agent',
+                });
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                this.logger.error(
+                    `Failed to dispatch scheduled task ${task.id}: ${message}`,
+                    err as Error,
+                );
+                summary.failed += 1;
+                summary.entries.push({
+                    taskId: task.id,
+                    taskSlug: task.slug,
+                    scheduledFor: scheduledFor.toISOString(),
+                    outcome: 'failed',
+                    message,
+                });
+            }
+        }
+
+        return summary;
+    }
+
+    // ── internals ─────────────────────────────────────────────────
+
+    private async copyAssignees(templateTaskId: string, instanceTaskId: string): Promise<void> {
+        if (!this.assignees) return;
+        try {
+            const rows = await this.assignees.findByTaskId(templateTaskId);
+            for (const row of rows) {
+                await this.assignees
+                    .add(instanceTaskId, row.assigneeType, row.assigneeId)
+                    .catch((err) =>
+                        this.logger.warn(
+                            `Assignee copy failed for instance ${instanceTaskId}: ${err}`,
+                        ),
+                    );
+            }
+        } catch (err) {
+            this.logger.warn(`Assignee lookup failed for template ${templateTaskId}: ${err}`);
+        }
+    }
+
+    /**
+     * Dispatch a spawned/scheduled Task through
+     * `TaskTransitionService.dispatchAgentRun` — THE single dispatch
+     * path, so the concurrency gate and the board denorm apply
+     * unchanged. Agent resolution: agent assignees (one run per agent,
+     * mirroring the drag-to-in-progress fan-out) → the Task's own
+     * `agentId` column. No resolvable agent → `task_run_no_agent`
+     * notification instead of a silent skip.
+     */
+    private async dispatchInstance(
+        task: Task,
+    ): Promise<'dispatched' | 'no-agent' | 'not-attempted'> {
+        if (!this.transitions) return 'not-attempted';
+
+        const agentIds = new Set<string>();
+        if (this.assignees) {
+            try {
+                const agentRows = await this.assignees.findAgentAssignees(task.id);
+                for (const row of agentRows) agentIds.add(row.assigneeId);
+            } catch (err) {
+                this.logger.warn(`Agent-assignee lookup failed for task ${task.id}: ${err}`);
+            }
+        }
+        if (agentIds.size === 0 && task.agentId) {
+            agentIds.add(task.agentId);
+        }
+
+        if (agentIds.size === 0) {
+            if (this.notifications) {
+                void this.notifications
+                    .emit(
+                        'task_run_no_agent',
+                        {
+                            taskId: task.id,
+                            taskSlug: task.slug,
+                            taskTitle: task.title,
+                        },
+                        [task.userId],
+                    )
+                    .catch(() => undefined);
+            }
+            return 'no-agent';
+        }
+
+        // Dedup discriminator: a spawned recurrence instance has a fresh
+        // task id per occurrence, so the generation suffices; a RE-scheduled
+        // one-shot reuses its task id, so the fired slot itself is the
+        // discriminator (two fires of the same Task at different slots must
+        // not dedup-collapse).
+        const discriminator =
+            task.scheduledAt?.getTime() ?? (task.recurrenceOccurredCount ?? 0) + 1;
+        let anyDispatched = false;
+        for (const agentId of agentIds) {
+            // dispatchAgentRun never throws — failures are recorded on the
+            // run row; a parked (gated) run still counts as dispatched
+            // because it is visibly queued and will be promoted.
+            const result = await this.transitions.dispatchAgentRun(task, agentId, {
+                dedupKey: `${task.id}:${agentId}:schedule:${discriminator}`,
+            });
+            if (result.dispatched || result.parked) anyDispatched = true;
+        }
+        return anyDispatched ? 'dispatched' : 'no-agent';
     }
 }

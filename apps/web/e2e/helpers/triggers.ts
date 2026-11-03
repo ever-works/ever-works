@@ -6,15 +6,22 @@ import { API_BASE, authedHeaders } from './api';
  * Inbound Triggers helpers (#1712) — signed webhook/API triggers that spawn Tasks.
  *
  * Verified live against http://127.0.0.1:3100 (sqlite in-memory):
- *   POST   /api/inbound-triggers { name, kind?, description?, targetAgentId?, taskTitleTemplate? }
+ *   POST   /api/inbound-triggers { name, kind?, description?, targetAgentId?, taskTitleTemplate?,
+ *            sourceType?, eventMatcher?, taskDescriptionTemplate?, taskTemplateSlug?,
+ *            mode?, agentPrompt?, showOnBoard?, replayWindowSec?, autoStart?, defaultVariables? }
  *            → 201 { trigger: InboundTriggerView, secret }  (secret returned ONCE)
- *          InboundTriggerView = { id, name, description|null, kind, status,
- *            targetAgentId|null, taskTitleTemplate, fireCount, lastFiredAt|null,
+ *          InboundTriggerView = { id, name, description|null, kind, status, sourceType,
+ *            eventMatcher|null, targetAgentId|null, taskTitleTemplate, taskDescriptionTemplate|null,
+ *            taskTemplateSlug|null, mode, agentPrompt|null, showOnBoard, replayWindowSec,
+ *            autoStart, defaultVariables|null, fireCount, lastFiredAt|null,
  *            rotatedAt|null, createdAt, updatedAt }  (NO secret material)
  *   GET    /api/inbound-triggers            → { triggers: InboundTriggerView[] }
  *   GET    /api/inbound-triggers/:id        → InboundTriggerView | 404
  *   PATCH  /api/inbound-triggers/:id        → InboundTriggerView | 404
  *   POST   /api/inbound-triggers/:id/rotate-secret → 200 { trigger, secret }
+ *   POST   /api/inbound-triggers/:id/fire-now → 200 { ok, taskId, taskSlug, taskTitle } (REAL fire)
+ *   GET    /api/inbound-triggers/:id/fires  → { fires: [{ id, origin, status, reason|null,
+ *                                                          taskId|null, firedAt }] } (max 50)
  *   POST   /api/inbound-triggers/:id/pause  → 200 InboundTriggerView (status paused)
  *   POST   /api/inbound-triggers/:id/resume → 200 InboundTriggerView (status active)
  *   DELETE /api/inbound-triggers/:id        → 204
@@ -25,14 +32,31 @@ import { API_BASE, authedHeaders } from './api';
  *                     404 unknown id, 409 while paused, 400 oversized (>64KB) / non-JSON.
  */
 
+export interface TriggerVariable {
+    key: string;
+    label?: string;
+    required: boolean;
+}
+
 export interface InboundTriggerView {
     id: string;
     name: string;
     description: string | null;
     kind: 'webhook' | 'api';
     status: string;
+    sourceType: 'webhook' | 'event';
+    eventMatcher: { source?: string; kind?: string; workId?: string } | null;
     targetAgentId: string | null;
     taskTitleTemplate: string;
+    taskDescriptionTemplate: string | null;
+    taskTemplateSlug: string | null;
+    /** Locked at create time: 'single-task' (prompt) or 'template'. */
+    mode: 'single-task' | 'template';
+    agentPrompt: string | null;
+    showOnBoard: boolean;
+    replayWindowSec: number;
+    autoStart: 'always' | 'manual';
+    defaultVariables: TriggerVariable[] | null;
     fireCount: number;
     lastFiredAt: string | null;
     rotatedAt: string | null;
@@ -51,6 +75,16 @@ export async function createTriggerViaAPI(
         description?: string;
         targetAgentId?: string;
         taskTitleTemplate?: string;
+        taskDescriptionTemplate?: string;
+        taskTemplateSlug?: string;
+        sourceType?: 'webhook' | 'event';
+        eventMatcher?: { source?: string; kind?: string; workId?: string };
+        mode?: 'single-task' | 'template';
+        agentPrompt?: string;
+        showOnBoard?: boolean;
+        replayWindowSec?: number;
+        autoStart?: 'always' | 'manual';
+        defaultVariables?: { key: string; label?: string; required?: boolean }[];
     },
 ): Promise<{ trigger: InboundTriggerView; secret: string }> {
     const res = await request.post(TRIGGERS_BASE, { headers: authedHeaders(token), data: body });

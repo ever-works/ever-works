@@ -21,6 +21,7 @@ export * from './agent-task-tools';
 export * from './recurrence';
 export * from './task-recurrence-dispatcher.service';
 export * from './task-notification.service';
+export * from './task-templates.service';
 export { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
 export { TaskAssignee } from '../entities/task-assignee.entity';
 export { TaskReviewer, type TaskReviewState } from '../entities/task-reviewer.entity';
@@ -32,11 +33,14 @@ export {
     type TaskChatMention,
     type TaskChatAttachmentRef,
 } from '../entities/task-chat-message.entity';
-export { TaskAttachment } from '../entities/task-attachment.entity';
+export { TaskAttachment, type TaskAttachmentRole } from '../entities/task-attachment.entity';
+export { TaskTemplate } from '../entities/task-template.entity';
+export { TaskTemplateStep } from '../entities/task-template-step.entity';
 export { TaskWatcher } from '../entities/task-watcher.entity';
 export { TaskKbMention } from '../entities/task-kb-mention.entity';
 export { UserTaskCounter } from '../entities/user-task-counter.entity';
 export { TaskRepository, type ListTasksFilter } from '../database/repositories/task.repository';
+export { TaskTemplateRepository } from '../database/repositories/task-template.repository';
 export {
     TaskAssigneeRepository,
     TaskReviewerRepository,

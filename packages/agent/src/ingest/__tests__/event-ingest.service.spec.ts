@@ -359,6 +359,23 @@ describe('EventIngestService', () => {
             });
         });
 
+        it("a wildcard processor (kinds: ['*']) is offered EVERY kind (Task Triggers seam)", async () => {
+            const first = storedEvent({ id: 'row-1', kind: 'slack.message' });
+            const second = storedEvent({ id: 'row-2', kind: 'github.push', source: 'github' });
+            repository.findUnprocessed.mockResolvedValue([first, second]);
+
+            const service = build();
+            const process = jest.fn(async () => undefined);
+            service.registerKindProcessor({ kinds: ['*'], process });
+
+            const result = await service.processBatch(10);
+
+            expect(process).toHaveBeenCalledTimes(2);
+            expect(process).toHaveBeenCalledWith(first);
+            expect(process).toHaveBeenCalledWith(second);
+            expect(result.processed).toBe(2);
+        });
+
         it('processor failure is REQUIRED-grade: row left unprocessed, no Activity duplicate risk', async () => {
             const bad = storedEvent({ id: 'row-bad', kind: 'zoom.recording' });
             const good = storedEvent({ id: 'row-good', kind: 'slack.message' });

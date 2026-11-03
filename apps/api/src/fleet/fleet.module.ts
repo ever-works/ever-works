@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 import { FleetController } from './fleet.controller';
 import { FleetJobsController } from './fleet-jobs.controller';
 import { FleetRunRouterService } from './fleet-run-router.service';
+import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
     buildNodeJobRuntimeProviders,
     NODE_JOB_RUNTIME_DISPATCHER_FACTORY,
@@ -29,6 +31,15 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  *     heartbeat / complete), node-secret authenticated, public,
  *     fail-closed to one undifferentiated 401.
  *
+ * `FleetRunnerStatusService` is the ONE composer behind both the
+ * always-visible runner pill and the router's availability check, so
+ * "3 of 4 runners online" and "there is a free runner, send the work
+ * locally" can never disagree. The Task → (Work, Goal) lookup the
+ * execution preference is resolved against lives in
+ * `fleet-task-scope.resolver.ts` but is PROVIDED by the api-side
+ * `TasksModule`, which is the module that has `TaskRepository` — the
+ * same split `SubAgentDelegationDepthResolverService` already uses.
+ *
  * It is ALSO the operator-side construction site for the `node` job
  * runtime (see `node-job-runtime.providers.ts`): the plugin's dispatcher
  * factory is bound to the real `fleet_jobs` store here, and
@@ -45,10 +56,20 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  *     channel, at the edge instead of only inside the services.
  */
 @Module({
-    imports: [AgentFleetModule, DatabaseModule, TypeOrmModule.forFeature([TenantJobRuntimeConfig])],
+    imports: [
+        AgentFleetModule,
+        DatabaseModule,
+        // NotificationsModule supplies the producer behind the
+        // "local runner fallback → cloud" inbox entry. Imported here
+        // rather than injected @Global() so the dependency is visible
+        // where the fallback is actually decided.
+        NotificationsModule,
+        TypeOrmModule.forFeature([TenantJobRuntimeConfig]),
+    ],
     controllers: [FleetController, FleetJobsController],
     providers: [
         ...buildNodeJobRuntimeProviders(),
+        FleetRunnerStatusService,
         FleetRunRouterService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
@@ -56,10 +77,15 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
     ],
     exports: [
         AgentFleetModule,
+        // Re-exported so the api-side TasksModule (which imports this
+        // module) can inject NotificationService into the fleet-aware
+        // dispatcher factory without importing NotificationsModule twice.
+        NotificationsModule,
         NODE_JOB_RUNTIME_STORE,
         NODE_JOB_RUNTIME_DISPATCHER_FACTORY,
         NODE_JOB_RUNTIME_PLUGIN,
         FleetRunRouterService,
+        FleetRunnerStatusService,
     ],
 })
 export class FleetApiModule {}

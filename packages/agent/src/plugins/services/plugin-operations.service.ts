@@ -776,6 +776,153 @@ export class PluginOperationsService {
         );
     }
 
+    /**
+     * Set or clear the user's default VOICE (speech-to-text) provider.
+     *
+     * Deliberately a mirror of `setGlobalPipelineDefault`: one flag on the
+     * user-plugin metadata blob, cleared everywhere before being set once.
+     * That keeps this a settings change with no schema change — the same
+     * reason the pipeline default lives there.
+     *
+     * Why a dedicated setting rather than reusing the active AI provider:
+     * transcription is an OPTIONAL method on the AI-provider interface, so
+     * the plugin answering chat is frequently not one that can transcribe at
+     * all (a gateway with no Whisper route, say). Without this the user's
+     * only lever was a per-request pick in the chat composer, which is the
+     * wrong altitude — swapping speech vendors is a once-a-year decision.
+     *
+     * @param userId - The user to update
+     * @param pluginId - Plugin to set as the voice default, or null to clear
+     */
+    async setGlobalVoiceDefault(userId: string, pluginId: string | null): Promise<void> {
+        // Validate the TARGET before touching a single row. The previous
+        // order cleared every existing flag first and only then checked the
+        // new plugin, so a bad `pluginId` (unknown plugin, non-AI plugin, or
+        // one that cannot transcribe) wiped the user's working voice default
+        // and *then* 400'd — a failed request that silently destroyed a
+        // setting. Everything that can reject now rejects while the DB is
+        // still untouched.
+        const validated = pluginId ? await this.resolveVoiceProvider(pluginId) : null;
+
+        // Clear-and-set as one unit. Without the transaction a crash between
+        // the clear loop and the save leaves the user with no voice default
+        // at all, having asked to change it rather than remove it.
+        await this.userPluginRepository.manager.transaction(async (manager) => {
+            const userPlugins = manager.getRepository(UserPluginEntity);
+
+            // Clear from the DB rather than the registry so a flag left on a
+            // plugin that has since been unloaded is cleaned up too.
+            const flaggedPlugins = await userPlugins.find({ where: { userId } });
+            for (const existing of flaggedPlugins) {
+                if (existing.metadata?.isGlobalVoiceDefault) {
+                    const newMeta = { ...existing.metadata };
+                    delete newMeta.isGlobalVoiceDefault;
+                    await userPlugins.save({ ...existing, metadata: newMeta });
+                }
+            }
+
+            if (!validated) return;
+
+            let userPlugin = await userPlugins.findOne({
+                where: { userId, pluginId: validated.pluginId },
+            });
+
+            if (!userPlugin) {
+                userPlugin = userPlugins.create({
+                    userId,
+                    pluginId: validated.pluginId,
+                    pluginEntityId: validated.pluginEntityId,
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                });
+            }
+
+            userPlugin.metadata = {
+                ...userPlugin.metadata,
+                isGlobalVoiceDefault: true,
+            };
+            await userPlugins.save(userPlugin);
+        });
+
+        if (validated) {
+            this.logger.log(
+                `Voice provider default set to "${validated.pluginId}" for user "${userId}"`,
+            );
+        }
+    }
+
+    /**
+     * Resolve `pluginId` to a provider that can genuinely transcribe, or throw.
+     *
+     * Runs entirely OUTSIDE the write transaction on purpose: materializing a
+     * cold plugin performs a dynamic `import()` plus the plugin's `onLoad`,
+     * and holding a DB transaction open across that is how a settings toggle
+     * turns into lock contention.
+     *
+     * @returns the validated plugin id and the `PluginEntity` id to attach a
+     *          freshly-created user-plugin row to.
+     */
+    private async resolveVoiceProvider(
+        pluginId: string,
+    ): Promise<{ pluginId: string; pluginEntityId: string }> {
+        const target = this.pluginRegistryService.get(pluginId);
+        if (!target) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+        if (!target.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
+            throw new BadRequestException(`Plugin "${pluginId}" is not an AI provider plugin`);
+        }
+
+        // Being an AI provider does NOT imply speech-to-text — `transcribe` is
+        // optional on the interface. Probe the REAL instance: a lazy plugin
+        // stub answers `typeof stub.transcribe === 'function'` with `true` for
+        // EVERY name, because its proxy `get` trap returns a forwarding
+        // wrapper for any unknown property. Probing the stub therefore accepts
+        // any AI provider at all, saves it as the voice default, and defers
+        // the failure to the first dictation — where the proxy materializes,
+        // finds no `transcribe`, and throws `has no method "transcribe"` as a
+        // 500. Materializing first (the same reason `PluginValidationService`
+        // and `BaseFacade.materializeForUse` do it) makes the probe truthful
+        // and keeps the rejection a clean 400 at save time.
+        const real = await this.materializePlugin(target.plugin);
+        if (typeof (real as { transcribe?: unknown }).transcribe !== 'function') {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" does not support voice transcription`,
+            );
+        }
+
+        const pluginEntity = await this.pluginRepository.findOne({ where: { pluginId } });
+        if (!pluginEntity) {
+            throw new NotFoundException(`Plugin entity "${pluginId}" not found`);
+        }
+
+        return { pluginId, pluginEntityId: pluginEntity.id };
+    }
+
+    /**
+     * Return the real instance behind a possibly-lazy registry stub.
+     * A non-lazy plugin (bundled mode, or a unit-test double) is its own
+     * real instance and is passed straight through.
+     */
+    private async materializePlugin(plugin: IPlugin): Promise<IPlugin> {
+        const stub = plugin as unknown as { __materialize?: () => Promise<IPlugin> };
+        return typeof stub.__materialize === 'function' ? await stub.__materialize() : plugin;
+    }
+
+    /**
+     * The plugin id this user picked as their voice provider, if any.
+     *
+     * Returns `null` when unset, which is meaningful rather than an error
+     * state: selection then falls through to the scope-active plugin and the
+     * platform default, exactly as it did before this setting existed.
+     */
+    async getGlobalVoiceDefault(userId: string): Promise<string | null> {
+        const flagged = await this.userPluginRepository.find({ where: { userId } });
+        return flagged.find((p) => p.metadata?.isGlobalVoiceDefault)?.pluginId ?? null;
+    }
+
     // ============================================
     // Work Plugin Operations
     // ============================================

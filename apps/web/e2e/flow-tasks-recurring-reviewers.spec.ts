@@ -37,8 +37,12 @@ import { createTaskViaAPI } from './helpers/agents-tasks';
  *       nextOccurrenceAt (idempotent / last-write-wins).
  *       · cron-style "0 9 * * 1" / garbage → 400 "RRULE parse error: Unknown
  *         RRULE property '<rule>'" (the rrule parser, NOT class-validator).
- *       · missing recurrenceRule → 400 class-validator array
- *         ("recurrenceRule must be a string"); rule > 200 chars → 400
+ *       · missing BOTH cadences → 400 "recurrenceRule or recurrenceCron is
+ *         required." (schedule-modes upgrade: `recurrenceCron` is an
+ *         accepted 5-field-cron alternative, so `recurrenceRule` is
+ *         @IsOptional and the controller guard produces the rejection);
+ *         sending BOTH → 400 "Provide exactly one of recurrenceRule …";
+ *         rule > 200 chars → 400
  *         "recurrenceRule must be shorter than or equal to 200 characters".
  *       · recurrenceMaxOccurrences is @IsInt @Min(1) @Max(9999): -3 / "five" /
  *         99999 → 400. An unknown body prop → 400 "property <x> should not
@@ -289,10 +293,25 @@ test.describe('Task recurring — RRULE/DTO validation (API)', () => {
         const token = u.access_token;
         const task = await createTaskViaAPI(request, token, { title: uniq('Recur dto val') });
 
-        // Missing recurrenceRule → class-validator array (@IsString).
+        // Missing BOTH cadence dialects → 400 from the controller guard.
+        // (Schedule-modes upgrade: `recurrenceRule` became optional because
+        // `recurrenceCron` is now an accepted alternative, so the rejection
+        // is the XOR guard's message rather than class-validator's
+        // "recurrenceRule must be a string".)
         const missing = await setRecurring(request, token, task.id, {});
         expect(missing.status()).toBe(400);
-        expect(String((await missing.json()).message)).toMatch(/recurrenceRule must be a string/i);
+        expect(String((await missing.json()).message)).toMatch(
+            /recurrenceRule or recurrenceCron is required/i,
+        );
+
+        // Providing BOTH is equally rejected — the two dialects would
+        // disagree about the next fire (service-level XOR).
+        const both = await setRecurring(request, token, task.id, {
+            recurrenceRule: 'FREQ=DAILY',
+            recurrenceCron: '0 9 * * 1',
+        });
+        expect(both.status()).toBe(400);
+        expect(String((await both.json()).message)).toMatch(/exactly one of recurrenceRule/i);
 
         // Rule over the 200-char cap → 400 (@MaxLength(200)) — even a
         // FREQ-prefixed (otherwise-valid) rule is rejected purely on length.

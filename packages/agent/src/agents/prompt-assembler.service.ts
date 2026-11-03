@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Agent } from '../entities/agent.entity';
+// Dependency-free helper (skills subpath): renders the one-line
+// `files: name (kind, size); …` manifest for a skill's companion files.
+import { renderSkillFileManifestLine } from '../skills/skill-invocation';
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 7.1–7.3.
@@ -97,7 +100,13 @@ export interface AssembleInput {
     /** Conversation context for task / chat runs. Newest last. */
     conversationContext?: Array<{ author: string; body: string; createdAt?: string }>;
     /** Resolved active skills (Phase 9 will source this from SkillBindingRepository.resolveActive). */
-    skills?: Array<{ slug: string; body: string; priority: number }>;
+    skills?: Array<{
+        slug: string;
+        body: string;
+        priority: number;
+        /** Companion-file manifest (skill files feature) — rendered as one `files:` line. */
+        files?: Array<{ filename: string; kind: string; sizeBytes: number }>;
+    }>;
     /** Optional Mission / Idea / Work description that anchors the scope. */
     scopeContext?: string | null;
     /** Work-scoped Agent — relevant WorkAdvancedPrompts column. */
@@ -268,7 +277,15 @@ export class PromptAssemblerService {
         for (const skill of skills) {
             const slug = neutralizeInjectedBlock(skill.slug);
             const body = neutralizeInjectedBlock(skill.body);
-            lines.push(`<skill slug="${slug}" priority="${skill.priority}">\n${body}\n</skill>`);
+            // Skill files feature — compact companion-file manifest inside
+            // the block. Filenames are user-supplied, so they ride through
+            // the same neutralizer as the body; content itself stays
+            // on-demand behind the getSkillFile tool.
+            const manifest = renderSkillFileManifestLine(skill.files);
+            const manifestSuffix = manifest ? `\n\n${neutralizeInjectedBlock(manifest)}` : '';
+            lines.push(
+                `<skill slug="${slug}" priority="${skill.priority}">\n${body}${manifestSuffix}\n</skill>`,
+            );
         }
         return lines.join('\n\n');
     }

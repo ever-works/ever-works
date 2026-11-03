@@ -13,6 +13,11 @@ export interface CreateFleetJobData {
     requiredCapabilities?: string[];
     maxAttempts?: number;
     idempotencyKey?: string | null;
+    /**
+     * Why this job is queued without a runner able to take it (today
+     * only `waiting-for-runner`). NULL means "queued normally".
+     */
+    queuedReason?: string | null;
 }
 
 /** Columns the lease CAS is allowed to stamp alongside the claim flip. */
@@ -21,6 +26,14 @@ export interface ClaimJobPatch {
     status: FleetJobStatus;
     leaseExpiresAt: Date;
     attempts: number;
+    /**
+     * Always written as null by the claim: a job that has just been
+     * claimed is by definition no longer waiting for a runner, and the
+     * CAS is the exact moment that stops being true. Clearing it HERE
+     * rather than in a second writer is what keeps the token from going
+     * stale.
+     */
+    queuedReason: null;
 }
 
 /**
@@ -152,7 +165,12 @@ export class FleetJobRepository {
     async reclaim(id: string, previousStatus: FleetJobStatus): Promise<boolean> {
         const result = await this.repository.update(
             { id, status: previousStatus },
-            { status: 'queued', nodeId: null, leaseExpiresAt: null },
+            // Reclaim returns the row to the pool as an ORDINARY queued
+            // job: the reason it originally waited (no free runner) is
+            // not necessarily why it is waiting now, and carrying a
+            // stale token forward would misreport a lapsed lease as a
+            // capacity problem.
+            { status: 'queued', nodeId: null, leaseExpiresAt: null, queuedReason: null },
         );
         return (result.affected ?? 0) === 1;
     }

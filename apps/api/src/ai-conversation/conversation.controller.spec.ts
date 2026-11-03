@@ -16,6 +16,7 @@ describe('ConversationController', () => {
             | 'create'
             | 'findById'
             | 'updateTitle'
+            | 'updateModel'
             | 'appendMessages'
             | 'delete'
             | 'deleteAllByUser'
@@ -30,6 +31,7 @@ describe('ConversationController', () => {
             create: jest.fn(),
             findById: jest.fn(),
             updateTitle: jest.fn(),
+            updateModel: jest.fn(),
             appendMessages: jest.fn(),
             delete: jest.fn(),
             deleteAllByUser: jest.fn(),
@@ -74,8 +76,26 @@ describe('ConversationController', () => {
                 userId: 'user-1',
                 title: 't',
                 providerId: 'openai',
+                model: undefined,
             });
             expect(result).toEqual({ id: 'c-1' });
+        });
+
+        it('stamps the starting model on the row when the composer has one pinned', async () => {
+            repo.create.mockResolvedValue({ id: 'c-2' } as any);
+
+            await controller.create(auth, {
+                title: 't',
+                providerId: 'openrouter',
+                model: 'openai/gpt-5-mini',
+            });
+
+            expect(repo.create).toHaveBeenCalledWith({
+                userId: 'user-1',
+                title: 't',
+                providerId: 'openrouter',
+                model: 'openai/gpt-5-mini',
+            });
         });
     });
 
@@ -105,6 +125,41 @@ describe('ConversationController', () => {
             expect(repo.updateTitle).toHaveBeenCalledWith('c-1', 'user-1', 'New');
         });
 
+        // A title-only PATCH is the shape every pre-existing caller sends
+        // (auto-title, rename). It must not touch the model pin — otherwise
+        // renaming a thread would silently drop the model it runs on.
+        it('leaves the model pin alone on a title-only update', async () => {
+            repo.findById.mockResolvedValue({ id: 'c-1' } as any);
+
+            await controller.update(auth, 'c-1', { title: 'New' });
+
+            expect(repo.updateModel).not.toHaveBeenCalled();
+        });
+
+        it('re-pins the model without clearing the title', async () => {
+            repo.findById.mockResolvedValue({ id: 'c-1' } as any);
+
+            await controller.update(auth, 'c-1', { model: 'anthropic/claude-3.5-haiku' });
+
+            expect(repo.updateModel).toHaveBeenCalledWith(
+                'c-1',
+                'user-1',
+                'anthropic/claude-3.5-haiku',
+            );
+            expect(repo.updateTitle).not.toHaveBeenCalled();
+        });
+
+        // Empty string is the clear signal: the field is typed `string` so the
+        // DTO whitelist keeps rejecting non-string payloads, and the handler
+        // maps it to a real NULL meaning "resolve the provider's default".
+        it('maps an empty model to null so the pin is cleared', async () => {
+            repo.findById.mockResolvedValue({ id: 'c-1' } as any);
+
+            await controller.update(auth, 'c-1', { model: '' });
+
+            expect(repo.updateModel).toHaveBeenCalledWith('c-1', 'user-1', null);
+        });
+
         it('throws NotFoundException when missing', async () => {
             repo.findById.mockResolvedValue(null as any);
 
@@ -112,6 +167,7 @@ describe('ConversationController', () => {
                 NotFoundException,
             );
             expect(repo.updateTitle).not.toHaveBeenCalled();
+            expect(repo.updateModel).not.toHaveBeenCalled();
         });
     });
 

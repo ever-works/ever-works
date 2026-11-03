@@ -21,6 +21,7 @@ export * from './heartbeat';
 export * from './logger';
 export * from './runtime';
 export * from './secret-store';
+export * from './telemetry-probe';
 export * from './types';
 export * from './worker-loop';
 export * from './executors/acceptance-checks';

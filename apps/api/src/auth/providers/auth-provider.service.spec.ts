@@ -986,6 +986,42 @@ describe('AuthProviderService', () => {
             delete process.env.LOGIN_LOCKOUT_DURATION_MS;
         });
 
+        // EW-014 — an unverified address is not a credential failure.
+        //
+        // `requireEmailVerification` is on by default, so signInEmail ALSO
+        // throws for an unverified account. Counting that meant a user typing
+        // their own CORRECT password locked themselves out after five tries,
+        // and the helpful "please verify your email" message was then replaced
+        // by the lockout one — a brand-new account is exactly where this lands.
+        it('does NOT count an unverified-email rejection toward the lockout', async () => {
+            const ctx = createService();
+            const row = installCounterFake(ctx, 0);
+            ctx.auth.api.signInEmail.mockRejectedValue(new Error('Email not verified'));
+
+            await expect(
+                ctx.service.signInEmail('a@b.co', 'correct-password', new Headers()),
+            ).rejects.toThrow(/Email not verified/);
+
+            expect(ctx.userRepository.increment).not.toHaveBeenCalled();
+            expect(row.failedLoginAttempts).toBe(0);
+        });
+
+        // Control: the discriminator must stay NARROW. If it ever matched
+        // broadly it would stop counting real credential failures and quietly
+        // disable the lockout — the opposite defect, and a security one.
+        it('control: a genuine credential failure STILL counts', async () => {
+            const ctx = createService();
+            const row = installCounterFake(ctx, 0);
+            ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
+
+            await expect(ctx.service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
+                /Invalid credentials/,
+            );
+
+            expect(ctx.userRepository.increment).toHaveBeenCalled();
+            expect(row.failedLoginAttempts).toBe(1);
+        });
+
         it('atomically increments failedLoginAttempts on a failed signInEmail', async () => {
             const { service, userRepository } = setupSignInEmailFailure();
 

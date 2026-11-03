@@ -129,7 +129,19 @@ export class AuthProviderService extends AuthProvider {
                 },
             });
         } catch (err) {
-            if (existingUser) {
+            // Lockout counts CREDENTIAL failures. `requireEmailVerification` is
+            // on by default (auth-runtime.instance.ts), so signInEmail also
+            // throws for an unverified address — and counting that meant a user
+            // typing their own CORRECT password locked themselves out after
+            // five tries, at which point the helpful "please verify your email"
+            // message was replaced by the lockout one and they had no idea what
+            // to fix. A brand-new account is exactly where this lands.
+            //
+            // Skipping the increment is safe in either ordering: if Better Auth
+            // checks verification BEFORE the password, every attempt returns the
+            // same rejection and no password information leaks; if it checks
+            // after, reaching this error means the credentials were right.
+            if (existingUser && !isEmailNotVerifiedRejection(err)) {
                 await this.recordFailedLogin(existingUser);
             }
             throw err;
@@ -529,4 +541,22 @@ export class AuthProviderService extends AuthProvider {
         await this.authSyncService.syncCredentialPassword(userId, newHash);
         await this.userRepository.update(userId, { password: newHash });
     }
+}
+
+/**
+ * Does this rejection mean "the address is not confirmed" rather than "the
+ * credentials were wrong"?
+ *
+ * Mirrors the web side's `isEmailNotVerifiedError` (apps/web/src/app/actions/
+ * auth.ts) deliberately: both sides key on the two words that carry the
+ * meaning, tolerant of case and wording drift, because Better Auth does not
+ * expose a stable code for this on the thrown value.
+ *
+ * Kept narrow on purpose. If it ever matched too broadly it would stop counting
+ * real credential failures toward the lockout, so it must match the verification
+ * wording and nothing else.
+ */
+function isEmailNotVerifiedRejection(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    return /email.*not.*verif/i.test(message);
 }

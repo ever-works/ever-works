@@ -73,6 +73,10 @@ describe('activity-log.types', () => {
             ['GIT_PUSHED', 'git_pushed'],
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
+            // Agent Collaborators — sub-agent delegation allow-list edits.
+            ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
+            ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
+            ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -114,10 +118,14 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
+            // +3 agent_collaborator_enabled / _disabled / _removed
+            //    (Agent Collaborators allow-list edits) -> 129.
             // +4 environment_created / environment_updated /
             //    environment_published / environment_deleted
-            //    (Settings → Environments, #2079) -> 127.
-            expect(literals).toHaveLength(127);
+            //    (Settings → Environments, #2079) -> 133.
+            expect(literals).toHaveLength(133);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

@@ -33,8 +33,12 @@ export class Conversation {
     @Column({ type: 'varchar', length: 100, nullable: true })
     providerId?: string;
 
+    // `string | null` rather than just optional: clearing the model pin back to
+    // "provider default" has to persist as a real NULL, and TypeORM skips
+    // `undefined` on update. The column is already nullable — this only makes
+    // the TS type tell the truth about it. No schema change, no migration.
     @Column({ type: 'varchar', length: 100, nullable: true })
-    model?: string;
+    model?: string | null;
 
     @Column({ type: 'simple-json', nullable: true })
     metadata?: Record<string, unknown>;

@@ -62,9 +62,14 @@ describe('AnthropicManagedAgentsClient — egress allow-list (H-25)', () => {
 		const callArgs = environmentsCreateMock.mock.calls[0][0];
 		expect(callArgs.name).toBe('pinned-env');
 		expect(callArgs.config.type).toBe('cloud');
+		// SDK >= 0.117 typed networking policy: the former untyped
+		// `{ type: 'allowlist', hosts }` payload became the documented
+		// `limited` policy with explicit registry/MCP egress flags (off).
 		expect(callArgs.config.networking).toEqual({
-			type: 'allowlist',
-			hosts: ['api.anthropic.com', 'foo.example']
+			type: 'limited',
+			allowed_hosts: ['api.anthropic.com', 'foo.example'],
+			allow_package_managers: false,
+			allow_mcp_servers: false
 		});
 	});
 
@@ -76,8 +81,10 @@ describe('AnthropicManagedAgentsClient — egress allow-list (H-25)', () => {
 
 		const callArgs = environmentsCreateMock.mock.calls[0][0];
 		expect(callArgs.config.networking).toEqual({
-			type: 'allowlist',
-			hosts: ['api.anthropic.com', 'foo.example']
+			type: 'limited',
+			allowed_hosts: ['api.anthropic.com', 'foo.example'],
+			allow_package_managers: false,
+			allow_mcp_servers: false
 		});
 	});
 

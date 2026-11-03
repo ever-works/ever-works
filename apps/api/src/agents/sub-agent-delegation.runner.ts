@@ -1,7 +1,16 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { SubAgentDelegationRequest, SubAgentDelegationResult } from '@ever-works/contracts';
-import type { SubAgentDelegationRunner } from '@ever-works/agent/agents';
-import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import {
+    evaluateCollaboratorDelegation,
+    refuseSubAgentDelegation,
+    type SubAgentDelegationRequest,
+    type SubAgentDelegationResult,
+} from '@ever-works/contracts';
+import { AgentStatus, type SubAgentDelegationRunner } from '@ever-works/agent/agents';
+import {
+    AgentCollaboratorRepository,
+    AgentRepository,
+    AgentRunRepository,
+} from '@ever-works/agent/database';
 import { TasksService, TaskTransitionService } from '@ever-works/agent/tasks-domain';
 
 /**
@@ -58,12 +67,25 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
     private static readonly POLL_INTERVAL_MS = 2_000;
     /** Fallback ceiling when the request carries no `maxDurationMs`. */
     private static readonly DEFAULT_TIMEOUT_MS = 10 * 60_000;
+    /**
+     * Ceiling on the serialized `inputs` block inlined into the child's
+     * brief. `inputs` is caller-supplied and unbounded, and the brief is
+     * a stored Task description — so it is truncated with an explicit
+     * marker rather than dropped (dropping is what made the field dead)
+     * or written whole.
+     */
+    private static readonly MAX_INPUTS_CHARS = 4_000;
 
     constructor(
         private readonly agents: AgentRepository,
         private readonly runs: AgentRunRepository,
         private readonly tasks: TasksService,
         private readonly transitions: TaskTransitionService,
+        // Agent Collaborators — the per-agent sub-agent allow-list. NOT
+        // @Optional(): this is a security gate, and an unbound repository
+        // would silently fail OPEN. TasksModule imports the agent-side
+        // AgentsModule (which exports it), so it always resolves.
+        private readonly collaborators: AgentCollaboratorRepository,
         @Optional() @Inject(DELEGATION_CLOCK) private readonly clock?: DelegationClock,
     ) {}
 
@@ -86,6 +108,50 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         // this because it never loads the agents.
         if (child.userId !== parent.userId) {
             return this.failure(request, 'child agent belongs to a different owner');
+        }
+
+        // Agent Collaborators — the allow-list layered on top of the
+        // same-owner check. Self-delegation (childAgentId empty / equal
+        // to the parent) is always admissible; a NAMED child must be an
+        // `enabled` collaborator of the parent. This is a REFUSAL (typed
+        // code, nothing ran), not a failure: the contract said no before
+        // anything was spent. Checked HERE because this runner is the one
+        // choke point every delegation path funnels through (chat tool,
+        // workflow graph node, any future caller).
+        if (childAgentId !== parent.id) {
+            // An ARCHIVED agent is retired: it is the one terminal status
+            // with no outgoing transitions, and `unarchive` deliberately
+            // lands on PAUSED so a restored agent does not start running
+            // again on its own. Spawning one as a sub-agent would run it
+            // anyway — nothing downstream re-checks status, so this is the
+            // gate. It matters now because the allow-list is what makes a
+            // NAMED child reachable in the first place, and the rule row
+            // outlives the archive: the Collaborators tab lists live
+            // agents, so an enabled rule pointing at an agent the owner has
+            // since archived is both invisible and still firing.
+            if (child.status === AgentStatus.ARCHIVED) {
+                const message = `agent ${childAgentId} is archived and cannot be spawned as a sub-agent`;
+                this.logger.warn(
+                    `Delegation ${request.delegationId} refused (collaborator-not-allowed): ${message}`,
+                );
+                return refuseSubAgentDelegation(
+                    request.delegationId,
+                    'collaborator-not-allowed',
+                    message,
+                );
+            }
+            const rules = await this.collaborators.listForAgent(parent.id);
+            const decision = evaluateCollaboratorDelegation(parent.id, childAgentId, rules);
+            if (decision.allowed === false) {
+                this.logger.warn(
+                    `Delegation ${request.delegationId} refused (collaborator-not-allowed): ${decision.message}`,
+                );
+                return refuseSubAgentDelegation(
+                    request.delegationId,
+                    decision.refusalCode,
+                    decision.message,
+                );
+            }
         }
 
         // Recover the parent Task from the parent RUN when the caller did
@@ -268,9 +334,57 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         if (request.resultSchemaHint) {
             lines.push('', `Expected result shape: ${request.resultSchemaHint}`);
         }
-        // `inputs` are NOT inlined: they can be large and may carry
-        // caller data that does not belong in a stored description.
+        // `inputs` ARE inlined, bounded.
+        //
+        // The description is the only channel a delegation has into the
+        // child's prompt, so anything left out of it never reaches the
+        // child at all. Leaving `inputs` out meant every caller that
+        // gathered context up front — the `delegateToAgent` chat tool's
+        // `context` argument, an `agent.delegate` graph node's inputs —
+        // had that context accepted, validated, narrowed and then
+        // silently dropped, and the child answered the objective without
+        // the data it was told it had while the delegation still reported
+        // `completed`.
+        //
+        // Size (the original reason for dropping it) is handled by
+        // truncating to MAX_INPUTS_CHARS with a visible marker, so the
+        // child can tell "there was more" from "that was everything".
+        const inputs = this.renderInputs(request.inputs);
+        if (inputs) {
+            lines.push('', 'Inputs:', inputs);
+        }
         return lines.join('\n');
+    }
+
+    /**
+     * Serialize `inputs` for the child's brief, or `null` when there is
+     * nothing to say.
+     *
+     * Never throws: `inputs` is caller-supplied, and a value
+     * `JSON.stringify` cannot handle (a cycle, a BigInt) must degrade to
+     * "no inputs block" rather than turning a valid delegation into a
+     * failure.
+     */
+    private renderInputs(inputs: SubAgentDelegationRequest['inputs']): string | null {
+        if (!inputs || typeof inputs !== 'object' || Object.keys(inputs).length === 0) {
+            return null;
+        }
+        let serialized: string;
+        try {
+            serialized = JSON.stringify(inputs, null, 2);
+        } catch (error) {
+            this.logger.warn(
+                `Delegation inputs could not be serialized for the child brief: ${
+                    (error as Error).message
+                }`,
+            );
+            return null;
+        }
+        if (typeof serialized !== 'string' || serialized.length === 0) return null;
+        const max = SubAgentDelegationRunnerService.MAX_INPUTS_CHARS;
+        return serialized.length > max
+            ? `${serialized.slice(0, max)}\n... [inputs truncated at ${max} characters]`
+            : serialized;
     }
 
     private failure(request: SubAgentDelegationRequest, summary: string): SubAgentDelegationResult {

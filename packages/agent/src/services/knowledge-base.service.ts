@@ -2723,6 +2723,37 @@ export class KnowledgeBaseService {
     }
 
     /**
+     * Memory Files — serve the bytes of an ORG-scoped Memory original
+     * (`workId IS NULL`), the org counterpart of `getUploadBytes`. There
+     * is no `ensureCanView` here because org originals have no Work to
+     * gate on; the caller (the /api/memory/files download route) asserts
+     * org membership before calling. The `findByIdForOrg` lookup pins
+     * `workId IS NULL` + the organization, so a Work-scoped or foreign
+     * upload id resolves to NotFound rather than leaking.
+     */
+    async getOrgUploadBytes(
+        organizationId: string,
+        uploadId: string,
+    ): Promise<{ buffer: Buffer; mimeType: string; filename: string; sizeBytes: number }> {
+        if (!this.storage) {
+            throw new ServiceUnavailableException(
+                'Memory uploads require a storage plugin — not configured in this deployment',
+            );
+        }
+        const upload = await this.uploadRepository.findByIdForOrg(organizationId, uploadId);
+        if (!upload) {
+            throw new NotFoundException(`Memory upload not found: ${uploadId}`);
+        }
+        const fetched = await this.storage.getObject(upload.storagePath);
+        return {
+            buffer: fetched.buffer,
+            mimeType: fetched.mimeType ?? upload.mimeType,
+            filename: upload.originalFilename,
+            sizeBytes: upload.fileSize,
+        };
+    }
+
+    /**
      * Receive a multipart upload and run the synchronous slice of the
      * ingest pipeline (spec §9.1–§9.4). The file bytes are already in
      * memory from `FileInterceptor` so the API handler can extract +

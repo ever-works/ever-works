@@ -89,6 +89,17 @@ function ResetPasswordContent() {
             return;
         }
 
+        // Length was never checked here — only the match was — so a password
+        // shorter than the API's @MinLength(8) sailed through to the server and
+        // came back as the generic `errors.failed`, while the hint beside the
+        // field still said 6 was fine. Someone resetting a password they have
+        // already lost had no way to read their way out of that. The message
+        // key existed all along and was simply never used.
+        if (formData.password.length < 8) {
+            setErrors({ password: t('form.password.errors.minLength') });
+            return;
+        }
+
         startTransition(() => {
             void (async () => {
                 const response = await resetPasswordAction(token!, formData.password);

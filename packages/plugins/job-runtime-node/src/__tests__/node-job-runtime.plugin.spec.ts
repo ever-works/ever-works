@@ -298,12 +298,20 @@ describe('NodeWorkerHostFactory', () => {
 		});
 
 		await host.start();
-		await settle();
+		// Poll for the three backoffs rather than betting 250ms of wall clock on
+		// them — the same reasoning the `until` docblock above already spells
+		// out. This was the last remaining `settle()` call site: the fix was
+		// introduced for this exact failure mode and never applied here, so the
+		// assertions below could see one or two delays on a loaded runner and
+		// fail with no code change.
+		await until(() => expect(delays.length).toBeGreaterThanOrEqual(3));
 
 		expect(calls).toBeGreaterThanOrEqual(3);
 		// Doubling from the base delay — not a hot loop against a dead endpoint.
 		expect(delays.slice(0, 3)).toEqual([1_000, 2_000, 4_000]);
 		// And the stop requested from INSIDE the loop actually took effect.
+		// Checked after the poll above, so this reads a settled loop rather than
+		// a count that simply has not grown yet.
 		expect(delays.length).toBeLessThan(10);
 	});
 

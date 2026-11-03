@@ -908,6 +908,38 @@ export class AgentRunRepository {
     }
 
     /**
+     * Session detail (Feature K) — merge tool-loop-observed file paths
+     * into `workspaceMeta.filesTouched`, preserving whatever provision
+     * audit is already on the row. Deduplicated, order-preserving, and
+     * capped so a pathological loop cannot grow the JSON without bound.
+     *
+     * Best-effort by contract: a missing row is a no-op and the caller
+     * additionally feature-detects + try/catches — capture must never
+     * fail a run.
+     */
+    async mergeFilesTouched(runId: string, paths: string[], cap = 200): Promise<void> {
+        if (!Array.isArray(paths) || paths.length === 0) return;
+        const row = await this.repository.findOne({
+            where: { id: runId },
+            select: { id: true, workspaceMeta: true },
+        });
+        if (!row) return;
+        const existing = row.workspaceMeta?.filesTouched ?? [];
+        const merged = [...existing];
+        const seen = new Set(existing);
+        for (const path of paths) {
+            if (merged.length >= cap) break;
+            if (typeof path !== 'string' || path.length === 0 || seen.has(path)) continue;
+            seen.add(path);
+            merged.push(path);
+        }
+        if (merged.length === existing.length) return;
+        await this.repository.update(runId, {
+            workspaceMeta: { ...(row.workspaceMeta ?? {}), filesTouched: merged },
+        });
+    }
+
+    /**
      * Find an in-flight run for the (taskId, agentId) pair — used by
      * the agent-chat-reply dedup guard (architecture/security §8 — T6
      * mitigation): if a chat-triggered run is already running for the
@@ -1348,6 +1380,73 @@ export class AgentRunRepository {
             totalTokensLast24h: num('totalTokensLast24h'),
         };
     }
+
+    /**
+     * Costs dashboard — how many runs each Agent started for one user
+     * inside the window, as ONE grouped scan.
+     *
+     * `createdAt` (not `startedAt`) is the window column deliberately:
+     * it matches `PluginUsageRepository.getUsageCountsForUser`'s
+     * `agentRuns` count, so the Costs "runs" column and the Usage &
+     * Credits "Agent runs" tile can never disagree for the same window,
+     * and a run that was queued but never picked up still counts.
+     *
+     * Backed by `idx_agent_runs_user_created`.
+     */
+    async countRunsByAgentForUser(
+        userId: string,
+        from: Date,
+        to: Date,
+    ): Promise<AgentRunCountRow[]> {
+        const rows = await this.repository
+            .createQueryBuilder('run')
+            .select('run.agentId', 'agentId')
+            .addSelect('COUNT(run.id)', 'runs')
+            .where('run.userId = :userId', { userId })
+            .andWhere('run.createdAt >= :from', { from })
+            .andWhere('run.createdAt < :to', { to })
+            .groupBy('run.agentId')
+            .getRawMany<{ agentId: string; runs: string }>();
+
+        return rows.map((row) => ({ agentId: row.agentId, runs: Number(row.runs ?? 0) }));
+    }
+
+    /**
+     * Costs dashboard — the most expensive runs of one user inside the
+     * window, newest-cost-first.
+     *
+     * Only runs with a SETTLED cost are returned (`costCents > 0`):
+     * `costCents` is NULL until run-cost settlement stamps it, and a
+     * NULL means "not attributable", not "free" — listing those in a
+     * table whose whole purpose is cost would be dishonest.
+     *
+     * `id` breaks ties so paging/ordering is deterministic across calls
+     * (the same reason `findPageForUserExport` adds it).
+     */
+    async findTopByCostForUser(
+        userId: string,
+        from: Date,
+        to: Date,
+        limit = 20,
+    ): Promise<AgentRun[]> {
+        const take = Math.min(Math.max(limit, 1), 100);
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.userId = :userId', { userId })
+            .andWhere('run.createdAt >= :from', { from })
+            .andWhere('run.createdAt < :to', { to })
+            .andWhere('run.costCents > 0')
+            .orderBy('run.costCents', 'DESC')
+            .addOrderBy('run.id', 'ASC')
+            .take(take)
+            .getMany();
+    }
+}
+
+/** Costs dashboard — one Agent's run count inside an aggregation window. */
+export interface AgentRunCountRow {
+    agentId: string;
+    runs: number;
 }
 
 /**

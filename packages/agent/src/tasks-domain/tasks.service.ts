@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
+import type { TaskApprover } from '../entities/task-approver.entity';
 import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
@@ -28,7 +29,11 @@ import { TaskTransitionService, type TransitionOptions } from './task-transition
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
-import { computeNextOccurrence, validateRecurrenceRule } from './recurrence';
+import {
+    computeNextTemplateOccurrence,
+    validateRecurrenceCron,
+    validateRecurrenceRule,
+} from './recurrence';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import type { Agent } from '../entities/agent.entity';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -54,6 +59,9 @@ export interface CreateTaskInput {
     parentTaskId?: string | null;
     createdByType: TaskActorType;
     createdById: string;
+    /** Schedule mode "Scheduled": run once at this instant (must be in
+     *  the future). Omitted/null = not scheduled. */
+    scheduledAt?: Date | null;
     requireAllApprovers?: boolean;
     /** Quality gates: `null` = inherit the Work's `checkDefaults` untouched. */
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
@@ -68,6 +76,15 @@ export interface CreateTaskInput {
      * itself shallow and recurse past the cap.
      */
     delegationDepth?: number | null;
+    /**
+     * Keep the Task off the Kanban board and default lists.
+     *
+     * SERVER-WRITTEN ONLY, like `delegationDepth`: inbound triggers with
+     * `showOnBoard: false` set it on the Tasks their fires produce, and
+     * it is deliberately absent from `CreateTaskDto` so a client cannot
+     * file work that is invisible to the humans who own the board.
+     */
+    hiddenFromBoard?: boolean;
 }
 
 export interface UpdateTaskInput {
@@ -88,6 +105,13 @@ export interface UpdateTaskInput {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Quality gates: `null` reverts to inheriting the Work's budget. */
     maxGateAttempts?: number | null;
+    /**
+     * Schedule mode "Scheduled": run once at this instant (must be in the
+     * future). `null` clears the schedule — the same effect as
+     * {@link TasksService.unscheduleTask}, so a form that edits the whole
+     * Task does not need a second round-trip.
+     */
+    scheduledAt?: Date | null;
 }
 
 /**
@@ -136,6 +160,38 @@ export interface TaskRunEmbed {
 }
 
 export type TaskWithRun = Task & { run?: TaskRunEmbed | null };
+
+// ── Sub-tasks projection (Tasks upgrades) ─────────────────────────
+
+/**
+ * Hard cap on the sub-tasks projection. A workflow template tops out at
+ * `MAX_TEMPLATE_STEPS` (30) sub-tasks; 200 leaves headroom for
+ * hand-built trees while keeping the two batched side-table queries
+ * bounded. Deeper trees are worked from the Tasks list, not the
+ * checklist.
+ */
+export const SUBTASKS_PAGE_SIZE = 200;
+
+/** One row of the Task-detail Subtasks checklist. */
+export type TaskSubtaskRow = Task & {
+    /** Agent assignees on this sub-task — the row's agent chips. */
+    agentAssigneeIds: string[];
+    userAssigneeIds: string[];
+    approverCount: number;
+    approvedCount: number;
+    /** True when the sub-task carries at least one approver row. */
+    requiresApproval: boolean;
+    /** Gate verdict under the row's own `requireAllApprovers` policy. */
+    approvalCleared: boolean;
+};
+
+export interface TaskSubtasksProjection {
+    rows: TaskSubtaskRow[];
+    /** Total matching children (may exceed `rows.length` at the cap). */
+    total: number;
+    /** Checklist numerator — children already in `done`. */
+    doneCount: number;
+}
 
 // ── Board dispatch (kanban M3 / M4) ───────────────────────────────
 
@@ -325,6 +381,78 @@ export class TasksService {
         return task;
     }
 
+    /**
+     * Tasks upgrades — the Subtasks section projection.
+     *
+     * The sub-task checklist needs three things per row that the plain
+     * Task row does not carry: which Agents are on it, whether it is
+     * approval-gated, and whether that gate has cleared. Fetching those
+     * per row would be a 3N query storm on a template-instantiated tree
+     * (nine steps = 27 queries), so both side tables are batched into ONE
+     * `IN` query each and grouped in memory.
+     *
+     * Owner-scoped: the parent id is resolved through {@link getOne}
+     * first, so a foreign parent 404s before any side row is read, and
+     * the child rows come from the user-scoped list query.
+     */
+    async listSubtasks(userId: string, parentTaskId: string): Promise<TaskSubtasksProjection> {
+        await this.getOne(userId, parentTaskId);
+        const { rows, total } = await this.tasks.findByUserIdFiltered(userId, {
+            parentTaskId,
+            limit: SUBTASKS_PAGE_SIZE,
+        });
+
+        const ids = rows.map((row) => row.id);
+        const [assigneeRows, approverRows] = await Promise.all([
+            this.assignees.findByTaskIds(ids).catch(() => []),
+            this.approvers.findByTaskIds(ids).catch(() => []),
+        ]);
+
+        const agentsByTask = new Map<string, string[]>();
+        const usersByTask = new Map<string, string[]>();
+        for (const row of assigneeRows) {
+            const bucket = row.assigneeType === 'agent' ? agentsByTask : usersByTask;
+            const list = bucket.get(row.taskId) ?? [];
+            list.push(row.assigneeId);
+            bucket.set(row.taskId, list);
+        }
+
+        const approversByTask = new Map<string, TaskApprover[]>();
+        for (const row of approverRows) {
+            const list = approversByTask.get(row.taskId) ?? [];
+            list.push(row);
+            approversByTask.set(row.taskId, list);
+        }
+
+        const subtasks: TaskSubtaskRow[] = rows.map((row) => {
+            const rowApprovers = approversByTask.get(row.id) ?? [];
+            const approved = rowApprovers.filter((a) => a.approvalState === 'approved').length;
+            return {
+                ...row,
+                agentAssigneeIds: agentsByTask.get(row.id) ?? [],
+                userAssigneeIds: usersByTask.get(row.id) ?? [],
+                approverCount: rowApprovers.length,
+                approvedCount: approved,
+                // The badge the checklist renders: gated at all, and
+                // whether the gate has cleared under the Task's own
+                // all-vs-any approver policy.
+                requiresApproval: rowApprovers.length > 0,
+                approvalCleared:
+                    rowApprovers.length === 0
+                        ? true
+                        : row.requireAllApprovers
+                          ? approved === rowApprovers.length
+                          : approved > 0,
+            };
+        });
+
+        return {
+            rows: subtasks,
+            total,
+            doneCount: subtasks.filter((row) => row.status === TaskStatus.DONE).length,
+        };
+    }
+
     async create(userId: string, input: CreateTaskInput): Promise<Task> {
         // Ownership is deliberately NOT exclusive. A Task may belong to a
         // Work and a Team and have been raised by a Mission at the same
@@ -384,6 +512,8 @@ export class TasksService {
             }
         }
 
+        if (input.scheduledAt) this.assertFutureSchedule(input.scheduledAt);
+
         const nextNumber = await this.counter.nextSlug(userId);
         const slug = `T-${nextNumber}`;
 
@@ -409,6 +539,9 @@ export class TasksService {
             acceptanceChecks: input.acceptanceChecks ?? null,
             maxGateAttempts: input.maxGateAttempts ?? null,
             delegationDepth: input.delegationDepth ?? null,
+            scheduledAt: input.scheduledAt ?? null,
+            scheduleClaimedAt: null,
+            hiddenFromBoard: input.hiddenFromBoard ?? false,
         });
 
         await this.logActivity({
@@ -439,6 +572,24 @@ export class TasksService {
         if (input.maxGateAttempts !== undefined) patch.maxGateAttempts = input.maxGateAttempts;
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
+        // Schedule mode "Scheduled" via the generic PATCH. Same rules as
+        // the dedicated `scheduleTask` endpoint: future-only, never on a
+        // recurring template, and any stale dispatcher claim is cleared so
+        // the new slot actually fires.
+        if (input.scheduledAt !== undefined) {
+            if (input.scheduledAt === null) {
+                patch.scheduledAt = null;
+            } else {
+                this.assertFutureSchedule(input.scheduledAt);
+                if (task.isRecurring) {
+                    throw new BadRequestException(
+                        'This Task is a recurring template — stop the recurrence before scheduling a one-shot run.',
+                    );
+                }
+                patch.scheduledAt = input.scheduledAt;
+            }
+            patch.scheduleClaimedAt = null;
+        }
 
         // Re-filing a Task under different owners. Each owner is set
         // independently — passing `null` detaches just that one. Any newly
@@ -554,7 +705,11 @@ export class TasksService {
 
     /**
      * Phase 17.2 — make a Task recurring (or update its rule).
-     * Validates the RRULE, computes the initial `nextOccurrenceAt`,
+     *
+     * Accepts EITHER an RFC 5545 RRULE (`recurrenceRule`) OR a 5-field
+     * cron expression (`recurrenceCron`) — exactly one (XOR, service
+     * validation). Computes the initial `nextOccurrenceAt` (RRULE via
+     * the `rrule` package, cron via `cadence.ts#computeNextCronFire`)
      * and flips the recurring columns. The Task row stays as the
      * TEMPLATE; the dispatcher spawns instances pointing back via
      * `parentRecurringTaskId`.
@@ -563,23 +718,41 @@ export class TasksService {
         userId: string,
         id: string,
         input: {
-            recurrenceRule: string;
+            recurrenceRule?: string | null;
+            recurrenceCron?: string | null;
             recurrenceTimezone?: string;
             recurrenceEndsAt?: Date | null;
             recurrenceMaxOccurrences?: number | null;
         },
     ): Promise<Task> {
-        const task = await this.getOne(userId, id);
-        const check = validateRecurrenceRule(input.recurrenceRule);
-        if (check.valid === false) {
-            // Post-rebase narrowing fix: TS doesn't infer `reason` from
-            // `!check.valid` alone on this discriminated union; explicit
-            // equality narrowing surfaces the `false` branch correctly.
-            throw new BadRequestException(check.reason);
+        await this.getOne(userId, id);
+        const hasRule = !!input.recurrenceRule;
+        const hasCron = !!input.recurrenceCron;
+        if (hasRule === hasCron) {
+            // XOR: both or neither is a caller error — the two cadence
+            // dialects would disagree about the next fire.
+            throw new BadRequestException(
+                'Provide exactly one of recurrenceRule (RRULE) or recurrenceCron (cron expression).',
+            );
+        }
+        if (hasRule) {
+            const check = validateRecurrenceRule(input.recurrenceRule!);
+            if (check.valid === false) {
+                // Post-rebase narrowing fix: TS doesn't infer `reason` from
+                // `!check.valid` alone on this discriminated union; explicit
+                // equality narrowing surfaces the `false` branch correctly.
+                throw new BadRequestException(check.reason);
+            }
+        } else {
+            const check = validateRecurrenceCron(input.recurrenceCron!);
+            if (check.valid === false) {
+                throw new BadRequestException(check.reason);
+            }
         }
 
-        const next = computeNextOccurrence({
-            rule: input.recurrenceRule,
+        const next = computeNextTemplateOccurrence({
+            rule: input.recurrenceRule ?? null,
+            cron: input.recurrenceCron ?? null,
             from: new Date(),
             recurrenceEndsAt: input.recurrenceEndsAt ?? null,
             recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
@@ -587,21 +760,20 @@ export class TasksService {
         });
         if (!next) {
             throw new BadRequestException(
-                'recurrenceRule yields no future occurrences — refusing to mark as recurring.',
+                'Recurrence yields no future occurrences — refusing to mark as recurring.',
             );
         }
 
         await this.tasks.updateById(id, {
             isRecurring: true,
-            recurrenceRule: input.recurrenceRule,
+            recurrenceRule: input.recurrenceRule ?? null,
+            recurrenceCron: input.recurrenceCron ?? null,
             recurrenceTimezone: input.recurrenceTimezone ?? 'UTC',
             nextOccurrenceAt: next,
             recurrenceEndsAt: input.recurrenceEndsAt ?? null,
             recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
         });
-        const refreshed = (await this.tasks.findById(id)) as Task;
-        void task;
-        return refreshed;
+        return (await this.tasks.findById(id)) as Task;
     }
 
     /** Phase 17.2 — turn off recurrence on a template. Existing
@@ -611,11 +783,60 @@ export class TasksService {
         await this.tasks.updateById(id, {
             isRecurring: false,
             recurrenceRule: null,
+            recurrenceCron: null,
             nextOccurrenceAt: null,
             recurrenceEndsAt: null,
             recurrenceMaxOccurrences: null,
         });
         return (await this.tasks.findById(id)) as Task;
+    }
+
+    // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
+
+    /**
+     * Schedule this Task to run once at `runAt`. Re-scheduling an
+     * already-scheduled Task moves the slot and clears any claim so
+     * the dispatcher picks up the NEW time. Mutually exclusive with
+     * recurrence — a recurring template already has a cadence.
+     */
+    async scheduleTask(userId: string, id: string, runAt: Date): Promise<Task> {
+        const task = await this.getOne(userId, id);
+        this.assertFutureSchedule(runAt);
+        if (task.isRecurring) {
+            throw new BadRequestException(
+                'This Task is a recurring template — stop the recurrence before scheduling a one-shot run.',
+            );
+        }
+        await this.tasks.updateById(id, { scheduledAt: runAt, scheduleClaimedAt: null });
+        await this.logActivity({
+            userId,
+            taskId: id,
+            actionType: ActivityActionType.TASK_UPDATED,
+            details: { scheduledAt: runAt.toISOString() },
+        });
+        return (await this.tasks.findById(id)) as Task;
+    }
+
+    /** Remove the one-shot schedule (mode back to Run Once). */
+    async unscheduleTask(userId: string, id: string): Promise<Task> {
+        await this.getOne(userId, id);
+        await this.tasks.updateById(id, { scheduledAt: null, scheduleClaimedAt: null });
+        await this.logActivity({
+            userId,
+            taskId: id,
+            actionType: ActivityActionType.TASK_UPDATED,
+            details: { scheduledAt: null },
+        });
+        return (await this.tasks.findById(id)) as Task;
+    }
+
+    private assertFutureSchedule(runAt: Date): void {
+        if (!(runAt instanceof Date) || Number.isNaN(runAt.getTime())) {
+            throw new BadRequestException('runAt must be a valid datetime.');
+        }
+        if (runAt.getTime() <= Date.now()) {
+            throw new BadRequestException('runAt must be in the future.');
+        }
     }
 
     // ── Board dispatch (kanban M3/M4) ─────────────────────────────
@@ -1042,9 +1263,17 @@ export class TasksService {
      * Task; the uploadId is taken as-is — ownership validation of
      * the upload row lives in the existing KB upload service.
      */
-    async addAttachment(userId: string, taskId: string, uploadId: string) {
+    async addAttachment(
+        userId: string,
+        taskId: string,
+        uploadId: string,
+        role: 'initial' | 'result' = 'initial',
+    ) {
         const task = await this.getOne(userId, taskId);
         if (!uploadId) throw new BadRequestException('uploadId is required.');
+        if (role !== 'initial' && role !== 'result') {
+            throw new BadRequestException(`Invalid attachment role: ${role}`);
+        }
         if (!this.attachments) {
             throw new BadRequestException('Attachment repository not wired in this context.');
         }
@@ -1061,7 +1290,7 @@ export class TasksService {
             throw new BadRequestException(`Upload ${uploadId} not found for this Task's Work.`);
         }
         try {
-            return await this.attachments.add(taskId, uploadId);
+            return await this.attachments.add(taskId, uploadId, role);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             if (/unique|duplicate|UNIQUE/i.test(message)) {

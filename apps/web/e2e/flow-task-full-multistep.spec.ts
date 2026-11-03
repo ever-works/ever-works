@@ -698,18 +698,24 @@ test.describe('Task full lifecycle — recurrence', () => {
         expect(cleared.recurrenceMaxOccurrences).toBeNull();
     });
 
-    test('recurrence rule validation: missing rule → 400 (DTO), garbage rule → 400 (RRULE parse error)', async ({
+    test('recurrence rule validation: no cadence → 400 (controller XOR guard), garbage rule → 400 (RRULE parse error)', async ({
         request,
     }) => {
         const ctx = await boot(request);
         const task = await createTask(request, ctx, { title: `RecurVal ${stamp()}` });
 
+        // Schedule-modes upgrade: `recurrenceCron` is an accepted
+        // alternative cadence, so `recurrenceRule` is @IsOptional and an
+        // empty body is rejected by the controller's XOR guard with a
+        // STRING message instead of class-validator's array.
         const missing = await request.post(`${tasksBase()}/${task.id}/recurring`, {
             headers: ctx.headers,
             data: {},
         });
         expect(missing.status()).toBe(400);
-        expect(Array.isArray((await missing.json()).message)).toBe(true);
+        expect(String((await missing.json()).message)).toMatch(
+            /recurrenceRule or recurrenceCron is required/i,
+        );
 
         const garbage = await request.post(`${tasksBase()}/${task.id}/recurring`, {
             headers: ctx.headers,
