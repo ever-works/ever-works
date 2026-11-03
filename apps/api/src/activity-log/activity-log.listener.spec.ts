@@ -10,6 +10,9 @@ jest.mock('@ever-works/agent/events', () => {
     class WorksConfigSyncFailedEvent {
         static EVENT_NAME = 'works_config.sync_failed';
     }
+    class WorksConfigSyncedEvent {
+        static EVENT_NAME = 'works_config.synced';
+    }
     class DeploymentDispatchedEvent {
         static EVENT_NAME = 'deployment.dispatched';
     }
@@ -23,6 +26,7 @@ jest.mock('@ever-works/agent/events', () => {
         WorkCreatedEvent,
         WorkGenerationCompletedEvent,
         WorksConfigSyncFailedEvent,
+        WorksConfigSyncedEvent,
         DeploymentDispatchedEvent,
         DeploymentCompletedEvent,
         DeploymentFailedEvent,
@@ -85,6 +89,7 @@ import type {
     WorkCreatedEvent,
     WorkGenerationCompletedEvent,
     WorksConfigSyncFailedEvent,
+    WorksConfigSyncedEvent,
     DeploymentDispatchedEvent,
     DeploymentCompletedEvent,
     DeploymentFailedEvent,
@@ -277,6 +282,59 @@ describe('ActivityLogListener', () => {
             activityLogService.log.mockRejectedValue(new Error('boom'));
             await expect(
                 listener.onWorksConfigSyncFailed(event as WorksConfigSyncFailedEvent),
+            ).resolves.toBeUndefined();
+            expect(loggerErrorSpy).toHaveBeenCalled();
+        });
+    });
+
+    describe('onWorksConfigSynced (EW-612)', () => {
+        const event: any = {
+            userId: 'u1',
+            workId: 'w1',
+            repository: 'org/repo',
+            reason: 'provider_changed',
+            deployProvider: 'k8s',
+        };
+
+        it('logs a completed WORKS_CONFIG_SYNC activity naming the synced provider', async () => {
+            await listener.onWorksConfigSynced(event as WorksConfigSyncedEvent);
+            expect(activityLogService.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    workId: 'w1',
+                    actionType: ActivityActionType.WORKS_CONFIG_SYNC,
+                    action: 'works_config.deploy_provider_synced',
+                    status: ActivityStatus.COMPLETED,
+                    summary: 'Synced deploy provider "k8s" to .works/works.yml in org/repo',
+                    details: {
+                        reason: 'provider_changed',
+                        repository: 'org/repo',
+                        deployProvider: 'k8s',
+                    },
+                }),
+            );
+        });
+
+        it('falls back to the generic sync action when no deploy provider was written', async () => {
+            await listener.onWorksConfigSynced({
+                ...event,
+                deployProvider: null,
+                reason: 'schedule_updated',
+            } as WorksConfigSyncedEvent);
+
+            expect(activityLogService.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'works_config.synced',
+                    status: ActivityStatus.COMPLETED,
+                    summary: 'Synced .works/works.yml to org/repo',
+                }),
+            );
+        });
+
+        it('swallows service errors', async () => {
+            activityLogService.log.mockRejectedValue(new Error('boom'));
+            await expect(
+                listener.onWorksConfigSynced(event as WorksConfigSyncedEvent),
             ).resolves.toBeUndefined();
             expect(loggerErrorSpy).toHaveBeenCalled();
         });

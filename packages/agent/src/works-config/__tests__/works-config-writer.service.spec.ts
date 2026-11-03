@@ -296,6 +296,60 @@ describe('WorksConfigWriterService', () => {
             await fs.rm(repoDir, { recursive: true, force: true });
         });
 
+        it('replaces the existing value and preserves every unrelated key (EW-612)', async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
+            await writeExistingConfig(repoDir, [
+                'name: Compare Cloud Pricing',
+                'initial_prompt: Track cloud pricing',
+                'deployProvider: vercel',
+                'custom_key: keep-me',
+                'nested:',
+                '    keep: also-me',
+                '',
+            ]);
+
+            const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+            await service.writeToDataRepository({
+                work: createWork(),
+                dataRepository: { dir: repoDir } as any,
+                request: { deployProvider: 'k8s' },
+            });
+
+            const written = yaml.parse(
+                await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+            );
+            expect(written).toMatchObject({
+                name: 'Compare Cloud Pricing',
+                initial_prompt: 'Track cloud pricing',
+                deployProvider: 'k8s',
+                custom_key: 'keep-me',
+                nested: { keep: 'also-me' },
+            });
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('drops a snake_case deploy_provider alias when the request sets the field (EW-612)', async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
+            await writeExistingConfig(repoDir, 'deploy_provider: vercel\n');
+
+            const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+            await service.writeToDataRepository({
+                work: createWork(),
+                dataRepository: { dir: repoDir } as any,
+                request: { deployProvider: 'k8s' },
+            });
+
+            const written = yaml.parse(
+                await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+            );
+            expect(written.deployProvider).toBe('k8s');
+            // Both keys at once would let the parser re-apply the stale value.
+            expect(written.deploy_provider).toBeUndefined();
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
         it('imported .works/works.yml deployProvider beats the work entity value', async () => {
             const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
             const service = new WorksConfigWriterService(new WorksConfigService({} as any));

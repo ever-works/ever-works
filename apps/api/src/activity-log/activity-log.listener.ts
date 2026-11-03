@@ -13,6 +13,7 @@ import {
     WorkCreatedEvent,
     WorkGenerationCompletedEvent,
     WorksConfigSyncFailedEvent,
+    WorksConfigSyncedEvent,
     DeploymentDispatchedEvent,
     DeploymentCompletedEvent,
     DeploymentFailedEvent,
@@ -108,6 +109,38 @@ export class ActivityLogListener {
             });
         } catch (error) {
             this.logger.error('Failed to log generation completed activity:', error);
+        }
+    }
+
+    /**
+     * EW-612 — the platform committed `.works/works.yml` to the user's data
+     * repo on their behalf (most visibly after a dashboard deploy-provider
+     * switch). Recording it gives the owner an audit trail for a write they
+     * did not make by hand, and pairs with the `sync_failed` entry below.
+     */
+    @OnEvent(WorksConfigSyncedEvent.EVENT_NAME)
+    async onWorksConfigSynced(event: WorksConfigSyncedEvent) {
+        try {
+            const deployProvider = event.deployProvider ?? null;
+            await this.activityLogService.log({
+                userId: event.userId,
+                workId: event.workId,
+                actionType: ActivityActionType.WORKS_CONFIG_SYNC,
+                action: deployProvider
+                    ? 'works_config.deploy_provider_synced'
+                    : 'works_config.synced',
+                status: ActivityStatus.COMPLETED,
+                summary: deployProvider
+                    ? `Synced deploy provider "${deployProvider}" to .works/works.yml in ${event.repository}`
+                    : `Synced .works/works.yml to ${event.repository}`,
+                details: {
+                    reason: event.reason,
+                    repository: event.repository,
+                    deployProvider,
+                },
+            });
+        } catch (error) {
+            this.logger.error('Failed to log .works/works.yml sync activity:', error);
         }
     }
 

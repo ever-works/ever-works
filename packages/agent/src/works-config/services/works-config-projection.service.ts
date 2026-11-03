@@ -26,6 +26,20 @@ export class WorksConfigProjectionService {
             name: work.name,
             model: pipelineModel ?? null,
             providers: this.mergeProviders(activeProviders, scheduleProviders) ?? null,
+            // EW-612: project the dashboard's deploy provider into the file.
+            //
+            // Without this the write request was silent on the field, so
+            // `WorksConfigWriterService.resolveDeployProvider` resolved it from
+            // the EXISTING `.works/works.yml` and re-wrote the value already
+            // there. The sync then produced no diff, no commit, and the
+            // dashboard change never reached the data repo — the user re-picked
+            // the provider forever while the file kept overriding them.
+            //
+            // `undefined` (NOT `?? null`) when the column is empty: `null` is
+            // the writer's explicit CLEAR signal and would delete a provider the
+            // user declared by hand in the file. An unset column simply has
+            // nothing to say, so the data repo keeps whatever it holds.
+            deployProvider: this.readString(work.deployProvider),
             activitySyncMode: work.activitySyncMode ?? null,
         };
     }

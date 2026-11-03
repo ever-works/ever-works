@@ -244,6 +244,60 @@ describe('WorkLifecycleService', () => {
         });
     });
 
+    describe('updateWork — deployProvider works.yml sync (EW-612)', () => {
+        const deployWork = (overrides: Record<string, unknown> = {}) =>
+            ({
+                id: 'dir-1',
+                name: 'Test Work',
+                description: 'Test description',
+                owner: 'ever-works',
+                organization: false,
+                organizationId: null,
+                tenantId: 'tenant-a',
+                readmeConfig: {},
+                gitProvider: 'github',
+                userId: user.id,
+                deployProvider: 'vercel',
+                getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+                getWebsiteRepo: jest.fn().mockReturnValue('test-work-website'),
+                ...overrides,
+            }) as any;
+
+        beforeEach(() => {
+            deployFacade.getAvailableProviders.mockReturnValue([{ id: 'k8s' }, { id: 'vercel' }]);
+        });
+
+        const emittedSyncReasons = () =>
+            eventEmitter.emit.mock.calls
+                .filter(([name]: [string]) => name === 'work.works_config.sync_requested')
+                .map(([, event]: [string, { reason: string }]) => event.reason);
+
+        it('requests a .works/works.yml sync when the provider actually changes', async () => {
+            const work = deployWork();
+            ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            workRepository.update.mockResolvedValueOnce({ ...work, deployProvider: 'k8s' });
+
+            await service.updateWork(work.id, { deployProvider: 'k8s' } as any, user);
+
+            expect(workRepository.update).toHaveBeenCalledWith(
+                work.id,
+                expect.objectContaining({ deployProvider: 'k8s' }),
+            );
+            expect(emittedSyncReasons()).toEqual(['provider_changed']);
+        });
+
+        it('requests no sync when the same provider is saved again', async () => {
+            const work = deployWork();
+            ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            workRepository.update.mockResolvedValueOnce({ ...work });
+
+            await service.updateWork(work.id, { deployProvider: 'vercel' } as any, user);
+
+            // AC: repeated switches must not accumulate conflict/sync noise.
+            expect(emittedSyncReasons()).toEqual([]);
+        });
+    });
+
     it('rejects website template changes after website repository initialization', async () => {
         const work = {
             id: 'dir-1',

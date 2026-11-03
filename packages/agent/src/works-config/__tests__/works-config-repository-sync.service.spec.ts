@@ -1,5 +1,5 @@
 import { WorksConfigRepositorySyncService } from '../services/works-config-repository-sync.service';
-import { WorksConfigSyncFailedEvent } from '@src/events';
+import { WorksConfigSyncedEvent, WorksConfigSyncFailedEvent } from '@src/events';
 
 jest.mock('@src/generators/data-generator/data-repository', () => ({
     DataRepository: { create: jest.fn().mockResolvedValue({ dir: '/tmp/data-repo' }) },
@@ -41,6 +41,7 @@ describe('WorksConfigRepositorySyncService', () => {
             buildWriteRequest: jest.fn().mockResolvedValue({
                 name: 'Compare Cloud Pricing',
                 providers: { ai: 'openai' },
+                deployProvider: 'k8s',
             }),
         };
         const writer = { writeToDataRepository: jest.fn().mockResolvedValue(undefined) };
@@ -77,6 +78,7 @@ describe('WorksConfigRepositorySyncService', () => {
             request: {
                 name: 'Compare Cloud Pricing',
                 providers: { ai: 'openai' },
+                deployProvider: 'k8s',
             },
         });
         expect(gitFacade.addAll).not.toHaveBeenCalled();
@@ -144,6 +146,60 @@ describe('WorksConfigRepositorySyncService', () => {
             2,
             { dir: '/tmp/data-repo', force: true },
             { userId: 'user-1', providerId: 'github', workId: 'dir-1' },
+        );
+    });
+
+    it('emits a success event carrying the synced deployProvider after the push (EW-612)', async () => {
+        const { service, eventEmitter } = createService([
+            { path: '.works/works.yml', status: 'modified' },
+        ]);
+
+        await service.syncWork({
+            workId: 'dir-1',
+            userId: 'user-1',
+            reason: 'provider_changed',
+        });
+
+        expect(eventEmitter.emit).toHaveBeenCalledWith(
+            WorksConfigSyncedEvent.EVENT_NAME,
+            expect.objectContaining({
+                workId: 'dir-1',
+                userId: 'user-1',
+                reason: 'provider_changed',
+                repository: 'ever-works/compare-cloud-pricing-data',
+                deployProvider: 'k8s',
+            }),
+        );
+    });
+
+    it('emits no success event when the config was already up to date (EW-612)', async () => {
+        const { service, eventEmitter } = createService();
+
+        await service.syncWork({
+            workId: 'dir-1',
+            userId: 'user-1',
+            reason: 'provider_changed',
+        });
+
+        // Re-saving the same provider must not accumulate activity-log noise.
+        expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('emits no success event when the push fails (EW-612)', async () => {
+        const { service, gitFacade, eventEmitter } = createService([
+            { path: '.works/works.yml', status: 'modified' },
+        ]);
+        gitFacade.push.mockRejectedValue(new Error('permission denied'));
+
+        await service.syncWork({
+            workId: 'dir-1',
+            userId: 'user-1',
+            reason: 'provider_changed',
+        });
+
+        expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+            WorksConfigSyncedEvent.EVENT_NAME,
+            expect.anything(),
         );
     });
 

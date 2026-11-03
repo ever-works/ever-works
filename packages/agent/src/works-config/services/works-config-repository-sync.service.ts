@@ -4,7 +4,11 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
 import { GitFacadeService } from '@src/facades/git.facade';
 import { DataRepository } from '@src/generators/data-generator/data-repository';
 import type { User } from '@src/entities/user.entity';
-import { WorksConfigSyncFailedEvent, type WorksConfigSyncReason } from '@src/events';
+import {
+    WorksConfigSyncedEvent,
+    WorksConfigSyncFailedEvent,
+    type WorksConfigSyncReason,
+} from '@src/events';
 import { WorksConfigProjectionService } from './works-config-projection.service';
 import { WorksConfigWriterService } from './works-config-writer.service';
 
@@ -67,10 +71,11 @@ export class WorksConfigRepositorySyncService {
             );
             const dataRepository = await DataRepository.create(dest);
 
+            const request = await this.projection.buildWriteRequest(work);
             await this.writer.writeToDataRepository({
                 work,
                 dataRepository,
-                request: await this.projection.buildWriteRequest(work),
+                request,
             });
 
             const changes = await this.gitFacade.getStatus(work.gitProvider, dataRepository.dir);
@@ -92,6 +97,22 @@ export class WorksConfigRepositorySyncService {
                 workId: work.id,
             });
             await this.pushSyncedConfig(dest, options.userId, work.gitProvider, work.id);
+
+            // EW-612: only announce a sync that actually reached the remote.
+            // The early return above (nothing changed) and the catch below
+            // (clone/commit/push failed) both skip this, so the activity log
+            // records one entry per real commit and re-saving the same value
+            // stays silent.
+            this.eventEmitter?.emit(
+                WorksConfigSyncedEvent.EVENT_NAME,
+                new WorksConfigSyncedEvent(
+                    work.id,
+                    options.userId,
+                    options.reason,
+                    `${owner}/${repo}`,
+                    request.deployProvider ?? null,
+                ),
+            );
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
