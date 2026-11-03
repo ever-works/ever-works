@@ -163,7 +163,8 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
                               repo: string,
                               work: AdmissionWork,
                           ) => {
-                              const provider = (work as { gitProvider?: string | null }).gitProvider;
+                              const provider = (work as { gitProvider?: string | null })
+                                  .gitProvider;
                               // No provider named on the Work: unmeasurable, never a guessed one.
                               if (!provider) return null;
                               const repository = await git.getRepository(owner, repo, {

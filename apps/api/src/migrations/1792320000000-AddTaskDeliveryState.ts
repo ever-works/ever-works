@@ -64,27 +64,49 @@ export class AddTaskDeliveryState1792320000000 implements MigrationInterface {
     static columns(driver: string): TableColumn[] {
         const date = AddTaskDeliveryState1792320000000.dateType(driver);
         return [
-            new TableColumn({ name: 'mergeCommitSha', type: 'varchar', length: '64', isNullable: true }),
-            new TableColumn({ name: 'deliveryState', type: 'varchar', length: '24', isNullable: true }),
+            new TableColumn({
+                name: 'mergeCommitSha',
+                type: 'varchar',
+                length: '64',
+                isNullable: true,
+            }),
+            new TableColumn({
+                name: 'deliveryState',
+                type: 'varchar',
+                length: '24',
+                isNullable: true,
+            }),
             new TableColumn({ name: 'deliveryBuildId', type: 'uuid', isNullable: true }),
             new TableColumn({ name: 'deliveryDeploymentId', type: 'uuid', isNullable: true }),
             new TableColumn({ name: 'deliveryUpdatedAt', type: date, isNullable: true }),
             new TableColumn({ name: 'deliveryClosedById', type: 'uuid', isNullable: true }),
-            new TableColumn({ name: 'followUpKey', type: 'varchar', length: '120', isNullable: true }),
+            new TableColumn({
+                name: 'followUpKey',
+                type: 'varchar',
+                length: '120',
+                isNullable: true,
+            }),
         ];
     }
 
     static indexes(): TableIndex[] {
         const C = AddTaskDeliveryState1792320000000;
         return [
-            new TableIndex({ name: C.INDEX_DUE, columnNames: ['deliveryState', 'deliveryUpdatedAt'] }),
+            new TableIndex({
+                name: C.INDEX_DUE,
+                columnNames: ['deliveryState', 'deliveryUpdatedAt'],
+            }),
             new TableIndex({
                 name: C.UNIQUE_MERGE,
                 columnNames: ['workId', 'mergeCommitSha'],
                 isUnique: true,
                 where: '"mergeCommitSha" IS NOT NULL',
             }),
-            new TableIndex({ name: C.UNIQUE_FOLLOW_UP, columnNames: ['followUpKey'], isUnique: true }),
+            new TableIndex({
+                name: C.UNIQUE_FOLLOW_UP,
+                columnNames: ['followUpKey'],
+                isUnique: true,
+            }),
         ];
     }
 

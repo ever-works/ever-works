@@ -117,10 +117,12 @@ describe('decideDelivery — plan §2.4 delivery input table (APW-08 T20)', () =
 
     describe('Build succeeded with deployable: false → build_failed', () => {
         it('a not-deployable Build is a terminal failure', () => {
-            expect(decideDelivery(input({ builds: [build({ deployable: false })] }))).toMatchObject({
-                state: 'build_failed',
-                failurePhase: 'build',
-            });
+            expect(decideDelivery(input({ builds: [build({ deployable: false })] }))).toMatchObject(
+                {
+                    state: 'build_failed',
+                    failurePhase: 'build',
+                },
+            );
         });
     });
 
@@ -175,12 +177,15 @@ describe('decideDelivery — plan §2.4 delivery input table (APW-08 T20)', () =
             ['image', 'QUEUED'],
             ['image', 'DEPLOYING'],
             ['none', 'VERIFYING'],
-        ])('strategy %s with a %s Deployment is deploying — never building/built', (strategy, s) => {
-            const d = deployment({ state: s });
-            expect(
-                decideDelivery(input({ buildStrategy: strategy, deployments: [d] })),
-            ).toMatchObject({ state: 'deploying', deploymentId: d.id, buildId: null });
-        });
+        ])(
+            'strategy %s with a %s Deployment is deploying — never building/built',
+            (strategy, s) => {
+                const d = deployment({ state: s });
+                expect(
+                    decideDelivery(input({ buildStrategy: strategy, deployments: [d] })),
+                ).toMatchObject({ state: 'deploying', deploymentId: d.id, buildId: null });
+            },
+        );
     });
 
     describe('build.strategy none, no Build, no Deployment → built, Task Done', () => {
@@ -264,7 +269,10 @@ describe('decideDelivery — plan §2.4 delivery input table (APW-08 T20)', () =
         it('reads APW-06 ERROR + failure code rollback_failed', () => {
             const d = deployment({
                 state: 'ERROR',
-                appRender: { warnings: [], failure: { code: 'rollback_failed', phase: 'rollback' } },
+                appRender: {
+                    warnings: [],
+                    failure: { code: 'rollback_failed', phase: 'rollback' },
+                },
             });
             expect(decideDelivery(input({ deployments: [d] }))).toMatchObject({
                 state: 'deploy_failed',
@@ -298,7 +306,9 @@ describe('decideDelivery — plan §2.4 delivery input table (APW-08 T20)', () =
             const failed = deployment({ state: 'ERROR' });
             const queued = deployment({ state: 'QUEUED', commitSha: LATER });
             expect(
-                decideDelivery(input({ deployments: [failed, queued], ancestry: { [LATER]: true } })),
+                decideDelivery(
+                    input({ deployments: [failed, queued], ancestry: { [LATER]: true } }),
+                ),
             ).toMatchObject({ state: 'deploying', deploymentId: queued.id, carried: true });
         });
     });
@@ -310,7 +320,11 @@ describe('decideDelivery — plan §2.4 delivery input table (APW-08 T20)', () =
             expect(
                 state(
                     decideDelivery(
-                        input({ builds: [later], deployments: [live], ancestry: { [LATER]: answer } }),
+                        input({
+                            builds: [later],
+                            deployments: [live],
+                            ancestry: { [LATER]: answer },
+                        }),
                     ),
                 ),
             ).toBe('merged');
@@ -320,7 +334,9 @@ describe('decideDelivery — plan §2.4 delivery input table (APW-08 T20)', () =
     describe('Task already live, closed_without_deploy → unchanged', () => {
         it.each(['live', 'closed_without_deploy'])('%s is terminal', (current) => {
             expect(
-                decideDelivery(input({ currentState: current, builds: [build({ status: 'failed' })] })),
+                decideDelivery(
+                    input({ currentState: current, builds: [build({ status: 'failed' })] }),
+                ),
             ).toEqual({ kind: 'unchanged', reason: 'terminal' });
         });
     });
@@ -331,7 +347,9 @@ describe('decideDelivery — carry-along and containment (FR-31, S23, S24, ACC-0
         const later = build({ commitSha: LATER });
         const live = deployment({ commitSha: LATER, buildId: later.id });
         expect(
-            decideDelivery(input({ builds: [later], deployments: [live], ancestry: { [LATER]: true } })),
+            decideDelivery(
+                input({ builds: [later], deployments: [live], ancestry: { [LATER]: true } }),
+            ),
         ).toMatchObject({ state: 'live', close: true, carried: true });
     });
 
@@ -375,9 +393,9 @@ describe('decideDelivery — carry-along and containment (FR-31, S23, S24, ACC-0
         const pr = build({ trigger: 'pull_request', status: 'failed' });
         const verification = build({ trigger: 'verification', status: 'failed' });
         const otherBranch = build({ branch: 'staging', status: 'failed' });
-        expect(
-            state(decideDelivery(input({ builds: [pr, verification, otherBranch] }))),
-        ).toBe('merged');
+        expect(state(decideDelivery(input({ builds: [pr, verification, otherBranch] })))).toBe(
+            'merged',
+        );
         expect(state(decideDelivery(input({ builds: [build({ trigger: 'manual' })] })))).toBe(
             'built',
         );
@@ -403,7 +421,9 @@ describe('decideDelivery — carry-along and containment (FR-31, S23, S24, ACC-0
         const later = build({ commitSha: LATER });
         const d2 = deployment({ commitSha: null, buildId: later.id });
         expect(
-            decideDelivery(input({ builds: [later], deployments: [d2], ancestry: { [LATER]: true } })),
+            decideDelivery(
+                input({ builds: [later], deployments: [d2], ancestry: { [LATER]: true } }),
+            ),
         ).toMatchObject({ state: 'live', carried: true });
     });
 });
@@ -439,7 +459,10 @@ describe('the helpers', () => {
             'rolled_back',
         );
         expect(
-            deploymentFailureOutcome({ state: 'ERROR', appRender: { failure: { code: 'rollback_failed' } } }),
+            deploymentFailureOutcome({
+                state: 'ERROR',
+                appRender: { failure: { code: 'rollback_failed' } },
+            }),
         ).toBe('rollback_failed');
         expect(deploymentFailureOutcome({ state: 'READY', appRender: null })).toBeNull();
     });
@@ -448,7 +471,9 @@ describe('the helpers', () => {
         expect(deploymentHasWarnings(deployment())).toBe(false);
         expect(
             deploymentHasWarnings(
-                deployment({ smokeResult: { inCluster: [], public: [{ name: 'p', status: 'skipped' }] } }),
+                deployment({
+                    smokeResult: { inCluster: [], public: [{ name: 'p', status: 'skipped' }] },
+                }),
             ),
         ).toBe(false);
     });

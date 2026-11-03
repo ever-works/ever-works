@@ -49,7 +49,9 @@ function fakeRepo<T extends Row>(rows: T[] = [], unique: Array<readonly string[]
             const where = options.where ?? {};
             // An array `where` is TypeORM's OR of its members.
             let out = rows.filter((row) =>
-                Array.isArray(where) ? where.some((branch) => matches(row, branch)) : matches(row, where),
+                Array.isArray(where)
+                    ? where.some((branch) => matches(row, branch))
+                    : matches(row, where),
             );
             if (options.order) {
                 const [[key, dir]] = Object.entries(options.order);
@@ -61,8 +63,14 @@ function fakeRepo<T extends Row>(rows: T[] = [], unique: Array<readonly string[]
             }
             return out.slice(0, options.take ?? out.length);
         }),
-        findOne: jest.fn(async (options: { where: Row }) => rows.find((row) => matches(row, options.where)) ?? null),
-        count: jest.fn(async (options: { where: Row }) => rows.filter((row) => matches(row, options.where)).length),
+        findOne: jest.fn(
+            async (options: { where: Row }) =>
+                rows.find((row) => matches(row, options.where)) ?? null,
+        ),
+        count: jest.fn(
+            async (options: { where: Row }) =>
+                rows.filter((row) => matches(row, options.where)).length,
+        ),
         manager: { connection: { driver: { escape: (name: string) => repo.escape(name) } } },
         createQueryBuilder: jest.fn(() => {
             let patch: Row = {};
@@ -100,7 +108,9 @@ function fakeRepo<T extends Row>(rows: T[] = [], unique: Array<readonly string[]
                         const clash = rows.find(
                             (row) =>
                                 row !== target &&
-                                columns.every((c) => (next as Row)[c] != null && row[c] === (next as Row)[c]),
+                                columns.every(
+                                    (c) => (next as Row)[c] != null && row[c] === (next as Row)[c],
+                                ),
                         );
                         if (clash) throw new Error('UNIQUE constraint failed');
                     }
@@ -164,12 +174,18 @@ const merged = (overrides: Row = {}) => ({
 let clock = Date.parse('2026-10-29T10:00:00Z');
 const at = () => new Date((clock += 60_000));
 
-function harness(seed: { tasks?: Task[]; builds?: Row[]; deployments?: Row[]; runtime?: Row | null } = {}) {
-    const tasks = fakeRepo((seed.tasks ?? [task()]) as unknown as Row[], [['workId', 'mergeCommitSha']]);
+function harness(
+    seed: { tasks?: Task[]; builds?: Row[]; deployments?: Row[]; runtime?: Row | null } = {},
+) {
+    const tasks = fakeRepo((seed.tasks ?? [task()]) as unknown as Row[], [
+        ['workId', 'mergeCommitSha'],
+    ]);
     const builds = fakeRepo(seed.builds ?? []);
     const deployments = fakeRepo(seed.deployments ?? []);
     const runtime = fakeRepo(
-        seed.runtime === null ? [] : [{ workId: 'work-1', target: 'your-cluster', ...(seed.runtime ?? {}) }],
+        seed.runtime === null
+            ? []
+            : [{ workId: 'work-1', target: 'your-cluster', ...(seed.runtime ?? {}) }],
     );
     const works = { findById: jest.fn(async (id: string) => (id === 'work-1' ? WORK : null)) };
     const specStates = { findByWorkId: jest.fn(async () => ({ trackedBranch: 'production' })) };
@@ -180,7 +196,9 @@ function harness(seed: { tasks?: Task[]; builds?: Row[]; deployments?: Row[]; ru
         })),
     };
     const git = { isAncestorCommit: jest.fn(async () => true) };
-    const transitions = { transition: jest.fn(async (t: Task, to: TaskStatus) => Object.assign(t, { status: to })) };
+    const transitions = {
+        transition: jest.fn(async (t: Task, to: TaskStatus) => Object.assign(t, { status: to })),
+    };
     const followUps = {
         open: jest.fn(async () => ({ kind: 'opened', taskId: 'follow-1', dispatched: true })),
         cancelObsolete: jest.fn(async () => 0),
@@ -215,7 +233,23 @@ function harness(seed: { tasks?: Task[]; builds?: Row[]; deployments?: Row[]; ru
         telemetry as never,
         chat as never,
     );
-    return { service, tasks, builds, deployments, runtime, works, specStates, specs, git, transitions, followUps, escalations, activityLog, telemetry, chat };
+    return {
+        service,
+        tasks,
+        builds,
+        deployments,
+        runtime,
+        works,
+        specStates,
+        specs,
+        git,
+        transitions,
+        followUps,
+        escalations,
+        activityLog,
+        telemetry,
+        chat,
+    };
 }
 
 function build(overrides: Row = {}): Row {
@@ -253,7 +287,12 @@ function deployment(overrides: Row = {}): Row {
 }
 
 const tracked = (overrides: Row = {}) =>
-    task({ mergeCommitSha: MERGE, deliveryState: 'merged', deliveryUpdatedAt: new Date(0), ...overrides });
+    task({
+        mergeCommitSha: MERGE,
+        deliveryState: 'merged',
+        deliveryUpdatedAt: new Date(0),
+        ...overrides,
+    });
 
 afterEach(() => {
     delete process.env.EVER_WORKS_APP_AUTO_DEPLOY_ENABLED;
@@ -268,12 +307,16 @@ describe('TaskDeliveryService — the merge hook (FR-29, FR-33)', () => {
 
     it('does not track a merge into another branch (S19)', async () => {
         const { service } = harness();
-        await expect(service.isDeliveryTracked(task(), merged({ baseRef: 'staging' }))).resolves.toBe(false);
+        await expect(
+            service.isDeliveryTracked(task(), merged({ baseRef: 'staging' })),
+        ).resolves.toBe(false);
     });
 
     it('does not track a non-App Work, or a provider that reported no merge commit', async () => {
         const h = harness();
-        await expect(h.service.isDeliveryTracked(task(), merged({ mergeCommitSha: null }))).resolves.toBe(false);
+        await expect(
+            h.service.isDeliveryTracked(task(), merged({ mergeCommitSha: null })),
+        ).resolves.toBe(false);
         h.works.findById.mockResolvedValue({ ...WORK, kind: 'directory' } as never);
         await expect(h.service.isDeliveryTracked(task(), merged())).resolves.toBe(false);
     });
@@ -281,15 +324,27 @@ describe('TaskDeliveryService — the merge hook (FR-29, FR-33)', () => {
     it('an App Work whose spec omits source.branch is still tracked, from APW-03 tracked branch (ACC-08-43)', async () => {
         const h = harness();
         h.specStates.findByWorkId.mockResolvedValue({ trackedBranch: 'main' });
-        h.specs.getEffectiveSpec.mockResolvedValue({ status: 'valid', spec: { source: {} } } as never);
-        await expect(h.service.isDeliveryTracked(task(), merged({ baseRef: 'main' }))).resolves.toBe(true);
+        h.specs.getEffectiveSpec.mockResolvedValue({
+            status: 'valid',
+            spec: { source: {} },
+        } as never);
+        await expect(
+            h.service.isDeliveryTracked(task(), merged({ baseRef: 'main' })),
+        ).resolves.toBe(true);
     });
 
     it("prefers the Work's own isolation base branch when it is set", async () => {
         const h = harness();
-        h.works.findById.mockResolvedValue({ ...WORK, taskIsolationBaseBranch: 'release' } as never);
-        await expect(h.service.isDeliveryTracked(task(), merged({ baseRef: 'release' }))).resolves.toBe(true);
-        await expect(h.service.isDeliveryTracked(task(), merged({ baseRef: 'production' }))).resolves.toBe(false);
+        h.works.findById.mockResolvedValue({
+            ...WORK,
+            taskIsolationBaseBranch: 'release',
+        } as never);
+        await expect(
+            h.service.isDeliveryTracked(task(), merged({ baseRef: 'release' })),
+        ).resolves.toBe(true);
+        await expect(
+            h.service.isDeliveryTracked(task(), merged({ baseRef: 'production' })),
+        ).resolves.toBe(false);
     });
 
     it('records the merge once: merged state, one Activity row, one telemetry event (S29)', async () => {
@@ -305,7 +360,11 @@ describe('TaskDeliveryService — the merge hook (FR-29, FR-33)', () => {
             expect.objectContaining({
                 actionType: ActivityActionType.APP_CHANGE,
                 action: APP_CHANGE_ACTIONS.merged,
-                details: expect.objectContaining({ resourceType: 'task', resourceId: 'task-1', state: 'merged' }),
+                details: expect.objectContaining({
+                    resourceType: 'task',
+                    resourceId: 'task-1',
+                    state: 'merged',
+                }),
             }),
         );
         expect(h.telemetry.track).toHaveBeenCalledWith(
@@ -329,33 +388,43 @@ describe.each([
     ['sqlite', (n: string) => `"${n}"`],
     ['mysql', (n: string) => `\`${n}\``],
     ['mariadb', (n: string) => `\`${n}\``],
-])('TaskDeliveryService — portable compare-and-set on %s (ACC-08-45, APW08-G17)', (_driver, escape) => {
-    it('spells the CAS with the driver escape, = :from or IS NULL — never IS NOT DISTINCT FROM or <=>', async () => {
-        const h = harness({ builds: [build({ status: 'running', deployable: false })] });
-        h.tasks.escape = escape;
-        await h.service.recordMerge(h.tasks.rows[0] as unknown as Task, merged());
-        await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
+])(
+    'TaskDeliveryService — portable compare-and-set on %s (ACC-08-45, APW08-G17)',
+    (_driver, escape) => {
+        it('spells the CAS with the driver escape, = :from or IS NULL — never IS NOT DISTINCT FROM or <=>', async () => {
+            const h = harness({ builds: [build({ status: 'running', deployable: false })] });
+            h.tasks.escape = escape;
+            await h.service.recordMerge(h.tasks.rows[0] as unknown as Task, merged());
+            await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
 
-        const [mergeWhere, stateWhere] = h.tasks.wheres;
-        expect(mergeWhere).toBe(`${escape('id')} = :taskId AND ${escape('deliveryState')} IS NULL`);
-        expect(stateWhere).toBe(`${escape('id')} = :taskId AND ${escape('deliveryState')} = :fromState`);
-        for (const where of h.tasks.wheres) {
-            expect(where).not.toMatch(/IS NOT DISTINCT FROM|<=>/);
-        }
-        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'building' });
-    });
+            const [mergeWhere, stateWhere] = h.tasks.wheres;
+            expect(mergeWhere).toBe(
+                `${escape('id')} = :taskId AND ${escape('deliveryState')} IS NULL`,
+            );
+            expect(stateWhere).toBe(
+                `${escape('id')} = :taskId AND ${escape('deliveryState')} = :fromState`,
+            );
+            for (const where of h.tasks.wheres) {
+                expect(where).not.toMatch(/IS NOT DISTINCT FROM|<=>/);
+            }
+            expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'building' });
+        });
 
-    it('a lost race (another worker moved the state) writes nothing and records nothing', async () => {
-        const h = harness({ tasks: [tracked()], builds: [build({ status: 'running', deployable: false })] });
-        h.tasks.escape = escape;
-        const stale = { ...h.tasks.rows[0] } as unknown as Task;
-        Object.assign(h.tasks.rows[0], { deliveryState: 'deploying' });
-        const outcome = await h.service.reconcileTask(stale);
-        expect(outcome.changed).toBe(false);
-        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'deploying' });
-        expect(h.activityLog.log).not.toHaveBeenCalled();
-    });
-});
+        it('a lost race (another worker moved the state) writes nothing and records nothing', async () => {
+            const h = harness({
+                tasks: [tracked()],
+                builds: [build({ status: 'running', deployable: false })],
+            });
+            h.tasks.escape = escape;
+            const stale = { ...h.tasks.rows[0] } as unknown as Task;
+            Object.assign(h.tasks.rows[0], { deliveryState: 'deploying' });
+            const outcome = await h.service.reconcileTask(stale);
+            expect(outcome.changed).toBe(false);
+            expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'deploying' });
+            expect(h.activityLog.log).not.toHaveBeenCalled();
+        });
+    },
+);
 
 describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
     it('merged → building → live: records the timeline and closes the Task through the state machine (S6)', async () => {
@@ -376,10 +445,16 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
         expect(h.transitions.transition).toHaveBeenCalledWith(
             row,
             TaskStatus.DONE,
-            expect.objectContaining({ actorType: 'agent', ownRunTask: true, livePullRequestHeadSha: 'feedface' }),
+            expect.objectContaining({
+                actorType: 'agent',
+                ownRunTask: true,
+                livePullRequestHeadSha: 'feedface',
+            }),
         );
         expect(h.followUps.cancelObsolete).toHaveBeenCalledWith(row);
-        const actions = h.activityLog.log.mock.calls.map((call) => (call as unknown as [Row])[0].action);
+        const actions = h.activityLog.log.mock.calls.map(
+            (call) => (call as unknown as [Row])[0].action,
+        );
         expect(actions).toEqual([APP_CHANGE_ACTIONS.progressed, APP_CHANGE_ACTIONS.live]);
         expect(h.telemetry.track).toHaveBeenCalledWith(
             'app.change.delivered',
@@ -396,7 +471,11 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
     });
 
     it('auto-deploy off: built, waiting for a person — the Task stays open (S20)', async () => {
-        const h = harness({ tasks: [tracked()], builds: [build()], runtime: { targetSettings: { autoDeploy: false } } });
+        const h = harness({
+            tasks: [tracked()],
+            builds: [build()],
+            runtime: { targetSettings: { autoDeploy: false } },
+        });
         const outcome = await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
         expect(outcome).toMatchObject({ closed: false });
         expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'built' });
@@ -420,7 +499,9 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
                 work: expect.objectContaining({ id: 'work-1', name: 'Bookings' }),
             }),
         );
-        const actions = h.activityLog.log.mock.calls.map((call) => (call as unknown as [Row])[0].action);
+        const actions = h.activityLog.log.mock.calls.map(
+            (call) => (call as unknown as [Row])[0].action,
+        );
         expect(actions).toEqual([APP_CHANGE_ACTIONS.failed, APP_CHANGE_ACTIONS.followUpOpened]);
         expect(h.telemetry.track).toHaveBeenCalledWith(
             'app.change.delivery_failed',
@@ -434,13 +515,20 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
         const h = harness({ tasks: [tracked()], builds: [b] });
         await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
         expect(h.followUps.open).toHaveBeenCalledWith(
-            expect.objectContaining({ phase: 'build', failureId: b.id, build: expect.objectContaining({ id: b.id }) }),
+            expect.objectContaining({
+                phase: 'build',
+                failureId: b.id,
+                build: expect.objectContaining({ id: b.id }),
+            }),
         );
     });
 
     it('EVER_WORKS_APP_AUTO_DEPLOY_ENABLED=false: the state is still honest, but no follow-up opens (T49)', async () => {
         process.env.EVER_WORKS_APP_AUTO_DEPLOY_ENABLED = 'false';
-        const h = harness({ tasks: [tracked()], builds: [build({ status: 'failed', deployable: false })] });
+        const h = harness({
+            tasks: [tracked()],
+            builds: [build({ status: 'failed', deployable: false })],
+        });
         await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
         expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'build_failed' });
         expect(h.followUps.open).not.toHaveBeenCalled();
@@ -464,7 +552,10 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
     });
 
     it('caches the ancestry answer per (work, merge, candidate)', async () => {
-        const h = harness({ tasks: [tracked()], deployments: [deployment({ commitSha: LATER, state: 'QUEUED' })] });
+        const h = harness({
+            tasks: [tracked()],
+            deployments: [deployment({ commitSha: LATER, state: 'QUEUED' })],
+        });
         const row = h.tasks.rows[0] as unknown as Task;
         await h.service.reconcileTask(row);
         await h.service.reconcileTask(row);
@@ -501,7 +592,11 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
 
     it('reconcile: stalest first, one failing Task does not abort the tick, counters and sweep telemetry', async () => {
         const good = tracked({ id: 'task-good', deliveryUpdatedAt: new Date(2) });
-        const bad = tracked({ id: 'task-bad', workId: 'work-boom', deliveryUpdatedAt: new Date(1) });
+        const bad = tracked({
+            id: 'task-bad',
+            workId: 'work-boom',
+            deliveryUpdatedAt: new Date(1),
+        });
         // A merge commit is recorded once per Work (the unique index), so the third change has its own.
         const done = tracked({
             id: 'task-live',
@@ -509,7 +604,10 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
             status: TaskStatus.DONE,
             mergeCommitSha: LATER,
         });
-        const h = harness({ tasks: [good, bad, done], builds: [build({ status: 'running', deployable: false })] });
+        const h = harness({
+            tasks: [good, bad, done],
+            builds: [build({ status: 'running', deployable: false })],
+        });
         h.works.findById.mockImplementation(async (id: string) => {
             if (id === 'work-boom') throw new Error('boom');
             return WORK as never;
@@ -518,7 +616,9 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
         const summary = await h.service.reconcile({ limit: 500 });
         expect(h.tasks.find).toHaveBeenCalledWith(expect.objectContaining({ take: 200 }));
         expect(summary).toMatchObject({ scanned: 2, changed: 1, failed: 1 });
-        expect(h.tasks.rows.find((r) => r.id === 'task-good')).toMatchObject({ deliveryState: 'building' });
+        expect(h.tasks.rows.find((r) => r.id === 'task-good')).toMatchObject({
+            deliveryState: 'building',
+        });
         expect(h.telemetry.track).toHaveBeenCalledWith(
             'app.change.delivery.sweep',
             expect.objectContaining({ scanned: 2, changed: 1, failed: 1 }),
@@ -527,31 +627,42 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
 });
 
 describe('TaskDeliveryService — Close anyway (S9, S20)', () => {
-    it.each(['building', 'deploying', 'live', null])('refuses a %s change with 422 notClosable', async (state) => {
-        const h = harness({ tasks: [tracked({ deliveryState: state })] });
-        await expect(
-            h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task),
-        ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'notClosable' }) });
-    });
+    it.each(['building', 'deploying', 'live', null])(
+        'refuses a %s change with 422 notClosable',
+        async (state) => {
+            const h = harness({ tasks: [tracked({ deliveryState: state })] });
+            await expect(
+                h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task),
+            ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'notClosable' }) });
+        },
+    );
 
     it('closes a failed change as the person, through the gates, and records who', async () => {
         const h = harness({ tasks: [tracked({ deliveryState: 'deploy_failed' })] });
         const row = h.tasks.rows[0] as unknown as Task;
         const view = await h.service.closeWithoutDeploy('user-1', row, '  accepted as is  ');
-        expect(h.transitions.transition).toHaveBeenCalledWith(row, TaskStatus.DONE, { actorType: 'user' });
-        expect(row).toMatchObject({ deliveryState: 'closed_without_deploy', deliveryClosedById: 'user-1' });
+        expect(h.transitions.transition).toHaveBeenCalledWith(row, TaskStatus.DONE, {
+            actorType: 'user',
+        });
+        expect(row).toMatchObject({
+            deliveryState: 'closed_without_deploy',
+            deliveryClosedById: 'user-1',
+        });
         expect(view.state).toBe('closed_without_deploy');
         expect(h.activityLog.log).toHaveBeenCalledWith(
-            expect.objectContaining({ action: APP_CHANGE_ACTIONS.closed, summary: 'Closed without deploying: accepted as is' }),
+            expect.objectContaining({
+                action: APP_CHANGE_ACTIONS.closed,
+                summary: 'Closed without deploying: accepted as is',
+            }),
         );
     });
 
     it('a gate refusal throws and changes nothing — the chain write is reverted', async () => {
         const h = harness({ tasks: [tracked({ deliveryState: 'built' })] });
         h.transitions.transition.mockRejectedValue(new Error('approvers pending'));
-        await expect(h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task)).rejects.toThrow(
-            'approvers pending',
-        );
+        await expect(
+            h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task),
+        ).rejects.toThrow('approvers pending');
         expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'built', deliveryClosedById: null });
         expect(h.activityLog.log).not.toHaveBeenCalled();
     });
@@ -562,7 +673,10 @@ describe('TaskDeliveryService — Close anyway (S9, S20)', () => {
         Object.assign(h.tasks.rows[0], { deliveryState: 'deploying' });
         const view = await h.service.closeWithoutDeploy('user-1', stale);
         expect(h.transitions.transition).not.toHaveBeenCalled();
-        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'deploying', status: TaskStatus.IN_REVIEW });
+        expect(h.tasks.rows[0]).toMatchObject({
+            deliveryState: 'deploying',
+            status: TaskStatus.IN_REVIEW,
+        });
         expect(view.state).toBe('deploying');
     });
 
@@ -579,8 +693,13 @@ describe('TaskDeliveryService — Close anyway (S9, S20)', () => {
     );
 
     it('closes the chain of a Task a person already moved to Done, without moving it again', async () => {
-        const h = harness({ tasks: [tracked({ deliveryState: 'built', status: TaskStatus.DONE })] });
-        const view = await h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task);
+        const h = harness({
+            tasks: [tracked({ deliveryState: 'built', status: TaskStatus.DONE })],
+        });
+        const view = await h.service.closeWithoutDeploy(
+            'user-1',
+            h.tasks.rows[0] as unknown as Task,
+        );
         expect(view.state).toBe('closed_without_deploy');
         expect(h.transitions.transition).not.toHaveBeenCalled();
     });
@@ -612,9 +731,20 @@ describe('TaskDeliveryService — Try once more (S22, APW08-G21)', () => {
             deployments: [d],
         });
         h.escalations.getForUser.mockResolvedValue(escalation());
-        const result = await h.service.requestFollowUp('user-1', h.tasks.rows[0] as unknown as Task, 'esc-1', scope);
+        const result = await h.service.requestFollowUp(
+            'user-1',
+            h.tasks.rows[0] as unknown as Task,
+            'esc-1',
+            scope,
+        );
         expect(result).toEqual({ taskId: 'follow-1' });
-        expect(h.escalations.resolveForTask).toHaveBeenCalledWith('esc-1', 'user-1', 'task-1', scope, 'Try once more');
+        expect(h.escalations.resolveForTask).toHaveBeenCalledWith(
+            'esc-1',
+            'user-1',
+            'task-1',
+            scope,
+            'Try once more',
+        );
         expect(h.followUps.open).toHaveBeenCalledWith(
             expect.objectContaining({ phase: 'deploy', failureId: d.id, outcome: 'failed' }),
             { manual: true },
@@ -626,11 +756,20 @@ describe('TaskDeliveryService — Try once more (S22, APW08-G21)', () => {
         ['another reason', { reasonCode: 'gate-exhausted' }],
         ['an already-used item', { status: 'resolved' }],
     ])('refuses %s with 422 followUpLimit and opens nothing', async (_name, overrides) => {
-        const h = harness({ tasks: [tracked({ deliveryState: 'build_failed', deliveryBuildId: 'b' })] });
+        const h = harness({
+            tasks: [tracked({ deliveryState: 'build_failed', deliveryBuildId: 'b' })],
+        });
         h.escalations.getForUser.mockResolvedValue(escalation(overrides));
-        const attempt = h.service.requestFollowUp('user-1', h.tasks.rows[0] as unknown as Task, 'esc-1', scope);
+        const attempt = h.service.requestFollowUp(
+            'user-1',
+            h.tasks.rows[0] as unknown as Task,
+            'esc-1',
+            scope,
+        );
         await expect(attempt).rejects.toBeInstanceOf(UnprocessableEntityException);
-        await expect(attempt).rejects.toMatchObject({ response: expect.objectContaining({ code: 'followUpLimit' }) });
+        await expect(attempt).rejects.toMatchObject({
+            response: expect.objectContaining({ code: 'followUpLimit' }),
+        });
         expect(h.followUps.open).not.toHaveBeenCalled();
     });
 
@@ -664,9 +803,12 @@ describe('TaskDeliveryService — Try once more (S22, APW08-G21)', () => {
         await expect(
             h.service.requestFollowUp('user-1', h.tasks.rows[0] as unknown as Task, 'esc-1', scope),
         ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'followUpLimit' }) });
-        expect(h.followUps.open).toHaveBeenCalledWith(expect.objectContaining({ failureId: b.id }), {
-            manual: true,
-        });
+        expect(h.followUps.open).toHaveBeenCalledWith(
+            expect.objectContaining({ failureId: b.id }),
+            {
+                manual: true,
+            },
+        );
         expect(h.escalations.resolveForTask).not.toHaveBeenCalled();
     });
 
@@ -682,17 +824,42 @@ describe('TaskDeliveryService — Try once more (S22, APW08-G21)', () => {
 describe('TaskDeliveryService — the view (GET /api/tasks/:id/delivery)', () => {
     it('answers the TaskDeliveryView for a live, carried change', async () => {
         const b = build({ commitSha: LATER });
-        const d = deployment({ commitSha: LATER, buildId: b.id, appRender: { warnings: [{ code: 'w' }] } });
+        const d = deployment({
+            commitSha: LATER,
+            buildId: b.id,
+            appRender: { warnings: [{ code: 'w' }] },
+        });
         const h = harness({
-            tasks: [tracked({ deliveryState: 'live', deliveryBuildId: b.id, deliveryDeploymentId: d.id })],
+            tasks: [
+                tracked({
+                    deliveryState: 'live',
+                    deliveryBuildId: b.id,
+                    deliveryDeploymentId: d.id,
+                }),
+            ],
             builds: [b],
             deployments: [d],
         });
         h.activityLog.findResourceEvents.mockResolvedValue({
             activities: [
-                { id: 'a2', actionType: 'app_change', createdAt: new Date('2026-10-29T10:10:00Z'), details: { state: 'live' } },
-                { id: 'x', actionType: 'task_updated', createdAt: new Date('2026-10-29T10:05:00Z'), details: {} },
-                { id: 'a1', actionType: 'app_change', createdAt: new Date('2026-10-29T10:00:00Z'), details: { state: 'merged' } },
+                {
+                    id: 'a2',
+                    actionType: 'app_change',
+                    createdAt: new Date('2026-10-29T10:10:00Z'),
+                    details: { state: 'live' },
+                },
+                {
+                    id: 'x',
+                    actionType: 'task_updated',
+                    createdAt: new Date('2026-10-29T10:05:00Z'),
+                    details: {},
+                },
+                {
+                    id: 'a1',
+                    actionType: 'app_change',
+                    createdAt: new Date('2026-10-29T10:00:00Z'),
+                    details: { state: 'merged' },
+                },
             ],
             total: 3,
         } as never);
@@ -711,7 +878,13 @@ describe('TaskDeliveryService — the view (GET /api/tasks/:id/delivery)', () =>
                 base: 'production',
                 mergedAt: '2026-10-29T10:00:00.000Z',
             },
-            build: { id: b.id, number: 3, status: 'succeeded', commitSha: LATER, logsUrl: 'https://ci.invalid/run/3' },
+            build: {
+                id: b.id,
+                number: 3,
+                status: 'succeeded',
+                commitSha: LATER,
+                logsUrl: 'https://ci.invalid/run/3',
+            },
             deployment: { id: d.id, number: null, status: 'READY', outcome: null },
             liveUrl: 'https://bookings.example.app',
             liveWithWarnings: true,
@@ -738,7 +911,9 @@ describe('TaskDeliveryService — the view (GET /api/tasks/:id/delivery)', () =>
 });
 
 /** The thread posts the chain wrote, as `[messageKey, body, authorType, authorId, params]`. */
-function posts(h: ReturnType<typeof harness>): Array<[string, string, string, string | null, Row | null]> {
+function posts(
+    h: ReturnType<typeof harness>,
+): Array<[string, string, string, string | null, Row | null]> {
     return h.chat.post.mock.calls.map((call) => {
         const input = (call as unknown as [string, Row])[1];
         return [
@@ -785,7 +960,11 @@ describe('TaskDeliveryService — the Task thread (FR-43, APW-08 T26 / T54)', ()
         for (const call of h.chat.post.mock.calls) {
             const [userId, input] = call as unknown as [string, Row];
             expect(userId).toBe('user-1');
-            expect(input).toMatchObject({ taskId: 'task-1', authorType: 'agent', authorId: 'agent-1' });
+            expect(input).toMatchObject({
+                taskId: 'task-1',
+                authorType: 'agent',
+                authorId: 'agent-1',
+            });
         }
         expect(posts(h)[1][4]).toEqual({ number: 12 });
         expect(posts(h)[4][4]).toEqual({ url: 'https://bookings.example.app' });
@@ -806,7 +985,12 @@ describe('TaskDeliveryService — the Task thread (FR-43, APW-08 T26 / T54)', ()
     });
 
     it('a failed Build posts its number and the recorded reason, then the follow-up it opened', async () => {
-        const b = build({ status: 'failed', deployable: false, number: 4, failureClass: 'compile error.' });
+        const b = build({
+            status: 'failed',
+            deployable: false,
+            number: 4,
+            failureClass: 'compile error.',
+        });
         const h = harness({
             tasks: [tracked(), task({ id: 'follow-1', slug: 'T-2', workId: 'work-1' })],
             builds: [b],
@@ -823,10 +1007,20 @@ describe('TaskDeliveryService — the Task thread (FR-43, APW-08 T26 / T54)', ()
         const b = build();
         const d = deployment({ buildId: b.id, state: 'ROLLED_BACK', lastError: 'crashloop' });
         const h = harness({ tasks: [tracked()], builds: [b], deployments: [d] });
-        h.followUps.open.mockResolvedValue({ kind: 'escalated', reason: 'chain-limit', escalationId: 'e' } as never);
+        h.followUps.open.mockResolvedValue({
+            kind: 'escalated',
+            reason: 'chain-limit',
+            escalationId: 'e',
+        } as never);
         await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
         expect(posts(h)).toEqual([
-            ['deliveryPosts.deployFailed', 'Deployment failed: rolled back.', 'agent', 'agent-1', { outcome: 'rolled_back' }],
+            [
+                'deliveryPosts.deployFailed',
+                'Deployment failed: rolled back.',
+                'agent',
+                'agent-1',
+                { outcome: 'rolled_back' },
+            ],
         ]);
     });
 
@@ -837,7 +1031,10 @@ describe('TaskDeliveryService — the Task thread (FR-43, APW-08 T26 / T54)', ()
     });
 
     it('a refused post never undoes the state write or the Activity row', async () => {
-        const h = harness({ tasks: [tracked()], builds: [build({ status: 'running', deployable: false })] });
+        const h = harness({
+            tasks: [tracked()],
+            builds: [build({ status: 'running', deployable: false })],
+        });
         h.chat.post.mockRejectedValue(new Error('secret-scan refused'));
         const outcome = await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
         expect(outcome.changed).toBe(true);
@@ -846,7 +1043,10 @@ describe('TaskDeliveryService — the Task thread (FR-43, APW-08 T26 / T54)', ()
     });
 
     it('without the chat collaborator the chain records Activity exactly as before', async () => {
-        const h = harness({ tasks: [tracked()], builds: [build({ status: 'running', deployable: false })] });
+        const h = harness({
+            tasks: [tracked()],
+            builds: [build({ status: 'running', deployable: false })],
+        });
         const bare = new TaskDeliveryService(
             h.tasks as never,
             h.builds as never,
@@ -981,7 +1181,9 @@ describe('TaskDeliveryService — Deploy now is offered (S20, APW-08 T27)', () =
     it('auto-deploy on, a target of None, no runtime row or another state does not', async () => {
         const b = build();
         const on = harness({ tasks: [builtTask(b)], builds: [b] });
-        await expect(on.service.getView(on.tasks.rows[0] as unknown as Task)).resolves.toMatchObject({
+        await expect(
+            on.service.getView(on.tasks.rows[0] as unknown as Task),
+        ).resolves.toMatchObject({
             canDeployNow: false,
         });
         const none = harness({
@@ -989,7 +1191,9 @@ describe('TaskDeliveryService — Deploy now is offered (S20, APW-08 T27)', () =
             builds: [b],
             runtime: { target: 'none', targetSettings: { autoDeploy: false } },
         });
-        await expect(none.service.getView(none.tasks.rows[0] as unknown as Task)).resolves.toMatchObject({
+        await expect(
+            none.service.getView(none.tasks.rows[0] as unknown as Task),
+        ).resolves.toMatchObject({
             canDeployNow: false,
         });
         const missing = harness({ tasks: [builtTask(b)], builds: [b], runtime: null });

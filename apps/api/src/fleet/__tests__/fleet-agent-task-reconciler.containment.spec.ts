@@ -190,7 +190,9 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
             build(),
             result({
                 containment: CONTAINMENT as never,
-                checks: [{ id: 'repo/check-1', status: 'red', exitCode: 1, durationMs: 1 }] as never,
+                checks: [
+                    { id: 'repo/check-1', status: 'red', exitCode: 1, durationMs: 1 },
+                ] as never,
             }) as never,
         );
         expect(recorder.recordRunContainment.mock.calls[0][0]).not.toHaveProperty('missingTool');

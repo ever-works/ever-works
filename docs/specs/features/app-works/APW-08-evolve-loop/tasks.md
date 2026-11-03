@@ -389,7 +389,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `golden/app-checks-two.yml` plus a 9-case block in `generator.spec.ts` (84/84). **One drift was found and
       fixed in `checks-job.ts`, as the cross-epic request above describes.** APW-05's job-level `if:` guard
       had only the pull-request leg. It now reads `(<pull-request leg, unchanged>) || (github.event_name ==
-      'push' && github.ref == 'refs/heads/<tracked>')`. APW-05's `checks-job.spec.ts` trigger pin is re-pinned
+    'push' && github.ref == 'refs/heads/<tracked>')`. APW-05's `checks-job.spec.ts` trigger pin is re-pinned
       to both legs, just as strictly (17/17), and `golden/checks.yml` changed on that one line only. Every other
       leg matched the contract: `EW_CHECK_COMMAND_B64`, `contents: read` only, `fail-fast: false`,
       `max-parallel: 5`, the per-leg name, `persist-credentials: false`, and `continue-on-error` on the
@@ -803,14 +803,10 @@ are recorded as `app.change.progressed` so FR-35's timeline has every change.
       gate (`pnpm format:check && pnpm lint && pnpm type-check && pnpm test && pnpm build`) has not been run as one
       command: PR CI runs CodeQL, egress and route-list only, and the lead's PC cannot hold a full root test run. Each
       PR ran its own specs, type-checks and builds locally instead (recorded in each PR). The ACC walk is covered
-      in part by the Playwright lanes run green locally on a SQLite stack:
-      - `app-works-evolve-chat`: ACC-08-24;
-      - `app-works-delivery-chips`: ACC-08-17, ‑21, ‑22;
-      - `app-works-guard-refusals`: ACC-08-08, ‑11, ‑12, ‑14, and FR-9/FR-12;
-      - `app-works-a11y`: ACC-08-35.
+      in part by the Playwright lanes run green locally on a SQLite stack: - `app-works-evolve-chat`: ACC-08-24; - `app-works-delivery-chips`: ACC-08-17, ‑21, ‑22; - `app-works-guard-refusals`: ACC-08-08, ‑11, ‑12, ‑14, and FR-9/FR-12; - `app-works-a11y`: ACC-08-35.
 
-      ACC-08-10 needs a Fleet node, and ACC-08-31 needs a Fleet producer of `rail_refusals`. Closing T30 is an
-      owner-run step: the root gate on a CI-sized runner, then the walk on stage.
+        ACC-08-10 needs a Fleet node, and ACC-08-31 needs a Fleet producer of `rail_refusals`. Closing T30 is an
+        owner-run step: the root gate on a CI-sized runner, then the walk on stage.
 
 ---
 
@@ -832,18 +828,13 @@ _Delivers FR-45…FR-55._
       Work answers not found. Run: `cd apps/api && pnpm test AddGoalWorkScope goal` and
       `pnpm --filter @ever-works/agent test goals.service`.
       **Done when**: the specs are green.
-      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-work-scope`): built.**
-      - `goals.workId` (uuid, nullable, no FK so a deleted Work pauses rather than cascades) and `idx_goals_work`.
-        The migration is `1792350000000-AddGoalWorkScope`: the next free App Works slot. The plan's
-        `1792080100000` predates the block's later stamps.
-      - `GoalsService` resolves the Work the way Task creation does: it must exist, be the acting user's, and be in
-        the same scope. A missing Work, another account's Work, or one in another scope all get the same
-        `404 workNotFound`. Without a Work repository a `workId` is refused, never stored unchecked.
-      - A change while `loopStatus = 'running'` is `409 loopRunning`; resending the current Work is not a change.
-      - The single read adds `workName`.
-      - DTOs: `workId?: uuid | null`.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-work-scope`): built.** - `goals.workId` (uuid, nullable, no FK so a deleted Work pauses rather than cascades) and `idx_goals_work`.
+      The migration is `1792350000000-AddGoalWorkScope`: the next free App Works slot. The plan's
+      `1792080100000` predates the block's later stamps. - `GoalsService` resolves the Work the way Task creation does: it must exist, be the acting user's, and be in
+      the same scope. A missing Work, another account's Work, or one in another scope all get the same
+      `404 workNotFound`. Without a Work repository a `workId` is refused, never stored unchecked. - A change while `loopStatus = 'running'` is `409 loopRunning`; resending the current Work is not a change. - The single read adds `workName`. - DTOs: `workId?: uuid | null`.
 
-      Specs: migration 3/3; DTO 35/35; service 60/60, with both rules bite-proven; controller 30/30 (3 new).
+        Specs: migration 3/3; DTO 35/35; service 60/60, with both rules bite-proven; controller 30/30 (3 new).
 
 - [ ] **T32. Orchestrator.**
       **Modify** `packages/agent/src/goals/goal-orchestrator.service.ts` — `applyDispatch` passes
@@ -856,36 +847,32 @@ _Delivers FR-45…FR-55._
       `pnpm --filter @ever-works/agent test goal-orchestrator`.
       **Done when**: the specs are green.
       **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-orchestrator-work`, stacked on T31):
-      built.**
-      - `applyDispatch` files every iteration on `goal.workId` (FR-46).
-      - `advanceOne` reads the Goal's Tasks and runs once. For an App Work, it counts the iteration Tasks in review
-        whose pull request is still open and that have no run in flight; those hold the concurrency ceiling
-        (`awaiting-merge`, with the S10 copy that names the iteration).
-      - A Work that is gone, or no longer the owner's in the Goal's scope, pauses the loop (`work-unavailable`, S26).
-        It is checked after "finished" and before the ceilings. A failed Work READ does not pause.
-      - The rules take optional `pullRequestsAwaitingMerge`, `awaitingMergeIterations` and `workUnavailable`; the
-        existing decision table is unchanged.
+      built.** - `applyDispatch` files every iteration on `goal.workId` (FR-46). - `advanceOne` reads the Goal's Tasks and runs once. For an App Work, it counts the iteration Tasks in review
+      whose pull request is still open and that have no run in flight; those hold the concurrency ceiling
+      (`awaiting-merge`, with the S10 copy that names the iteration). - A Work that is gone, or no longer the owner's in the Goal's scope, pauses the loop (`work-unavailable`, S26).
+      It is checked after "finished" and before the ceilings. A failed Work READ does not pause. - The rules take optional `pullRequestsAwaitingMerge`, `awaitingMergeIterations` and `workUnavailable`; the
+      existing decision table is unchanged.
 
-      **Independent review (2026-10-31), fixed:**
-      - **High:** `GoalsModule` did not register `Work`, so the `@Optional()` repository was `undefined` in
-        production. Every `workId` was refused and the loop never checked its Work. Now registered, and pinned by
-        `goals.module.work-repository.spec`.
-      - "Open pull request" now uses the workspace's own rule (`openPullRequestOf`) instead of
-        `in_review` + `prState = 'open'`. An unknown state (before the PR sweep first runs) and a draft count as
-        open, and so does a BLOCKED change whose PR is still open.
-      - It counts only this Work's unfinished Tasks, through their own query, so the Goal's 500-Task window can
-        never hide one.
-      - The S10 wait line is logged once, when the wait begins.
-      - A Work read failure waits (`work-unreadable`) rather than dispatching.
-      - `startLoop` refuses a Work that is gone (`422 workUnavailable`).
-      - A teammate reading a shared Goal never sees the owner's Work name.
+        **Independent review (2026-10-31), fixed:**
+        - **High:** `GoalsModule` did not register `Work`, so the `@Optional()` repository was `undefined` in
+          production. Every `workId` was refused and the loop never checked its Work. Now registered, and pinned by
+          `goals.module.work-repository.spec`.
+        - "Open pull request" now uses the workspace's own rule (`openPullRequestOf`) instead of
+          `in_review` + `prState = 'open'`. An unknown state (before the PR sweep first runs) and a draft count as
+          open, and so does a BLOCKED change whose PR is still open.
+        - It counts only this Work's unfinished Tasks, through their own query, so the Goal's 500-Task window can
+          never hide one.
+        - The S10 wait line is logged once, when the wait begins.
+        - A Work read failure waits (`work-unreadable`) rather than dispatching.
+        - `startLoop` refuses a Work that is gone (`422 workUnavailable`).
+        - A teammate reading a shared Goal never sees the owner's Work name.
 
-      Specs:
-      - `goal-orchestrator-rules.awaiting-merge` 9/9 (new);
-      - `goal-orchestrator-rules` 43/43, unchanged;
-      - `goal-orchestrator.service` 91/91 (the T32 cases live there rather than in a separate
-        `work-scope` spec; the new rules are bite-proven);
-      - the run-order integration spec 8/8.
+        Specs:
+        - `goal-orchestrator-rules.awaiting-merge` 9/9 (new);
+        - `goal-orchestrator-rules` 43/43, unchanged;
+        - `goal-orchestrator.service` 91/91 (the T32 cases live there rather than in a separate
+          `work-scope` spec; the new rules are bite-proven);
+        - the run-order integration spec 8/8.
 
 - [ ] **T33 (parallel with T32). Goal form.**
       **Modify** `apps/web/src/components/goals/GoalForm.tsx`, `apps/web/src/components/goals/goal-form-payload.ts`,
@@ -1078,17 +1065,13 @@ _Delivers FR-56…FR-60._
       **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-tool-denied`): every P1 event has an
       emitter.** Built differently from the text above, as recorded in `app-change.telemetry.ts`: the agent package
       keeps no `@ever-works/monitoring` dependency and uses APW-01's one sanitizer (`AppWorksTelemetryService`, rule 3
-      drops any free text) over the API's `@Global()` `APP_WORKS_TELEMETRY_SINK`. The emitters:
-      - `started` / `blocked_by_switch` / `guard_refused`: #3027;
-      - the delivery events: the chain (#3030);
-      - `run_admitted`: #3047;
-      - **`tool_denied` (this branch):** the Fleet planner sends group `mcp` when it withholds an App Work run's
-        platform-MCP bridge (the live path), and `AgentRunService` sends one event per group the policy withholds or
-        refuses (cloud loop). The properties are `{ workId, taskId, group }`, attributed to the App Work through the
-        new `AppWorkRunClassifier.appWorkIdOf`.
+      drops any free text) over the API's `@Global()` `APP_WORKS_TELEMETRY_SINK`. The emitters: - `started` / `blocked_by_switch` / `guard_refused`: #3027; - the delivery events: the chain (#3030); - `run_admitted`: #3047; - **`tool_denied` (this branch):** the Fleet planner sends group `mcp` when it withholds an App Work run's
+      platform-MCP bridge (the live path), and `AgentRunService` sends one event per group the policy withholds or
+      refuses (cloud loop). The properties are `{ workId, taskId, group }`, attributed to the App Work through the
+      new `AppWorkRunClassifier.appWorkIdOf`.
 
-      Specs: planner `app-work-policy` 12/12, `app-work-tool-policy` 25/25, both emitters bite-proven. Still
-      missing: `mission.task_output.*` (comes with P2 T35).
+        Specs: planner `app-work-policy` 12/12, `app-work-tool-policy` 25/25, both emitters bite-proven. Still
+        missing: `mission.task_output.*` (comes with P2 T35).
 
 - [ ] **T44. Docs.**
       **Create** `docs/features/app-works-evolve.md` (behaviour: delivery states, rules, follow-ups, Goals/Missions

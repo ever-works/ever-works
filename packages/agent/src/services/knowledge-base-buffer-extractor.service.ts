@@ -556,11 +556,7 @@ export class KnowledgeBaseBufferExtractorService {
     private escapeTableCell(value: string): string {
         // Backslashes first: a cell ending in `\` would otherwise escape the
         // `\|` added after it and open a new column.
-        return value
-            .replace(/\r?\n/g, ' ')
-            .replace(/\\/g, '\\\\')
-            .replace(/\|/g, '\\|')
-            .trim();
+        return value.replace(/\r?\n/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').trim();
     }
 
     /**
