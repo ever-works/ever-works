@@ -80,6 +80,13 @@ module.exports = {
         '^@ever-works/plugin/(.*)$': '<rootDir>/../../../packages/plugin/src/$1/index.ts',
         '^@ever-works/contracts$': '<rootDir>/../../../packages/contracts/src/index.ts',
         '^@ever-works/contracts/(.*)$': '<rootDir>/../../../packages/contracts/src/$1/index.ts',
+        // The conformance library is a sibling workspace package that
+        // `packages/agent` imports directly (agent-plugins/package-catalog.service.ts).
+        // apps/api does not depend on it, so it is absent from this app's
+        // node_modules and any api spec that reaches an agent module importing
+        // it dies at resolution before a single test runs. Mapped to SOURCE,
+        // exactly as `packages/agent/jest.config.js` already does.
+        '^@ever-works/agent-plugins$': '<rootDir>/../../../packages/agent-plugins/src/index.ts',
         '^@ever-works/agent$': '<rootDir>/../../../packages/agent/src/index.ts',
         '^@ever-works/agent/(.*)$': '<rootDir>/../../../packages/agent/src/$1/index.ts',
         '^@ever-works/monitoring$': '<rootDir>/../../../packages/monitoring/src/index.ts',
