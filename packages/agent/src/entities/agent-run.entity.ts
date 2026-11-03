@@ -541,6 +541,48 @@ export class AgentRun {
     @Column({ type: 'simple-json', nullable: true })
     delegationScope?: SubAgentScope | null;
 
+    /**
+     * APW-08 T48 (FR-70, ACC-08-34) — the containment a FLEET run of an App Work Task actually got,
+     * written by the fleet reconciler beside the run's receipt (the usage row it books first):
+     * the node's execution path, whether the per-run isolated home applied, every downgrade the
+     * node declared, the node that ran it and when. Normalized on the way in
+     * (`normalizeFleetAgentTaskContainment`, every coercion toward LESS containment) and read back
+     * through `readAgentRunContainmentRecord`, never trusted raw.
+     *
+     * Written for App Work runs only: every other run keeps NULL, exactly as before T48. The
+     * Task's Cost view shows it (`TaskCostView.containment`); `tasks` gains nothing — the record
+     * rides the run. Migration: `1792340000000-AddAppRunContainment`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    containment?: {
+        executionPath: 'hardened' | 'ordinary';
+        isolatedHome: boolean;
+        downgrades: Array<{ control: string; reason: string }>;
+        needsOwnerAllowance: boolean;
+        nodeId: string | null;
+        reportedAt: string;
+    } | null;
+
+    /**
+     * APW-08 T35 (FR-53, APW08-G15) — this run's own spend cap in cents, or NULL (no cap beyond
+     * the Agent's own settings — every run before APW-08 P2). Set at dispatch (a Mission-filed
+     * Task's run carries the Mission's `maxBudgetCentsPerRun`) and kept on the row, so a parked,
+     * drained or resumed run keeps it. On the Fleet path it becomes `execution.maxBudgetUsd`,
+     * rounded DOWN, never above the Agent's own cap and never above the node's maximum
+     * (`FLEET_AGENT_EXECUTION_MAX_BUDGET_USD`). Migration 1792370000000-AddAgentRunBudgetCap.
+     *
+     * Resolved for EVERY run of a Mission's Task (review of #3061): `dispatchAgentRun` and the
+     * Task chat's mention runs read the Mission's cap themselves, and a resume carries it over.
+     *
+     * Follow-up (review of #3061): the in-process (non-Fleet) executor does NOT enforce this cap
+     * yet. Its only spend control is the per-Agent period budget checked before the run starts
+     * (`AgentRunService.checkBudget`); the tool loop has no per-run spend hook to stop a run
+     * mid-way, so honouring the cap there needs one (tracked as an APW-08 follow-up, not built
+     * here).
+     */
+    @Column({ type: 'int', nullable: true })
+    budgetCapCents?: number | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

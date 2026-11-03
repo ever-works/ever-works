@@ -1639,7 +1639,8 @@
                 "openIdea": "이 아이디어 열기",
                 "openAgent": "이 에이전트 열기",
                 "extraRepos": "Also in",
-                "extraReposUpdateError": "Failed to update the extra repositories"
+                "extraReposUpdateError": "Failed to update the extra repositories",
+                "systemAuthor": "Ever Works"
             },
             "recurring": {
                 "section": "반복 일정",
@@ -1763,7 +1764,9 @@
                     "green": "Passed",
                     "red": "Failed",
                     "timeout": "Timeout",
-                    "error": "Error"
+                    "error": "Error",
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -1850,6 +1853,141 @@
                     "openPerUpstream": "You already have {count, plural, one {# open pull request} other {# open pull requests}} on {upstream}.",
                     "window": "You've reached this limit for now (limit: {count} per 24 hours). Next one available at {time}."
                 }
+            },
+            "delivery": {
+                "sectionTitle": "Delivery",
+                "loading": "Loading delivery…",
+                "unavailable": "Delivery could not be read.",
+                "merged": "Pull request #{number} merged into {branch}",
+                "mergedNoBranch": "Pull request #{number} merged",
+                "build": "Build #{number} of {shortSha}",
+                "buildUnnumbered": "Build of {shortSha}",
+                "buildLogs": "Build logs",
+                "deployment": "Deployment #{number}",
+                "deploymentUnnumbered": "Deployment",
+                "openBuilds": "Builds",
+                "openDeployments": "Deployments",
+                "liveAt": "Live at {url}",
+                "chipMerged": "Merged ✓ · Waiting for a build",
+                "chipBuilding": "Build ⟳",
+                "chipBuildFailed": "Build failed ✗",
+                "chipBuilt": "Built ✓ · Waiting for a deployment",
+                "chipDeploying": "Deploying ⟳",
+                "chipDeployFailed": "Deploy failed ✗ ({outcome})",
+                "chipDeployFailedPlain": "Deploy failed ✗",
+                "chipLive": "Live ✓",
+                "chipLiveWarnings": "Live ✓ (with warnings)",
+                "chipCarried": "Live ✓ (with a later change)",
+                "chipClosed": "Closed without deploying",
+                "outcome": {
+                    "failed": "failed",
+                    "rolledBack": "rolled back",
+                    "rollbackFailed": "rollback failed",
+                    "liveWithWarnings": "live with warnings"
+                },
+                "warnings": "The deployment reported warnings. Check the live app.",
+                "notDeployedBranch": "Merged into {branch} — not deployed by this app",
+                "deployNow": "Deploy now",
+                "closeWithoutDeploying": "Close without deploying",
+                "closeAnyway": "Close anyway",
+                "closeConfirm": "Close this Task even though its change isn't live? The failure stays on record.",
+                "keepOpen": "Keep open",
+                "closing": "Closing…",
+                "createFixTask": "Create a fix Task",
+                "followUp": "Follow-up: {slug} {title} ({status})",
+                "followUpRow": "Follow-up: {slug} ({status})",
+                "followUpCancelled": "No longer needed — a later deployment containing this change is live.",
+                "tryOnceMore": "Try once more",
+                "tryOnceMoreHint": "The automatic follow-ups for this change are used up. Open one more follow-up Task?",
+                "followUpOpened": "A follow-up Task was opened.",
+                "pollingStopped": "Stopped checking for updates. Reload the page to check again.",
+                "ariaBuildSucceeded": "Build succeeded",
+                "ariaDeployFailed": "Deployment failed, {outcome}",
+                "filterLabel": "Delivery",
+                "filterAny": "Any",
+                "filterWaiting": "Waiting to merge",
+                "filterBuilding": "Building",
+                "filterDeploying": "Deploying",
+                "filterLive": "Live",
+                "filterFailed": "Failed",
+                "filterClosed": "Closed without deploying",
+                "filterApply": "Apply",
+                "errors": {
+                    "notClosable": "This change can't be closed in its current state.",
+                    "followUpLimit": "No more follow-ups can be opened for this change.",
+                    "generic": "That didn't work. Try again.",
+                    "fixTaskUnavailable": "A fix Task can't be created for this change right now."
+                },
+                "deployNowHint": "Auto-deploy is off for this app, so this build waits for you to deploy it.",
+                "createFixTaskConfirm": "Create a Task to fix this failure? When this change has an Agent, Ever Works tries to start it on the fix right away (a paused agent or a spend limit can hold it); its run is billed to your workspace.",
+                "cancel": "Cancel",
+                "creatingFixTask": "Creating…",
+                "fixTaskCreated": "Fix Task {slug} was created.",
+                "fixTaskCreatedUnnamed": "A fix Task was created.",
+                "fixTaskExists": "A fix Task for this failure already exists: {slug}.",
+                "openFixTask": "Open the fix Task"
+            },
+            "cost": {
+                "sectionTitle": "Cost",
+                "loading": "Loading cost…",
+                "unavailable": "Cost could not be read.",
+                "runs": "Runs {count} · {amount}",
+                "builds": "Builds {count} · {minutes} runner minutes ({payer})",
+                "paidByGithub": "Paid by your GitHub account",
+                "paidByEverWorks": "Billed to your workspace",
+                "unknown": "unknown",
+                "total": "Total {amount}",
+                "noRuns": "No runs yet.",
+                "runLabel": "Run {id}",
+                "receipt": "Receipt",
+                "runsTruncated": "Showing the newest {count} runs.",
+                "containment": {
+                    "title": "Containment",
+                    "lastRun": "Latest Fleet run on {node}",
+                    "nextRun": "Won't receive this Task's runs until you allow it: {node}",
+                    "nodesUnreadable": "Your machines could not be read, so this Task's next Fleet run is held. Try again in a moment.",
+                    "unknownMachine": "an unknown machine",
+                    "pathHardened": "Hardened executor",
+                    "pathOrdinary": "Ordinary command runner",
+                    "isolatedHomeApplied": "Isolated home applied to the model step",
+                    "isolatedHomeNotApplied": "Isolated home not applied to the model step",
+                    "notReported": "This machine hasn't reported its containment yet.",
+                    "downgrades": "Downgrades the machine declared",
+                    "noDowngrades": "No downgrades declared.",
+                    "allowed": "You allowed this machine's downgrade for this app.",
+                    "acceptedDowngrade": "Accepted: {reason}",
+                    "withdraw": "Withdraw",
+                    "saving": "Saving…",
+                    "saveFailed": "Couldn't save the allowance. Try again.",
+                    "realHome": "Setup steps and app checks on your machines run with the machine's real home and toolchain; the checks you admit are what control them."
+                }
+            },
+            "appRules": {
+                "containmentDowngrade": "This machine runs app changes without an isolated home. Allow it once, or run this Task in an isolated sandbox.",
+                "allowOnThisMachine": "Allow on this machine"
+            },
+            "deliveryPosts": {
+                "runStarted": "Run started.",
+                "prOpened": "Opened pull request #{number}.",
+                "checksPassed": "Checks passed.",
+                "checksFailed": "Checks failed: {names}.",
+                "checksFailedUnnamed": "Checks failed.",
+                "merged": "Merged into {branch}.",
+                "mergedNoBranch": "Merged.",
+                "buildStarted": "Build #{number} started.",
+                "buildStartedUnnumbered": "Build started.",
+                "buildSucceeded": "Build #{number} succeeded.",
+                "buildSucceededUnnumbered": "Build succeeded.",
+                "buildFailed": "Build #{number} failed: {reason}.",
+                "buildFailedUnnumbered": "Build failed: {reason}.",
+                "buildFailedNoReason": "Build #{number} failed.",
+                "buildFailedUnnumberedNoReason": "Build failed.",
+                "deploying": "Deploying.",
+                "live": "Live at {url}.",
+                "liveNoUrl": "Live.",
+                "deployFailed": "Deployment failed: {outcome}.",
+                "followUpOpened": "Opened follow-up {taskSlug}.",
+                "closedWithoutDeploy": "Closed without deploying."
             }
         },
         "skillsPage": {
@@ -2192,7 +2330,10 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "미션의 App Works에 작업을 등록했습니다.",
+                    "no-tasks": "미션의 App Works에 등록할 새 항목이 없습니다.",
+                    "spawned-and-tasks-filed": "새 아이디어를 생성하고 미션의 App Works에 작업을 등록했습니다."
                 }
             },
             "goals": {
@@ -2224,6 +2365,26 @@
                     "detached": "목표가 분리되었습니다",
                     "detachError": "목표를 분리할 수 없습니다"
                 }
+            },
+            "output": {
+                "title": "출력",
+                "ideas": "아이디어",
+                "tasks": "첨부된 App Works의 작업",
+                "both": "둘 다",
+                "tasksPerTick": "실행당 작업 수",
+                "openCap": "Work당 열린 작업 한도",
+                "appliesTo": "“개선” 또는 “운영”으로 첨부된 Works에 적용됩니다.",
+                "noAppWork": "작업을 등록하려면 App Work를 “개선” 또는 “운영”으로 첨부하세요.",
+                "tasksOnWorks": "첨부된 Works의 작업",
+                "nothingToFile": "작업을 등록할 App Work가 첨부되어 있지 않습니다.",
+                "tasksOnWorksEmpty": "아직 등록된 작업이 없습니다.",
+                "save": "저장",
+                "saved": "출력이 저장되었습니다",
+                "saveError": "출력을 저장하지 못했습니다",
+                "loading": "불러오는 중…",
+                "unavailable": "작업을 불러오지 못했습니다.",
+                "previous": "이전",
+                "next": "다음"
             }
         },
         "ideasPage": {
@@ -2521,7 +2682,8 @@
                     "identityUnlinked": "ID 연결 해제됨",
                     "logout": "로그아웃",
                     "delegatedAccess": "위임된 액세스",
-                    "identityProviderConfigChanged": "ID 공급자 설정됨"
+                    "identityProviderConfigChanged": "ID 공급자 설정됨",
+                    "appChange": "App change"
                 },
                 "statuses": {
                     "allStatuses": "모든 상태",
@@ -2589,6 +2751,11 @@
             "viewToggle": {
                 "log": "로그",
                 "schedules": "일정"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b>이(가) 오늘 미션의 App Works에 등록할 새 항목을 찾지 못했습니다"
             }
         },
         "works": {
@@ -3150,7 +3317,22 @@
                     "upgrade": "Upgrade",
                     "upgradeHint": "Paid plans are activated through billing once payments launch.",
                     "changeSuccess": "Plan updated to {name}",
-                    "changeError": "Failed to change plan"
+                    "changeError": "Failed to change plan",
+                    "perYear": "/yr",
+                    "cycle": {
+                        "label": "Billing cycle",
+                        "monthly": "Monthly",
+                        "annual": "Annual"
+                    },
+                    "billedYearly": "Billed {amount} yearly",
+                    "monthlyOnly": "Billed monthly (no annual option for this plan)",
+                    "checkoutSeats": {
+                        "label": "Members (Employees and Agents)",
+                        "extra": "{count} extra Members at {price}{period} each",
+                        "total": "Total {amount}{period}"
+                    },
+                    "manageSubscription": "Manage subscription",
+                    "subscribedNote": "You already have a subscription, so a second checkout is not offered. Change or cancel it from the billing portal."
                 },
                 "credits": {
                     "title": "Credits",
@@ -4125,6 +4307,7 @@
                         "title": "각 값의 출처",
                         "admin": "플러그인 설정",
                         "env": "환경",
+                        "platform": "Ever Platform",
                         "default": "기본값",
                         "unset": "설정되지 않음"
                     },
@@ -4408,6 +4591,13 @@
             "createButton": "워크 생성"
         },
         "workDetail": {
+            "appCost": {
+                "unknown": "Unknown",
+                "tasksTitle": "This month's costliest changes",
+                "tasksHint": "What each change cost, with its runs and receipts, is on its Task's Cost section.",
+                "untitledTask": "Untitled Task",
+                "openTaskCost": "Open the Cost section of {title}"
+            },
             "missions": {
                 "title": "Missions",
                 "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
@@ -4622,8 +4812,8 @@
                     "plans": {
                         "free": "무료",
                         "pro": "Pro",
-                        "standard": "스탠다드",
-                        "premium": "프리미엄",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "측정 없음"
                     },
                     "usageRequired": "이 주기를 사용하려면 사용량 기반으로 전환하세요.",
@@ -6201,7 +6391,22 @@
                     "maxAttemptsDescription": "How many times a run may retry after a red gate before it gives up and asks for help (1–5).",
                     "defaultsLabel": "Default checks",
                     "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
-                    "defaultsSave": "Save default checks"
+                    "defaultsSave": "Save default checks",
+                    "appChecks": {
+                        "title": "App checks on your machines",
+                        "subtitle": "The checks this app's App spec declares. A Fleet node runs a check only once you admit its exact command for your machines; until then it is reported Not admitted and the gate is never green because of it.",
+                        "loading": "Loading the App spec checks…",
+                        "loadFailed": "The App spec checks could not be loaded. Try again later.",
+                        "empty": "This App spec declares no checks.",
+                        "required": "required",
+                        "advisory": "advisory",
+                        "admitted": "Admitted",
+                        "notAdmitted": "Not admitted",
+                        "admit": "Admit for my machines",
+                        "admitSaved": "Command admitted for your machines",
+                        "admitFailed": "The command could not be admitted",
+                        "allowListFull": "This Work already admits {max} commands, the most allowed."
+                    }
                 },
                 "externalRefs": {
                     "title": "Ingest routing claims",
@@ -7011,6 +7216,7 @@
                     "other": "리포지토리를 설정하는 중에 문제가 발생했습니다."
                 },
                 "overview": {
+                    "changesPaused": "운영자가 앱 변경을 일시 중지했습니다.",
                     "title": "App",
                     "repository": "Work 리포지토리",
                     "upstream": "업스트림",
@@ -7974,6 +8180,14 @@
                     "targetNone": "이 앱은 아직 배포 위치가 설정되지 않았습니다. 종속성을 프로비저닝하려면 배포 대상을 선택하세요.",
                     "targetNotChecked": "클러스터가 아직 검사를 통과하지 않았습니다. 연결을 확인한 다음 다시 시도해 주세요."
                 }
+            },
+            "requestChange": {
+                "title": "Start a change on {work}?",
+                "titleUnnamed": "Start this change?",
+                "body": "{agent} will work on it. An agent run will start; runs are billed to your workspace.",
+                "bodyNoAgent": "An agent will work on it. An agent run will start; runs are billed to your workspace.",
+                "start": "Start",
+                "cancel": "Cancel"
             }
         },
         "newPage": {
@@ -8888,6 +9102,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Work 없음",
+                "hint": "선택 사항. 루프는 각 반복을 이 Work에 등록합니다. App Work에서는 반복마다 자체 브랜치와 풀 리퀘스트가 생성됩니다."
             }
         },
         "goalDetail": {
@@ -9130,6 +9349,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Work 없음",
+                "unnamed": "더 이상 열 수 없는 Work",
+                "changeLabel": "Work 변경",
+                "hint": "루프는 각 반복을 이 Work에 등록합니다.",
+                "lockedWhileRunning": "Work를 변경하려면 루프를 일시 중지하세요.",
+                "saved": "Work가 저장되었습니다",
+                "saveError": "Work를 변경하지 못했습니다"
             }
         },
         "sidebar": {
@@ -9292,6 +9521,25 @@
                 "loadError": "모델을 불러오지 못했습니다",
                 "noModels": "사용 가능한 모델 없음",
                 "context": "컨텍스트 {value}"
+            },
+            "changeCard": {
+                "starting": "Starting…",
+                "cancelled": "Cancelled",
+                "started": "Started {slug} on {work}.",
+                "startedUnnamed": "Started {slug}.",
+                "awaitingOwner": "Filed for the App Work's owner, who decides when it starts.",
+                "refused": "The change could not be started.",
+                "openTask": "Open the Task",
+                "stepRun": "Run",
+                "stepPullRequest": "Pull request",
+                "stepBuild": "Build",
+                "stepDeployment": "Deployment",
+                "stepLive": "Live",
+                "stateDone": "{step}: done",
+                "stateActive": "{step}: in progress",
+                "stateFailed": "{step}: failed",
+                "statePending": "{step}: not started",
+                "pollingStopped": "Stopped checking for updates. Open the Task to see where it stands."
             }
         },
         "plugins": {

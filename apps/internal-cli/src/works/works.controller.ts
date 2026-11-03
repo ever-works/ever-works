@@ -9,6 +9,7 @@ import {
     Post,
     Query,
 } from '@nestjs/common';
+import { ActivityLogService, workDeletedActivity } from '@ever-works/agent/activity-log';
 import { UserRepository } from '@ever-works/agent/database';
 import { CreateWorkDto } from '@ever-works/agent/dto';
 import {
@@ -48,6 +49,7 @@ export class WorksController {
         private readonly workGenerationService: WorkGenerationService,
         private readonly ownershipService: WorkOwnershipService,
         private readonly userRepository: UserRepository,
+        private readonly activityLogService: ActivityLogService,
     ) {}
 
     @Get('works')
@@ -159,7 +161,13 @@ export class WorksController {
     ): Promise<DeleteWorkResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
 
-        return this.workLifecycleService.deleteWork(id, deleteWorkDto, user);
+        const result = await this.workLifecycleService.deleteWork(id, deleteWorkDto, user);
+        // C-13 — the same Activity record the API writes for a deletion (ACC-NEG-07); this
+        // route used to write none. Best effort, as there: a failed write never fails the delete.
+        await this.activityLogService
+            .log(workDeletedActivity(user.id, id, result))
+            .catch(() => undefined);
+        return result;
     }
 
     @Post('deploy/works/:id')

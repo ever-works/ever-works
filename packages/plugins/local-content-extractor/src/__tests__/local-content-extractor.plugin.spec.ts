@@ -298,3 +298,37 @@ describe('SSRF: every connection resolves through the guarded, pinned lookup (re
 		spy.mockRestore();
 	});
 });
+
+describe('LocalContentExtractorPlugin link extraction', () => {
+	it('keeps web, mail and phone links and drops script-bearing schemes in any spelling', async () => {
+		const { parseHTML } = await import('linkedom');
+		const { document } = parseHTML(
+			buildHtml(
+				[
+					'<a href="/docs">docs</a>',
+					'<a href="https://other.test/x">other</a>',
+					'<a href="mailto:a@b.test">mail</a>',
+					'<a href="tel:+100">call</a>',
+					'<a href="#top">top</a>',
+					'<a href="javascript:alert(1)">a</a>',
+					'<a href="JavaScript:alert(1)">b</a>',
+					'<a href=" javascript:alert(1)">c</a>',
+					'<a href="data:text/html,x">d</a>',
+					'<a href="vbscript:msgbox(1)">e</a>'
+				].join('')
+			)
+		);
+		const links = (
+			new LocalContentExtractorPlugin() as unknown as {
+				extractLinks(doc: unknown, base: string): Array<{ href: string; isExternal: boolean }>;
+			}
+		).extractLinks(document, 'https://site.test/page');
+		expect(links.map((link) => link.href)).toEqual([
+			'https://site.test/docs',
+			'https://other.test/x',
+			'mailto:a@b.test',
+			'tel:+100'
+		]);
+		expect(links.map((link) => link.isExternal)).toEqual([false, true, true, true]);
+	});
+});

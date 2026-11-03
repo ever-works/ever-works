@@ -3,50 +3,15 @@
 import { useSyncExternalStore } from 'react';
 import { PluginsApiIcon } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
+import { sanitizeInlineSvg } from '@/lib/utils/inline-svg';
 import { Plug } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 // Security: an `icon.type === 'svg'` plugin icon is injected verbatim into the
 // DOM via `dangerouslySetInnerHTML`, so it executes in the host document's
-// origin. Plugin icon values originate from plugin manifests, which under
-// dynamic plugin distribution (EW-693: runtime npm / GitHub Packages installs)
-// can be supplied by a third-party or compromised plugin. Run a conservative,
-// regex-based deny-list pass here before rendering — the same defense-in-depth
-// approach already used for inline category SVGs in
-// `apps/web/src/components/works/detail/items/CategoriesTab.tsx`
-// (`sanitizeSvgClient`) and the server-side `svg-sanitizer.ts` in
-// `@ever-works/agent`. Inline icon SVGs never legitimately carry any of these
-// elements/attributes, so stripping them wholesale is safe for every real
-// icon. Swap this client copy for `isomorphic-dompurify` if it is ever added
-// as a web dependency.
-const SVG_DANGEROUS_TAG_RE =
-    /<\/?\s*(?:script|iframe|object|embed|foreignObject|use|a|style|image|set|handler|listener|animate|animateTransform|animateMotion|feImage)\b[^>]*>/gi;
-// Security: strip whole `<style>…</style>` blocks so CSS-based payloads such as
-// `*{background:url('javascript:…')}` or `@import` cannot survive.
-const SVG_STYLE_BLOCK_RE = /<\s*style\b[^>]*>[\s\S]*?<\s*\/\s*style\s*>/gi;
-// Security: strip event handlers / href, including the `/`-delimited form
-// (`<svg/onload=…>`). Real icons carry no on* handlers or href attributes.
-const SVG_DANGEROUS_ATTR_RE =
-    /[\s/](?:on[a-z]+|xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
-// Security: fail closed if a dangerous URL scheme survives anywhere in the body.
-const SVG_DANGEROUS_URL_RE = /\b(?:javascript|vbscript|data|file)\s*:/i;
-
-function sanitizeSvgIcon(svg: string | undefined | null): string {
-    if (typeof svg !== 'string') return '';
-    const cleaned = svg
-        .replace(/<\?xml[^>]*\?>/gi, '')
-        .replace(/<!DOCTYPE[^>]*>/gi, '')
-        // Security: drop comments / CDATA so payloads cannot hide inside them.
-        .replace(/<!--[\s\S]*?-->/g, '')
-        .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
-        .replace(SVG_STYLE_BLOCK_RE, '')
-        .replace(SVG_DANGEROUS_TAG_RE, '')
-        .replace(SVG_DANGEROUS_ATTR_RE, '');
-    // Security: fail closed — render nothing rather than risk execution if a
-    // dangerous URL scheme still survived the tag/attribute scrub.
-    if (SVG_DANGEROUS_URL_RE.test(cleaned)) return '';
-    return cleaned;
-}
+// origin, and plugin manifests can come from a third-party or compromised
+// plugin (EW-693 dynamic distribution). It goes through the shared
+// `sanitizeInlineSvg` (`@/lib/utils/inline-svg`) first.
 
 /**
  * Observes the `dark` class on `<html>` so the component re-renders
@@ -119,7 +84,7 @@ export function PluginIcon({ icon, name, size = 32, className, plain = false }: 
                         style={{ ...containerStyle, color: icon.color || undefined }}
                         className={cn('[&>svg]:w-full [&>svg]:h-full', className)}
                         // Security: sanitize untrusted plugin SVG before inline DOM injection.
-                        dangerouslySetInnerHTML={{ __html: sanitizeSvgIcon(iconValue) }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeInlineSvg(iconValue) }}
                     />
                 );
             return (
@@ -131,7 +96,7 @@ export function PluginIcon({ icon, name, size = 32, className, plain = false }: 
                         color: icon.color || (icon.backgroundColor ? '#ffffff' : undefined),
                     }}
                     // Security: sanitize untrusted plugin SVG before inline DOM injection.
-                    dangerouslySetInnerHTML={{ __html: sanitizeSvgIcon(iconValue) }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeInlineSvg(iconValue) }}
                 />
             );
 

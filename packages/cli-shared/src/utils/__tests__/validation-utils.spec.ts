@@ -34,6 +34,22 @@ describe('validateEmail', () => {
 		expect(validateEmail('alice@example').isValid).toBe(false);
 		expect(validateEmail('@example.com').isValid).toBe(false);
 	});
+
+	it('accepts subdomains and dotted local parts, refuses empty domain labels', () => {
+		expect(validateEmail('first.last@mail.example.co.uk').isValid).toBe(true);
+		expect(validateEmail('alice@example..com').isValid).toBe(false);
+		expect(validateEmail('alice@example.com.').isValid).toBe(false);
+		expect(validateEmail('alice@.example.com').isValid).toBe(false);
+	});
+
+	it('stays linear on a long run of dots (CodeQL js/polynomial-redos)', () => {
+		const started = Date.now();
+		// Correctness, not speed: the old pattern ACCEPTED an all-dots domain.
+		expect(validateEmail(`a@${'.'.repeat(50_000)}`).isValid).toBe(false);
+		// Speed: the old pattern took seconds here.
+		expect(validateEmail(`a@${'a.'.repeat(25_000)}@`).isValid).toBe(false);
+		expect(Date.now() - started).toBeLessThan(1_000);
+	});
 });
 
 describe('validateGitUsername', () => {

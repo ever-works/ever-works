@@ -35,6 +35,19 @@ interface UrlboxSettings {
 	readonly hideCookieBanners?: boolean;
 }
 
+/**
+ * `true` when `url` parses and its host is exactly `host`. A substring test
+ * (`url.includes(host)`) also accepts `https://evil.test/?api.example.com`
+ * (CodeQL js/incomplete-url-substring-sanitization).
+ */
+function urlHostIs(url: unknown, ...hosts: string[]): boolean {
+	try {
+		return hosts.includes(new URL(String(url)).hostname);
+	} catch {
+		return false;
+	}
+}
+
 export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 	readonly id = 'urlbox';
 	readonly name = 'Urlbox';
@@ -220,7 +233,7 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 			const client = this.createClient(resolvedSettings);
 			const url = client.generateRenderLink({ url: 'https://example.com' });
 
-			if (url && url.includes('api.urlbox.com')) {
+			if (urlHostIs(url, 'api.urlbox.io', 'api.urlbox.com')) {
 				return { success: true, message: 'Urlbox connection verified.' };
 			}
 
@@ -255,7 +268,7 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 			const client = this.createClient(resolvedSettings);
 			const url = client.generateRenderLink({ url: 'https://example.com' });
 
-			if (url && url.includes('api.urlbox.com')) {
+			if (urlHostIs(url, 'api.urlbox.io', 'api.urlbox.com')) {
 				return {
 					valid: true,
 					message: 'Credentials are valid'

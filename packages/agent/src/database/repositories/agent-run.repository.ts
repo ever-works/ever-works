@@ -719,6 +719,8 @@ export class AgentRunRepository {
          * column NULL exactly as before.
          */
         fleetSessionId?: string | null;
+        /** APW-08 T35 (APW08-G15) — the run's own spend cap in cents; omitted = none. */
+        budgetCapCents?: number | null;
     }): Promise<AgentRun> {
         const run = this.repository.create({
             agentId: args.agentId,
@@ -736,6 +738,9 @@ export class AgentRunRepository {
                 ? { conversationMessageId: args.conversationMessageId }
                 : {}),
             ...(args.fleetSessionId ? { fleetSessionId: args.fleetSessionId } : {}),
+            ...(typeof args.budgetCapCents === 'number'
+                ? { budgetCapCents: args.budgetCapCents }
+                : {}),
             // Only stamp when explicitly provided — the ambient scope
             // subscriber (EW-657) remains the default writer.
             ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),
@@ -1106,6 +1111,18 @@ export class AgentRunRepository {
         workspaceMeta: NonNullable<AgentRun['workspaceMeta']>,
     ): Promise<void> {
         await this.repository.update(runId, { workspaceMeta });
+    }
+
+    /**
+     * APW-08 T48 — record the containment a Fleet run of an App Work Task got
+     * (`agent_runs.containment`). Written by the fleet reconciler's recorder, already
+     * normalized; a replayed completion writes the same record again (idempotent).
+     */
+    async recordContainment(
+        runId: string,
+        containment: NonNullable<AgentRun['containment']>,
+    ): Promise<void> {
+        await this.repository.update(runId, { containment });
     }
 
     /**

@@ -47,3 +47,20 @@ export function safeHttpsUrl(raw: string | null | undefined): string | null {
 export function safeWebUrl(raw: string | null | undefined): string | null {
     return guard(raw, ['https:', 'http:']);
 }
+
+/**
+ * A download link for a file the app stores. Upload rows carry a same-origin
+ * serve path (`/api/uploads/serve/…`) or, on an object-storage backend, an
+ * `https:`/`http:` URL; a local preview may be a `blob:` URL. A path must stay
+ * on this origin: `//host` and `/\host` (also with the tabs and newlines the
+ * browser drops before it resolves the value) are another host, not a path.
+ */
+export function safeDownloadHref(raw: string | null | undefined): string | null {
+    if (typeof raw !== 'string') return null;
+    const value = raw.trim();
+    if (value.startsWith('/')) {
+        const resolved = value.replace(/[\t\n\r]/g, '');
+        return resolved.startsWith('//') || resolved.startsWith('/\\') ? null : value;
+    }
+    return guard(value, ['https:', 'http:', 'blob:']);
+}

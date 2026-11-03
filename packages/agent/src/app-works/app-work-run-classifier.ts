@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { isAppWorkKind } from '@ever-works/contracts';
 
 import { appWorkTaskToolPolicyApplies } from './app-work-task-tool-policy';
 
@@ -28,6 +29,12 @@ export interface AppWorkRunSubject {
 
 export interface AppWorkRunClassifier {
     appliesTo(subject: AppWorkRunSubject): Promise<boolean>;
+    /**
+     * APW-08 T43 — the App Work the run works on (the Task's when that is one, else the Agent's
+     * own), for telemetry; `null` when neither is one or a read fails. Never throws. Optional,
+     * so a classifier double without it simply reports nothing.
+     */
+    appWorkIdOf?(subject: AppWorkRunSubject): Promise<string | null>;
 }
 
 /** The two reads the classifier needs — structural, so a spec passes plain doubles. */
@@ -70,6 +77,27 @@ export class AppWorkRunClassifierService implements AppWorkRunClassifier {
             });
         } catch (err) {
             return this.failClosed(err instanceof Error ? err.message : String(err));
+        }
+    }
+
+    async appWorkIdOf(subject: AppWorkRunSubject): Promise<string | null> {
+        try {
+            const taskId = subject.taskId?.trim();
+            if (taskId) {
+                const task = await this.reads.tasks.findById(taskId);
+                if (task?.workId) {
+                    const work = await this.reads.works.findById(task.workId);
+                    if (work && isAppWorkKind(work.kind)) return task.workId;
+                }
+            }
+            const agentWorkId = subject.agentWorkId?.trim();
+            if (agentWorkId) {
+                const work = await this.reads.works.findById(agentWorkId);
+                if (work && isAppWorkKind(work.kind)) return agentWorkId;
+            }
+            return null;
+        } catch {
+            return null;
         }
     }
 

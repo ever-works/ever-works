@@ -35,9 +35,15 @@
  * job — which is also FR-90's requirement that the evaluation, its writes and its
  * in-process events happen in the API process.
  *
- * `APP_SPEC_TELEMETRY_SINK` (plan §9.1:802-804) and the licence evaluation
- * (`APP_LICENSE_EVALUATE_DISPATCHER`, §2.3:185-186) are other tasks' — see
- * `app-spec.service.ts`'s docstring for the exact reason each is absent.
+ * The licence evaluation (`APP_LICENSE_EVALUATE_DISPATCHER`, §2.3:185-186) is
+ * another task's — see `app-spec.service.ts`'s docstring for the exact reason.
+ *
+ * `AppSpecTelemetry` (T49, plan §9.1) IS provided here, over
+ * `APP_SPEC_TELEMETRY_SINK`, which this module does not bind either: the API binds
+ * it with a `@Global()` alias to its PostHog client
+ * (`apps/api/src/telemetry/app-works-telemetry-binding.module.ts`), so the token is
+ * visible here without an import, and unbound (the worker, a spec) every event is
+ * counted and dropped.
  */
 
 import { Module } from '@nestjs/common';
@@ -49,6 +55,7 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { FacadesModule } from '../facades/facades.module';
 import { AppSpecService } from './app-spec.service';
+import { AppSpecTelemetry } from './app-spec-telemetry.port';
 
 @Module({
     imports: [
@@ -57,7 +64,12 @@ import { AppSpecService } from './app-spec.service';
         FacadesModule,
         ActivityLogModule,
     ],
-    providers: [WorkAppSpecStateRepository, DistributedTaskLockService, AppSpecService],
-    exports: [AppSpecService, WorkAppSpecStateRepository],
+    providers: [
+        WorkAppSpecStateRepository,
+        DistributedTaskLockService,
+        AppSpecTelemetry,
+        AppSpecService,
+    ],
+    exports: [AppSpecService, WorkAppSpecStateRepository, AppSpecTelemetry],
 })
 export class AppSpecModule {}

@@ -6,6 +6,7 @@ export * from './plugin-version-checker.service';
 export * from './plugin-class-validator.service';
 export * from './plugin-lifecycle-manager.service';
 export * from './plugin-secret-enc.service';
+export * from './plugin-platform-settings.service';
 export * from './plugin-settings.service';
 export * from './plugin-context-factory.service';
 export * from './custom-capability-registry.service';

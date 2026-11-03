@@ -66,7 +66,7 @@ export function normalizeReferenceUrl(raw: string): string {
 		if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
 			return '';
 		}
-		const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+		const pathname = parsed.pathname.replace(/(?<!\/)\/+$/, '') || '/';
 		const searchParams = [...parsed.searchParams.entries()]
 			.filter(([key]) => {
 				const normalizedKey = key.toLowerCase();
@@ -85,7 +85,7 @@ export function normalizeReferenceUrl(raw: string): string {
 
 		return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${pathname}${search ? `?${search}` : ''}`;
 	} catch {
-		return trimmed.toLowerCase().replace(/\/+$/, '');
+		return trimmed.toLowerCase().replace(/(?<!\/)\/+$/, '');
 	}
 }
 

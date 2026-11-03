@@ -22,6 +22,20 @@ import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
+import { WorkBuild } from '../entities/work-build.entity';
+import { WorkDeployment } from '../entities/work-deployment.entity';
+import { WorkAppRuntimeState } from '../entities/work-app-runtime-state.entity';
+import { AgentEscalation } from '../entities/agent-escalation.entity';
+import { TaskDeliveryService } from '../app-works/task-delivery.service';
+import { DeliveryFollowUpService } from '../app-works/delivery-follow-up.service';
+import { TASK_DELIVERY_TRACKER } from './task-delivery.port';
+import { TASK_THREAD_POSTER } from './task-thread-poster.port';
+import { TASK_LIFECYCLE_POSTER } from './task-lifecycle-poster.port';
+import { TaskLifecyclePostsService } from './task-lifecycle-posts.service';
+import { TASK_APP_CHECKS } from './task-app-checks.port';
+import { TaskAppChecksService } from '../app-works/task-app-checks.service';
+import { APP_WORK_RUN_STOP_HANDLER } from './task-run-stop.port';
+import { AppWorkRunHoldsService } from '../app-works/app-work-run-holds.service';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
@@ -73,8 +87,15 @@ import { DatabaseModule } from '../database/database.module';
 // T10 specifies: the apps services sit in this module to avoid a module cycle
 // with `TaskTransitionService`.
 import { AppWorkRulesService } from '../app-works/app-work-rules.service';
+// APW-08 T11 / T50 — the App Work Task columns kept in step with the App spec: the shared
+// resolver + ownership-scoped write, the `app.spec.applied` listener, and the one-off backfill.
+import { AppWorkIsolationService } from '../app-works/app-work-isolation.service';
+import { AppWorkSpecAppliedListener } from '../app-works/app-spec-applied.listener';
+import { AppWorkIsolationBackfillRunner } from '../app-works/app-work-isolation-backfill.runner';
 import { AppChangeGuard } from '../app-works/app-change-guard';
 import { AppWorkChangeGateService } from '../app-works/app-work-change-gate.service';
+import { AppChangeTelemetry } from '../app-works/app-change.telemetry';
+import { AppProvisioningTelemetry } from '../app-works/app-provisioning.telemetry';
 import { AppSpecModule } from '../app-spec/app-spec.module';
 import { APP_WORK_CHANGE_GATE } from './app-work-change-gate.port';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
@@ -139,6 +160,12 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
             // needs no forFeature here: the relation loads through the
             // DataSource metadata (both entities are in ENTITIES).
             AgentRepoAttachment,
+            // APW-08 T21 — what the delivery chain reads: APW-05 Builds, APW-06 Deployments
+            // and runtime state, and the delivery-failed escalations it raises.
+            WorkBuild,
+            WorkDeployment,
+            WorkAppRuntimeState,
+            AgentEscalation,
         ]),
         ActivityLogModule,
         // Phase 15 — TaskTransitionService + TaskChatService consume
@@ -190,6 +217,11 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // that choice avoids).
         AppWorkChangeGateService,
         { provide: APP_WORK_CHANGE_GATE, useExisting: AppWorkChangeGateService },
+        // Gauzy Ever Works #37 — the gate's two guard-refusal events (APW-08's
+        // `app.change.guard_refused`, APW-04's `app.provision.guard_rejected`), over the
+        // API's global `APP_WORKS_TELEMETRY_SINK` alias; unbound, counted and dropped.
+        AppChangeTelemetry,
+        AppProvisioningTelemetry,
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,
@@ -278,6 +310,37 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // Backed by `cache_entries` through DatabaseModule (imported above);
         // local, not exported, like CommunityPrModule's copy.
         DistributedTaskLockService,
+        // APW-08 T21/T22 — the App Works delivery chain and its merge hook.
+        DeliveryFollowUpService,
+        TaskDeliveryService,
+        { provide: TASK_DELIVERY_TRACKER, useExisting: TaskDeliveryService },
+        // APW-08 T26 / T54 — the delivery chain posts its progress into the Task thread (FR-43)
+        // through the ordinary chat service.
+        { provide: TASK_THREAD_POSTER, useExisting: TaskChatService },
+        // APW-08 T26 / T54 (FR-43, lane L7) — the run-side thread posts (Run started, Opened pull
+        // request, Checks passed / failed) for App Work Tasks, asked by `TaskRunDenormService`,
+        // `TaskWorkspaceService` and `TaskPrStatusService` through the token. Reads
+        // `WorkRepository` (provided above) and `AgentRunRepository` (AgentsModule, imported
+        // above), and posts through `TASK_THREAD_POSTER`.
+        TaskLifecyclePostsService,
+        { provide: TASK_LIFECYCLE_POSTER, useExisting: TaskLifecyclePostsService },
+        // APW-08 T11 — keep an App Work's Task columns in step with its App spec. The service is
+        // the ONE resolver (spec → tracked branch → Work Repository default) and the ONE
+        // ownership-scoped write; the listener (on `app.spec.applied`, which `AppSpecService`
+        // emits in the API process) and T50's runner both go through it. Reads `WorkRepository`
+        // (provided above), `AppSpecService` + `WorkAppSpecStateRepository` (AppSpecModule),
+        // `GitFacadeService` (FacadesModule), `NotificationService` (NotificationsModule) and
+        // `NotificationRepository` (DatabaseModule) — all imported above.
+        AppWorkIsolationService,
+        AppWorkSpecAppliedListener,
+        // APW-08 T50 — the one-off backfill, reached by the `app-work-isolation-backfill` task over
+        // the internal RPC channel (exported below for the API's `TriggerInternalController`).
+        AppWorkIsolationBackfillRunner,
+        { provide: TASK_APP_CHECKS, useClass: TaskAppChecksService }, // APW-08 T16 (lane L9)
+        // APW-08 T46 (R-17, FR-67) — an App Work run a safety rail refused ends as `needs_input`
+        // (Task BLOCKED + one `guardrail-refusal` escalation), asked by `TaskRunDenormService`.
+        AppWorkRunHoldsService,
+        { provide: APP_WORK_RUN_STOP_HANDLER, useExisting: AppWorkRunHoldsService },
     ],
     exports: [
         // Exported as well as provided: the dispatch brief, the Fleet
@@ -326,6 +389,11 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         TaskAgentReviewService,
         TaskGateRunnerService,
         TaskGateJudgeService,
+        DeliveryFollowUpService,
+        TaskDeliveryService,
+        TASK_DELIVERY_TRACKER,
+        // APW-08 T50 — for the API's `TriggerInternalController.remoteMap`.
+        AppWorkIsolationBackfillRunner,
     ],
 })
 export class TasksDomainModule {}

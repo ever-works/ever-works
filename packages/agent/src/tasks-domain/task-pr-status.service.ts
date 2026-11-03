@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs
 import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import type { GitDiffResult, GitPullRequestStatus } from '@ever-works/plugin';
 import { DEFAULT_DIFF_MAX_BYTES, DEFAULT_DIFF_MAX_FILES, capChecks } from '@ever-works/plugin';
-import { normalizeCommitSha } from '@ever-works/contracts';
+import { isAppWorkKind, normalizeCommitSha } from '@ever-works/contracts';
 import { Task, TaskStatus } from '../entities/task.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -17,6 +17,11 @@ import {
     type PromotionLaneWatcher,
 } from '../policy/promotion-merge-guard.port';
 import { pickOwnerRepo, requireTaskRepository } from './task-repository';
+import { TASK_DELIVERY_TRACKER, type TaskDeliveryTracker } from './task-delivery.port';
+import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
+import { checksSettledPost } from './task-lifecycle-posts';
+import { TASK_APP_CHECKS, type TaskAppChecks } from './task-app-checks.port';
+import { hasAppCheckLeg, isAdvisoryAppCheckLeg, withAppCheckRollUp } from './app-check-legs';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -100,6 +105,23 @@ export interface PrStatusSyncSummary {
     merged: number;
     completed: number;
     failed: number;
+    /**
+     * APW-08 T22 — merges the App Works delivery chain took over: recorded as `merged` and NOT
+     * completed here (the Task closes when its change is live). Always `0` without the chain.
+     */
+    deliveryTracked: number;
+}
+
+/** What {@link TaskPrStatusService.refreshTask} answers: the Task, and the provider read behind it. */
+export interface TaskPrRefresh {
+    task: Task;
+    /** `null` when no provider read happened, or the pull request is gone from the provider. */
+    status: GitPullRequestStatus | null;
+    /**
+     * APW-08 T16 — the Work's kind, as the read already resolved it (absent when no read
+     * happened), so the sweep's App-only steps need no second Work read.
+     */
+    workKind?: string | null;
 }
 
 @Injectable()
@@ -107,7 +129,7 @@ export class TaskPrStatusService {
     private readonly logger = new Logger(TaskPrStatusService.name);
 
     /** Single-flight map, keyed by task id (rule 2 above). */
-    private readonly inFlight = new Map<string, Promise<Task>>();
+    private readonly inFlight = new Map<string, Promise<TaskPrRefresh>>();
 
     constructor(
         private readonly tasks: TaskRepository,
@@ -138,6 +160,27 @@ export class TaskPrStatusService {
         // `task.runtime_updated`, no version or updatedAt bump. Appended LAST
         // + @Optional (positional-spec arity rule).
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // APW-08 T22 — the App Works delivery chain's merge hook. Appended LAST + @Optional()
+        // (positional-spec arity rule) and injected by TOKEN so this file never imports the
+        // app-works graph. Absent, every merged pull request completes its Task as before.
+        @Optional()
+        @Inject(TASK_DELIVERY_TRACKER)
+        private readonly delivery?: TaskDeliveryTracker,
+        // APW-08 T26 / T54 (FR-43) — **Checks passed.** / **Checks failed: {names}.** on an App
+        // Work Task, once per settled verdict (see `checksSettledPost`). Appended LAST +
+        // @Optional() (positional-spec arity rule) and injected by TOKEN (see the port). Absent,
+        // a refresh posts nothing, exactly as before.
+        @Optional()
+        @Inject(TASK_LIFECYCLE_POSTER)
+        private readonly lifecycle?: TaskLifecyclePoster,
+        // APW-08 T16 (APW08-G04) — the required/advisory split of an App Work pull request's
+        // `Ever Works check: {name}` legs, read from the App rules at the PR base. Appended LAST +
+        // @Optional() (positional-spec arity rule) and injected by TOKEN (see the port: a value
+        // import of the App rules from here closes a require ring). Absent, or for any other Work
+        // kind, the provider's roll-up is used exactly as before.
+        @Optional()
+        @Inject(TASK_APP_CHECKS)
+        private readonly appChecks?: TaskAppChecks,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -168,14 +211,26 @@ export class TaskPrStatusService {
             return this.toView(task, true);
         }
 
-        const refreshed = await this.refreshTask(task, userId).catch((error) => {
-            this.logger.warn(
-                `PR status refresh failed for task ${task.id}: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-            );
-            return task;
-        });
+        const before = task.prState;
+        const refreshed = await this.refreshTask(task, userId)
+            .then(async (result) => {
+                // APW-08 T22 — the on-demand read can be the first to see a merge, and the sweep
+                // never re-selects a merged pull request, so a tracked merge is recorded here too
+                // (once: `recordMerge` writes only from no state). Nothing else changes on this
+                // path — it still never completes a Task.
+                if (result.task.prState === 'merged' && before !== 'merged') {
+                    await this.recordTrackedMerge(result.task, result.status);
+                }
+                return result.task;
+            })
+            .catch((error) => {
+                this.logger.warn(
+                    `PR status refresh failed for task ${task.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                return task;
+            });
         return this.toView(refreshed, refreshed === task);
     }
 
@@ -265,6 +320,7 @@ export class TaskPrStatusService {
             merged: 0,
             completed: 0,
             failed: 0,
+            deliveryTracked: 0,
         };
         if (!this.gitFacade) return summary;
 
@@ -279,13 +335,17 @@ export class TaskPrStatusService {
         for (const task of due) {
             try {
                 const before = task.prState;
-                const after = await this.refreshTask(task, task.userId);
+                const { task: after, status, workKind } = await this.refreshTask(task, task.userId);
                 summary.refreshed += 1;
                 if (after.prState === 'merged' && before !== 'merged') {
                     summary.merged += 1;
-                    if (await this.completeOnMerge(after)) summary.completed += 1;
+                    if (await this.recordTrackedMerge(after, status)) {
+                        summary.deliveryTracked += 1;
+                    } else if (await this.completeOnMerge(after)) {
+                        summary.completed += 1;
+                    }
                 } else {
-                    await this.offerRedGateToFixLoop(after);
+                    await this.offerRedGateToFixLoop(after, workKind);
                 }
             } catch (error) {
                 summary.failed += 1;
@@ -298,6 +358,43 @@ export class TaskPrStatusService {
         }
 
         return summary;
+    }
+
+    /**
+     * APW-08 T22 (FR-29, FR-30, FR-33) — a merge the App Works delivery chain follows is recorded
+     * (`deliveryState = 'merged'`) and the Task stays in review until its change is live; the
+     * caller then skips `completeOnMerge`. Any other merge — another branch (S19), a non-App
+     * Work, no merge commit reported, no chain bound — answers `false` and completes as before.
+     *
+     * A tracker that THROWS also answers `false`: a merged Task is never stranded in review by a
+     * broken hook (the chain degrades to today's behaviour, plan §8.2).
+     */
+    private async recordTrackedMerge(
+        task: Task,
+        status: GitPullRequestStatus | null,
+    ): Promise<boolean> {
+        if (!this.delivery) return false;
+        try {
+            if (!(await this.delivery.isDeliveryTracked(task, status))) return false;
+            // A Task the chain already follows (its state was recorded by an earlier read).
+            if (task.deliveryState) return true;
+            if (!status) return false;
+            const { recorded } = await this.delivery.recordMerge(task, status);
+            if (recorded) return true;
+            // Review of #3030 — a merge that was NOT recorded (a unique-index conflict, a caught
+            // write error) leaves `deliveryState` NULL, and skipping the completion then would
+            // strand the Task in review. Only a genuinely lost compare-and-set (another reader
+            // recorded this merge first) counts as tracked, and only once the row says so.
+            const current = await this.tasks.findById(task.id);
+            return Boolean(current?.deliveryState);
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: the delivery merge hook threw; completing on merge instead (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+            return false;
+        }
     }
 
     /**
@@ -323,9 +420,17 @@ export class TaskPrStatusService {
      * `ci:<headSha>`, so a head the webhook already resumed for is
      * `already-claimed` on every tick thereafter, forever.
      */
-    private async offerRedGateToFixLoop(task: Task): Promise<void> {
+    private async offerRedGateToFixLoop(task: Task, workKind?: string | null): Promise<void> {
         if (!this.autoResume?.onCheckResult) return;
         if (task.ciState !== 'failing' || !task.workId || !task.prNumber) return;
+        // APW-08 T16 — the way back from `gate-exhausted`: an App Work Task the owner unblocked
+        // after raising the Work's gate-attempt budget gets its one-shot stop marker released, so
+        // this very re-offer can resume the Agent. App Works only, from the kind this sweep already
+        // read; every other stopped Task stays a pure read here, as before.
+        if (task.ciAutoResumeNoticedAt && this.appChecks && isAppWorkKind(workKind)) {
+            const reopened = await this.appChecks.reopenAfterUnblock(task).catch(() => false);
+            if (reopened) Object.assign(task, { ciAutoResumeNoticedAt: null });
+        }
         // F8 — only a red check REPORTED BY an allow-listed app may be
         // re-offered: the webhook intake and the evaluator refuse any other
         // reporter, and this safety net must not be the way around them. A
@@ -334,10 +439,13 @@ export class TaskPrStatusService {
         const trustedApps = config.agents.getTrustedCheckApps();
         const failing = (Array.isArray(task.prChecks) ? task.prChecks : []).filter(
             (check) =>
+                // APW-08 T16 — an advisory App leg is reported, never handed to the fix loop.
+                check.advisory !== true &&
                 classifyCheckResult({
                     status: check.status,
                     conclusion: check.conclusion ?? null,
-                }) === 'failing' && isTrustedCheckApp(check.appSlug, trustedApps),
+                }) === 'failing' &&
+                isTrustedCheckApp(check.appSlug, trustedApps),
         );
         if (failing.length === 0) return;
         try {
@@ -359,6 +467,8 @@ export class TaskPrStatusService {
                 observedAt: task.ciCheckedAt ?? null,
                 verdict: 'failing',
                 granularity: 'check_suite',
+                // APW-08 T16 — this sweep's own roll-up: advisory App legs are already out of it.
+                fromPullRequestPoll: true,
                 appSlug: failing[0].appSlug ?? null,
                 checkName: failing[0].name,
                 conclusion: failing[0].conclusion ?? 'failure',
@@ -416,14 +526,18 @@ export class TaskPrStatusService {
     /**
      * Provider read + cache write for one Task, single-flighted.
      * Returns the Task with the fresh cache values applied in memory
-     * (so the caller can answer without a re-read).
+     * (so the caller can answer without a re-read) AND the provider's
+     * status behind it (APW-08 T22, APW08-G10: the merge hook needs the
+     * merge commit and base branch, which the Task does not store).
+     * `status` is `null` exactly where no read happened or the pull
+     * request is gone from the provider.
      */
-    private async refreshTask(task: Task, userId: string): Promise<Task> {
+    private async refreshTask(task: Task, userId: string): Promise<TaskPrRefresh> {
         const existing = this.inFlight.get(task.id);
         if (existing) return existing;
 
         const work = (async () => {
-            if (!this.gitFacade || !task.prNumber || !task.workId) return task;
+            if (!this.gitFacade || !task.prNumber || !task.workId) return { task, status: null };
             const target = await this.resolveRepo(task, userId);
             const status = await this.gitFacade.getPullRequestStatus(
                 target.owner,
@@ -436,12 +550,28 @@ export class TaskPrStatusService {
                 // The PR is gone from the provider. Record the read so the
                 // sweep does not spin on it; the state stays whatever it was.
                 await this.tasks.updatePrStatusCache(task.id, { ciCheckedAt: checkedAt });
-                return Object.assign(task, { ciCheckedAt: checkedAt });
+                return { task: Object.assign(task, { ciCheckedAt: checkedAt }), status: null };
             }
-            const patch = this.toCachePatch(status, checkedAt);
+            // APW-08 T16 (FR-16) — an App Work's advisory legs, read at the PR base, so a failing
+            // advisory `Ever Works check: {name}` leg reds neither the roll-up nor the merge gate
+            // nor the **Checks failed** post. `null` (and `effective === status`) for every other
+            // kind and whenever the rules cannot be read: then nothing is reclassified.
+            const advisory = await this.appAdvisoryLegs(task, target, status);
+            const effective = withAppCheckRollUp(status, advisory);
+            const patch = this.toCachePatch(effective, checkedAt, advisory);
             // Reviewer agent stage (slice AD) — the head this Task had
             // recorded BEFORE this read, so a moved head is detectable below.
             const previousPrHead = task.prHeadSha ?? null;
+            // APW-08 T26 / T54 (FR-43) — the verdict this Task had recorded
+            // BEFORE this read against the one written now: a settled change
+            // owes one thread post, an unchanged one none (so a sweep or a
+            // poll that re-reads the same verdict posts nothing).
+            const checksPost = this.lifecycle
+                ? checksSettledPost(
+                      { ciState: task.ciState, checks: task.prChecks },
+                      { ciState: patch.ciState, checks: patch.prChecks },
+                  )
+                : null;
             await this.tasks.updatePrStatusCache(task.id, patch);
             await this.recordRuntimeChange(task, patch);
             // CI feedback + autonomous fix loop (slice AC, EW-806): the
@@ -476,6 +606,23 @@ export class TaskPrStatusService {
                 Object.assign(task, { branchState: 'merged' });
             }
             Object.assign(task, patch);
+
+            // APW-08 T26 / T54 (FR-43) — posted once the cache write landed
+            // and BEFORE the merge gate below may merge on green, so the
+            // thread reads "Checks passed." ahead of "Merged into …". App
+            // Work Tasks only (the poster decides); never throws.
+            if (checksPost && this.lifecycle) {
+                await this.lifecycle
+                    .post({ task, post: checksPost, workKind: target.workKind })
+                    .catch((error: unknown) => {
+                        this.logger.warn(
+                            `Task ${task.id}: the checks thread post threw: ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                        );
+                        return false;
+                    });
+            }
 
             // Reviewer agent stage (slice AD, EW-811) — a push while the
             // Task sits in `in_review` is not an ENTRY into `in_review`, so
@@ -540,7 +687,7 @@ export class TaskPrStatusService {
             // what this just recorded, for the same live head.
             if (this.promotionLane) {
                 await this.promotionLane
-                    .onPullRequestStatusRefreshed(task, status)
+                    .onPullRequestStatusRefreshed(task, effective)
                     .catch((error: unknown) => {
                         this.logger.warn(
                             `Task ${task.id}: promotion lane threw after a PR status refresh: ${
@@ -558,18 +705,25 @@ export class TaskPrStatusService {
             // never fails a status refresh, and it is deliberately given
             // the LIVE `status` rather than the Task's cache.
             if (this.mergeGate) {
-                await this.mergeGate
-                    .onPullRequestStatusRefreshed(task, status)
-                    .catch((error: unknown) => {
-                        this.logger.warn(
-                            `Task ${task.id}: merge gate threw after a PR status refresh: ${
-                                error instanceof Error ? error.message : String(error)
-                            }`,
-                        );
-                        return undefined;
-                    });
+                // APW-08 T16 — an App Work read hands the merge gate the classification it used,
+                // for the facade's LIVE check at merge time. Every other read makes the exact
+                // two-argument call it always made.
+                const gateRead =
+                    advisory && advisory.size > 0
+                        ? this.mergeGate.onPullRequestStatusRefreshed(task, effective, {
+                              advisoryCheckLegs: advisory,
+                          })
+                        : this.mergeGate.onPullRequestStatusRefreshed(task, effective);
+                await gateRead.catch((error: unknown) => {
+                    this.logger.warn(
+                        `Task ${task.id}: merge gate threw after a PR status refresh: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                    return undefined;
+                });
             }
-            return task;
+            return { task, status: effective, workKind: target.workKind };
         })().finally(() => {
             this.inFlight.delete(task.id);
         });
@@ -578,9 +732,38 @@ export class TaskPrStatusService {
         return work;
     }
 
+    /**
+     * APW-08 T16 — the advisory `Ever Works check: {name}` legs of an App Work pull request, from
+     * the App rules at the PR's base branch. Read only for an App Work whose status carries at
+     * least one App leg (no leg, no read). Never throws: a failed read classifies nothing, which
+     * can only keep a red roll-up red.
+     */
+    private async appAdvisoryLegs(
+        task: Task,
+        target: { baseRef: string; workKind: string | null },
+        status: GitPullRequestStatus,
+    ): Promise<ReadonlySet<string> | null> {
+        if (!this.appChecks || !isAppWorkKind(target.workKind)) return null;
+        if (!hasAppCheckLeg(status.checks)) return null;
+        try {
+            return await this.appChecks.advisoryLegs(task, status.baseRef ?? target.baseRef);
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: App check legs could not be classified; the provider roll-up stands (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+            return null;
+        }
+    }
+
     private toCachePatch(
         status: GitPullRequestStatus,
         checkedAt: Date,
+        // APW-08 T16 — advisory App legs, marked on the cached row so every later reader of
+        // `prChecks` (the **Checks failed** names, the fix-loop re-offer) skips them without
+        // re-reading the rules. Absent for every other kind: the row is byte-for-byte as before.
+        advisory?: ReadonlySet<string> | null,
     ): Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks' | 'prHeadSha'> {
         return {
             prState: status.state,
@@ -599,6 +782,9 @@ export class TaskPrStatusService {
                 ...(check.detailsUrl ? { detailsUrl: check.detailsUrl } : {}),
                 // Who reported it (F8) — the fix-loop re-offer reads this.
                 appSlug: check.appSlug ?? null,
+                // Name AND reporter (`isAdvisoryAppCheckLeg`): another app's check named like
+                // an advisory leg is an ordinary check, and is never marked.
+                ...(isAdvisoryAppCheckLeg(check, advisory) ? { advisory: true } : {}),
             })),
         };
     }
@@ -659,6 +845,8 @@ export class TaskPrStatusService {
         repo: string;
         baseRef: string;
         gitOptions: { userId: string; providerId: string; workId: string };
+        /** APW-08 FR-43 — the Work's kind, so the thread post needs no second Work read. */
+        workKind: string | null;
     }> {
         const work = await this.works.findById(task.workId as string);
         if (!work) {
@@ -670,6 +858,7 @@ export class TaskPrStatusService {
             baseRef:
                 (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || 'main',
             gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
+            workKind: work.kind ?? null,
         };
     }
 

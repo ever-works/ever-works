@@ -45,8 +45,11 @@ export class TaskCiAutoResumeAttemptRepository {
      * Rows, not events: one row is one dispatched (or attempted)
      * resume. THROWS on a read failure — see the class doc.
      */
-    async countForTask(taskId: string): Promise<number> {
-        return this.repository.count({ where: { taskId } });
+    async countForTask(taskId: string, trigger?: TaskAutoResumeTrigger): Promise<number> {
+        // APW-08 T16 — an App Work's CI budget counts CI attempts only, so a
+        // reviewer-triggered resume does not spend a check-fix attempt.
+        // Without `trigger`, every attempt counts, exactly as before.
+        return this.repository.count({ where: trigger ? { taskId, trigger } : { taskId } });
     }
 
     /**

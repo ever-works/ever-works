@@ -597,7 +597,9 @@ export class RunSteeringService implements RunSteeringPort {
             // it made the resumed run an ordinary, unrestricted one. Carried
             // verbatim, so the new run is exactly as narrow as the old one —
             // never narrower by accident, never wider. (Review-scoped sources
-            // are refused above and never reach this line.) It is stated HERE
+            // are refused above and never reach this line.) `budgetCapCents`
+            // likewise (APW-08 FR-53, review of #3061): a resumed run keeps the
+            // spend cap its source was dispatched with. It is stated HERE
             // rather than beside the property because `dispatch-paths-gated`
             // reads a fixed window of lines after a `createQueued` to prove the
             // call is gated, and prose inside the object literal pushes the
@@ -623,6 +625,9 @@ export class RunSteeringService implements RunSteeringPort {
                     // `requirePersistent` gate reads.
                     persistent: run.persistent === true,
                     delegationScope: run.delegationScope ?? null,
+                    ...(typeof run.budgetCapCents === 'number'
+                        ? { budgetCapCents: run.budgetCapCents }
+                        : {}),
                     // Inserted together with its link on the source, and
                     // only while this claim is still held — a request whose
                     // claim was taken over creates nothing.
@@ -819,7 +824,9 @@ export class RunSteeringService implements RunSteeringPort {
                     requirePersistent: true,
                 });
                 if (outcome.started === false) {
-                    this.logger.warn(
+                    // Sessions off is the install's default, not a problem with this run.
+                    const log = outcome.reason === 'sessions-disabled' ? 'debug' : 'warn';
+                    this.logger[log](
                         `Run ${next.id}: terminal not restarted on resume (${outcome.reason}).`,
                     );
                 }

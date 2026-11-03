@@ -74,6 +74,11 @@ import { classifyLicenseExpression } from '../app-license/license-classify';
 import { GitFacadeService } from '../facades/git.facade';
 import { validateAppSpecDocument } from '../works-config/schema/app-spec.validate';
 import { APP_BLUEPRINT_TOPIC } from './app-blueprint.constants';
+import {
+    APP_SPEC_TELEMETRY_EVENTS,
+    AppSpecTelemetry,
+    type AppBlueprintResolvedSource,
+} from '../app-spec/app-spec-telemetry.port';
 
 // The topic lives in a dependency-free leaf so website-template discovery can
 // recognise a Blueprint without importing this service; re-exported here so
@@ -258,6 +263,11 @@ class ReadBudget {
         }
         this.used += 1;
     }
+
+    /** Reads taken so far — `app.blueprint.resolved.providerReads` (APW-03 T49). */
+    get reads(): number {
+        return this.used;
+    }
 }
 
 interface CacheEntry {
@@ -276,22 +286,32 @@ export class AppBlueprintResolverService {
         // unavailable", not `undefined.getRepository`.
         @Optional()
         private readonly gitFacade?: GitFacadeService,
+        // APW-03 T49 — `app.blueprint.resolved`. `@Optional()` and appended LAST: absent,
+        // nothing is emitted; present, it never throws.
+        @Optional()
+        private readonly telemetry?: AppSpecTelemetry,
     ) {}
 
     async resolve(input: AppBlueprintResolveInput): Promise<AppBlueprintResolution> {
+        const startedAtMs = Date.now();
         const owner = typeof input.owner === 'string' ? input.owner.trim() : '';
         const repo = typeof input.repo === 'string' ? input.repo.trim() : '';
         const blueprintId = input.blueprintId;
 
         // A malformed id can name no repository: zero reads, nothing cached.
         if (blueprintId !== undefined && !BLUEPRINT_ID_PATTERN.test(blueprintId)) {
-            return { status: 'none', reason: 'blueprintNotFound' };
+            return this.observeResolution(
+                { status: 'none', reason: 'blueprintNotFound' },
+                'explicit',
+                startedAtMs,
+                0,
+            );
         }
 
         const key = `${owner}/${repo}`.toLowerCase() + (blueprintId ? `:${blueprintId}` : '');
         const cached = this.readCache(key);
         if (cached) {
-            return cached;
+            return this.observeResolution(cached, 'cache', startedAtMs, 0);
         }
 
         const facade = this.gitFacade;
@@ -328,6 +348,35 @@ export class AppBlueprintResolverService {
         }
 
         this.writeCache(key, result);
+        return this.observeResolution(
+            result,
+            blueprintId !== undefined ? 'explicit' : 'probe',
+            startedAtMs,
+            budget.reads,
+        );
+    }
+
+    /**
+     * APW-03 T49 — `app.blueprint.resolved`: how the answer was reached, the outcome code and
+     * the read count. Never the source repository, the Blueprint repository or a prompt.
+     * Returns the resolution unchanged.
+     */
+    private observeResolution(
+        result: AppBlueprintResolution,
+        source: AppBlueprintResolvedSource,
+        startedAtMs: number,
+        providerReads: number,
+    ): AppBlueprintResolution {
+        const outcome: string = result.status === 'hit' ? 'hit' : result.reason;
+        this.telemetry?.track(APP_SPEC_TELEMETRY_EVENTS.blueprintResolved, {
+            source,
+            outcome,
+            // This resolver applies no ref constraint (the manifest path's `refMismatch`
+            // belongs to the catalog), so it is the outcome code that says so, if ever.
+            refMismatch: outcome === 'refMismatch',
+            durationMs: Math.max(0, Date.now() - startedAtMs),
+            providerReads,
+        });
         return result;
     }
 

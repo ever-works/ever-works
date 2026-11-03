@@ -139,6 +139,9 @@ export const DOMAIN_EVENT_CATALOG = [
 	{ type: 'inbox.item.answered', domain: 'inbox', aggregateType: 'inbox_item', phase: 'P3' },
 	{ type: 'inbox.item.state_changed', domain: 'inbox', aggregateType: 'inbox_item', phase: 'P3' },
 	{ type: 'inbox.item.deleted', domain: 'inbox', aggregateType: 'inbox_item', phase: 'P3' },
+	// Integration inbox push: an integration's PATCH of its own item, and the member's
+	// answer to an integration item (stored on the item; no run is started).
+	{ type: 'inbox.item.updated', domain: 'inbox', aggregateType: 'inbox_item', phase: 'P3' },
 	{ type: 'kb.document.created', domain: 'kb', aggregateType: 'kb_document', phase: 'P3' },
 	{ type: 'kb.document.updated', domain: 'kb', aggregateType: 'kb_document', phase: 'P3' },
 	{ type: 'kb.document.moved', domain: 'kb', aggregateType: 'kb_document', phase: 'P3' },

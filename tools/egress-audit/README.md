@@ -30,7 +30,7 @@ its `ever-mock-platform` bin. The browser leg is specified in the SDK's
 
 | Pinned version | Where it is set                                               |
 | -------------- | ------------------------------------------------------------- |
-| `1.0.0-rc.7`   | `@ever-co/connect-tools` in `tools/egress-audit/package.json` |
+| `1.0.0-rc.8`   | `@ever-co/connect-tools` in `tools/egress-audit/package.json` |
 
 The module itself uses `@ever-co/connect-sdk` and `@ever-co/connect-contracts` at the same
 version (`apps/api`, `packages/agent`, `packages/contracts`); `drift.spec.ts` in the statistics

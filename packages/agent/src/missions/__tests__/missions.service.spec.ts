@@ -656,3 +656,151 @@ describe('MissionsService', () => {
         });
     });
 });
+
+/**
+ * APW-08 T34 (FR-51, plan §5 / S27) — the output mode is validated and stored, the Task output is
+ * stored normalized, and a Mission that files Tasks with no App Work attached as Improves or
+ * Operates is ACCEPTED with the `noAppWorkRelation` warning.
+ */
+describe('MissionsService — output mode (APW-08 T34)', () => {
+    let repo: ReturnType<typeof makeRepoMock>;
+    const relationsOf = (rows: Array<{ relation: string; workKind: string | null }>) => ({
+        listForMissionWithWork: jest.fn(async () => rows),
+    });
+    const build = (missionWorks?: unknown) =>
+        new MissionsService(
+            repo as unknown as Repository<Mission>,
+            new TitlerService(),
+            undefined, // tickService
+            undefined, // missionAttachments
+            undefined, // uploadsRepo
+            missionWorks as never,
+        );
+    const base = { title: 'Grow Bookings', description: 'd', type: MissionType.ONE_SHOT };
+
+    beforeEach(() => {
+        repo = makeRepoMock();
+    });
+
+    it('a Mission without the field is ideas with default Task output, and warns nothing', async () => {
+        const dto = await build(relationsOf([])).create('u1', base);
+        expect(dto).toMatchObject({
+            outputMode: 'ideas',
+            taskOutput: { tasksPerTick: 1, openTasksCap: 3 },
+            taskOutputNoticeAt: null,
+        });
+        expect(dto.warnings).toBeUndefined();
+    });
+
+    it('files Tasks with no App Work attached: accepted, with noAppWorkRelation', async () => {
+        const dto = await build(relationsOf([{ relation: 'markets', workKind: 'app' }])).create(
+            'u1',
+            { ...base, outputMode: 'tasks' },
+        );
+        expect(dto.outputMode).toBe('tasks');
+        expect(dto.warnings).toEqual(['noAppWorkRelation']);
+        expect(repo._rows).toHaveLength(1);
+    });
+
+    it('no warning once an App Work is attached as Improves or Operates', async () => {
+        for (const relation of ['improves', 'operates']) {
+            const dto = await build(relationsOf([{ relation, workKind: 'app' }])).create('u1', {
+                ...base,
+                outputMode: 'both',
+            });
+            expect(dto.warnings).toBeUndefined();
+        }
+        // A directory Work attached as Improves is not an App Work.
+        const site = await build(
+            relationsOf([{ relation: 'improves', workKind: 'directory' }]),
+        ).create('u1', { ...base, outputMode: 'tasks' });
+        expect(site.warnings).toEqual(['noAppWorkRelation']);
+    });
+
+    it('refuses an unknown mode (400) and stores Task output normalized', async () => {
+        await expect(
+            build(relationsOf([])).create('u1', { ...base, outputMode: 'all' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        const dto = await build(relationsOf([])).create('u1', {
+            ...base,
+            taskOutput: { tasksPerTick: 9, openTasksCap: 5, junk: true },
+        });
+        expect(dto.taskOutput).toEqual({ tasksPerTick: 1, openTasksCap: 5 });
+        expect(repo._rows[0].taskOutput).toEqual({ tasksPerTick: 1, openTasksCap: 5 });
+    });
+
+    it('update sets the mode and output, and null resets the output to its defaults', async () => {
+        const service = build(relationsOf([{ relation: 'improves', workKind: 'app' }]));
+        const created = await service.create('u1', base);
+        const updated = await service.update('u1', created.id, {
+            outputMode: 'tasks',
+            taskOutput: { tasksPerTick: 2, openTasksCap: 4 },
+        });
+        expect(updated).toMatchObject({
+            outputMode: 'tasks',
+            taskOutput: { tasksPerTick: 2, openTasksCap: 4 },
+        });
+        const reset = await service.update('u1', created.id, { taskOutput: null });
+        expect(reset.taskOutput).toEqual({ tasksPerTick: 1, openTasksCap: 3 });
+    });
+
+    // Review of #3061 — the Output card sends only the two bounds; a save must keep the Agent.
+    describe('the Task output’s Agent', () => {
+        const AGENT = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+        const FOREIGN = 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+        const agentsRepo = {
+            findOne: jest.fn(async (opts: { where: { id: string; userId?: string } }) =>
+                opts.where.id === AGENT && opts.where.userId === 'u1' ? { id: AGENT } : null,
+            ),
+        };
+        const withAgents = () =>
+            new MissionsService(
+                repo as unknown as Repository<Mission>,
+                new TitlerService(),
+                undefined, // tickService
+                undefined, // missionAttachments
+                undefined, // uploadsRepo
+                relationsOf([{ relation: 'improves', workKind: 'app' }]) as never,
+                undefined, // worksRepo
+                undefined, // activityLog
+                undefined, // accessPolicy
+                undefined, // domainEvents
+                undefined, // recordVisibility
+                agentsRepo as never,
+            );
+
+        beforeEach(() => agentsRepo.findOne.mockClear());
+
+        it('merges a partial save over the stored output, so the Agent survives', async () => {
+            const service = withAgents();
+            const created = await service.create('u1', {
+                ...base,
+                taskOutput: { tasksPerTick: 1, openTasksCap: 3, agentId: AGENT },
+            });
+            const saved = await service.update('u1', created.id, {
+                taskOutput: { tasksPerTick: 2, openTasksCap: 5 },
+            });
+            expect(saved.taskOutput).toEqual({ tasksPerTick: 2, openTasksCap: 5, agentId: AGENT });
+            // The unchanged Agent is not re-checked on every save.
+            expect(agentsRepo.findOne).toHaveBeenCalledTimes(1);
+            // An omitted bound keeps its stored value; `agentId: null` clears the Agent.
+            const cleared = await service.update('u1', created.id, {
+                taskOutput: { openTasksCap: 7, agentId: null },
+            });
+            expect(cleared.taskOutput).toEqual({ tasksPerTick: 2, openTasksCap: 7 });
+        });
+
+        it('refuses an Agent the caller cannot use (400), on create and on update', async () => {
+            const service = withAgents();
+            await expect(
+                service.create('u1', { ...base, taskOutput: { agentId: FOREIGN } }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(repo._rows).toHaveLength(0);
+            const created = await service.create('u1', base);
+            await expect(
+                service.update('u1', created.id, { taskOutput: { agentId: FOREIGN } }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(repo._rows[0].taskOutput).toBeNull();
+        });
+    });
+});

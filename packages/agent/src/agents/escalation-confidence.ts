@@ -77,6 +77,9 @@ const REASON_PRIOR: Record<AgentEscalationReasonCode, number> = {
     'gate-precheck-red': 0.6,
     'queued-too-long': 0.45,
     'run-parked': 0.35,
+    // APW-08 T7 — a merged App Work change that keeps failing to build or deploy, with the
+    // automatic follow-up budget spent: a person decides (Close anyway / Try once more).
+    'delivery-failed': 0.85,
 };
 
 /** Fallback prior for a reason code added later than this table. */

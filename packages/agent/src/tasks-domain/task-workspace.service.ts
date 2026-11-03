@@ -26,7 +26,9 @@ import { isAppWorkKind } from '@ever-works/contracts';
 // → task-extra-repos → this file; see the port's docstring.
 import {
     APP_WORK_CHANGE_GATE,
+    APP_WORK_COMPARE_DIFF_OPTIONS,
     APP_WORK_SPEC_PATH,
+    appWorkDiffFileListIncomplete,
     type AppWorkChangeGate,
     type AppWorkChangeGateVerdict,
 } from './app-work-change-gate.port';
@@ -44,6 +46,9 @@ import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TASK_STATUS_TRANSITIONS, TaskTransitionService } from './task-transition.service';
 import { TaskChatService } from './task-chat.service';
+import { renderTaskThreadPost, type TaskThreadPost } from './task-thread-posts';
+import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
+import { pullRequestOpenedPost } from './task-lifecycle-posts';
 import { MergePolicyService } from '../policy/merge-policy.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
@@ -263,6 +268,12 @@ export class TaskWorkspaceService {
         // the integration DTO shows (`runtime.prUrl`): `task.runtime_updated`.
         // Appended LAST + @Optional (positional-spec arity rule).
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // APW-08 T26 / T54 (FR-43) — the **Opened pull request #{number}.** post on an App Work
+        // Task. Appended LAST + @Optional() (this file's positional-spec arity rule, see
+        // `appChangeGate` above) and injected by TOKEN (see the port). Absent = no post.
+        @Optional()
+        @Inject(TASK_LIFECYCLE_POSTER)
+        private readonly lifecycle?: TaskLifecyclePoster,
     ) {}
 
     /**
@@ -609,14 +620,12 @@ export class TaskWorkspaceService {
      * described workspace the primary contributes no grants (LESS access,
      * never more); the Work is not re-read for a second, looser match.
      *
-     * That match is the only thing scoped to a host. A mirror row that is also
-     * ATTACHED to the run's Agent or listed as a Task extra is skipped as a
-     * mount (`resolveFleetMounts` skips both by `owner/repo` only, host
-     * ignored, and logs each as the primary), yet its grants still join the
-     * union above like every attachment's and Task extra's — mounted or not.
-     * Recorded, not a regression: closing it needs a host-scoped primary skip
-     * there and in `normalizeFleetTaskWorkspaceMounts`, or dropping the grants
-     * of attachments and Task extras that were not mounted.
+     * That match is the only thing scoped to a host. An attachment or Task extra
+     * with the primary's `owner/repo` is skipped as a MOUNT (`resolveFleetMounts`
+     * skips it by `owner/repo` only, host ignored, as the primary), so its grants
+     * are skipped here by the same rule (C-11, #31): a mirror on another host
+     * used to be unmounted yet still add its names to the union. Grants follow
+     * what is mounted — LESS access, never more.
      */
     async resolveFleetRunEnvGrants(input: {
         task: Task;
@@ -646,6 +655,17 @@ export class TaskWorkspaceService {
                 { repoConnection: connection } as unknown as AgentRepoAttachment,
             ]);
             if (resolved) sources.push(resolved);
+        }
+        if (input.workspace) {
+            // The mount rule, applied to grants: what `resolveFleetMounts` skips as the primary
+            // is not mounted, so it grants nothing. The primary's own grants come below, from its
+            // host-matched registry row.
+            const primaryId = input.workspace.repositoryId.toLowerCase();
+            for (let index = sources.length - 1; index >= 0; index--) {
+                if (repositoryIdFromCloneUrl(sources[index].url)?.toLowerCase() === primaryId) {
+                    sources.splice(index, 1);
+                }
+            }
         }
         if (input.workspace && this.repoConnections) {
             const primary = await this.resolvePrimaryConnection(
@@ -702,12 +722,21 @@ export class TaskWorkspaceService {
      * import path depends on it), so this is a theoretical gap rather than
      * a live one — but it is a gap, and it is why the FEATURE is opt-in
      * per Work rather than inferred from the file's presence.
+     *
+     * APW-08 T13 — the Work's KIND rides into the parser and the gate. An
+     * App Work's file is the App spec, so its `spec.checks` is read, and a
+     * check the owner has not admitted comes back under `notAdmitted`
+     * instead of refusing the plan (FR-14). Every other kind reads
+     * `spec.tasks` and refuses exactly as before. The opt-in above is NOT
+     * relaxed for an App Work: at the defaults (`repoDeclaredCommands` off)
+     * nothing is read, and switching it on is the `app.spec.applied`
+     * listener's job (T11, APW08-G02), never this reader's.
      */
     async readFleetRepoDeclaredCommands(input: {
         task: Task;
         userId: string;
         workspace: FleetTaskWorkspaceSpec;
-    }): Promise<{ setup: TaskAcceptanceCheck[]; checks: TaskAcceptanceCheck[] }> {
+    }): Promise<ReturnType<typeof admitRepoDeclaredCommands>> {
         const empty = { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] };
         if (!input.task.workId) return empty;
         const work = await this.works.findById(input.task.workId);
@@ -779,12 +808,16 @@ export class TaskWorkspaceService {
             );
         }
 
-        const declared = parseRepoDeclaredCommands((parsed as Record<string, unknown>).spec);
+        const declared = parseRepoDeclaredCommands(
+            (parsed as Record<string, unknown>).spec,
+            work.kind,
+        );
         return admitRepoDeclaredCommands({
             declared,
             policy,
             mountDirs: (input.workspace.mounts ?? []).map((mount) => mount.mountDir),
             repositoryId: `${owner}/${repo}`,
+            kind: work.kind,
         });
     }
 
@@ -1347,6 +1380,7 @@ export class TaskWorkspaceService {
                 verdict = await this.appChangeGate.evaluate({
                     work,
                     taskOrigin: task.origin ?? null,
+                    taskId: task.id,
                     owner: target.owner,
                     repo: target.repo,
                     gitOptions,
@@ -2242,6 +2276,10 @@ export class TaskWorkspaceService {
             prNumber: pr.number,
             prUrl: pr.url,
         });
+        // APW-08 T26 / T54 (FR-43) — **Opened pull request #{number}.**, once: only when the
+        // number recorded now differs from the one the Task carried (`task` is the row as it was
+        // before this write). App Work Tasks only, as the run's Agent; never throws.
+        await this.postPullRequestOpened(task, work, args.agentId, pr.number);
         await this.transitionTask(task, TaskStatus.IN_REVIEW);
         this.logger.log(
             `Task ${task.id} opened PR #${pr.number} (${pr.url})` +
@@ -2401,6 +2439,12 @@ export class TaskWorkspaceService {
          * {@link AgentMergeActor.requireHumanApproval}.
          */
         requireHumanApproval?: boolean;
+        /**
+         * APW-08 T16 — an App Work pull request's advisory legs, read at the PR
+         * base by the caller; handed to the facade's merge-time CI check
+         * ({@link AgentMergeActor.advisoryCheckLegs}). Absent = strict.
+         */
+        advisoryCheckLegs?: readonly string[] | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task } = input;
         if (!this.gitFacade || !this.mergePolicy) return undefined;
@@ -2444,6 +2488,9 @@ export class TaskWorkspaceService {
             gateStatus: input.gateStatus ?? null,
             headSha: input.headSha ?? task.prHeadSha ?? null,
             requireHumanApproval: input.requireHumanApproval === true,
+            ...(input.advisoryCheckLegs && input.advisoryCheckLegs.length > 0
+                ? { advisoryCheckLegs: input.advisoryCheckLegs }
+                : {}),
         });
     }
 
@@ -2505,6 +2552,8 @@ export class TaskWorkspaceService {
         headSha?: string | null;
         /** Raises the approval requirement; can never clear it (slice AI). */
         requireHumanApproval?: boolean;
+        /** APW-08 T16 — see {@link AgentMergeActor.advisoryCheckLegs}. */
+        advisoryCheckLegs?: readonly string[] | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task, work, userId, agentId, owner, repo, prNumber, baseRef } = args;
         if (!this.mergePolicy || !this.gitFacade) return undefined;
@@ -2575,6 +2624,10 @@ export class TaskWorkspaceService {
                     // requirement — only insist on one the policy did not
                     // ask for.
                     requireHumanApproval: args.requireHumanApproval === true,
+                    // APW-08 T16 — conditional key: every non-App merge's actor is unchanged.
+                    ...(args.advisoryCheckLegs && args.advisoryCheckLegs.length > 0
+                        ? { advisoryCheckLegs: args.advisoryCheckLegs }
+                        : {}),
                 },
             );
 
@@ -3268,6 +3321,7 @@ export class TaskWorkspaceService {
             verdict = await this.appChangeGate.evaluate({
                 work,
                 taskOrigin: task.origin ?? null,
+                taskId: task.id,
                 owner,
                 repo,
                 gitOptions,
@@ -3566,11 +3620,22 @@ export class TaskWorkspaceService {
      * is refused (the protected file could be in the part that was dropped); a
      * provider with no compare capability is let through with a warning — the
      * cloud path already checked before its push.
+     *
+     * APW-08 T17 (APW08-G06, FR-21) — for an App Work, "could not be read whole"
+     * means the FILE LIST: the diff is asked for with no patch text
+     * (`APP_WORK_COMPARE_DIFF_OPTIONS`) and refused only when the list is short
+     * or at the 300-file ceiling, never on `truncated` alone, so the five-file
+     * lockfile change the App change gate lets through is not refused here
+     * instead. Every other Work kind asks and refuses exactly as before.
      */
     private async protectedPathsRefusalForBranch(args: {
         task: Task;
-        /** The Work whose operator opt-in (`AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS`) applies. */
-        work: { id: string };
+        /**
+         * The Work whose operator opt-in (`AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS`) applies.
+         * `kind` selects the App Work file-list rule (APW08-G06); absent = the
+         * pre-existing rule.
+         */
+        work: { id: string; kind?: string | null };
         owner: string;
         repo: string;
         gitOptions: { userId: string; providerId: string; workId: string };
@@ -3581,9 +3646,11 @@ export class TaskWorkspaceService {
     }): Promise<string | null> {
         if (workflowChangesAllowedForWork(args.work.id) || !this.gitFacade) return null;
         if (typeof this.gitFacade.getCompareDiff !== 'function') return null;
+        const appWork = isAppWorkKind(args.work.kind);
         let diff: {
             files: ReadonlyArray<{ path: string; previousPath?: string }>;
             truncated: boolean;
+            totalFiles?: number;
         };
         try {
             diff = await this.gitFacade.getCompareDiff(
@@ -3591,7 +3658,7 @@ export class TaskWorkspaceService {
                 args.repo,
                 args.baseRef,
                 args.branch,
-                { maxFiles: 300 },
+                appWork ? { ...APP_WORK_COMPARE_DIFF_OPTIONS } : { maxFiles: 300 },
                 args.gitOptions,
             );
         } catch (error) {
@@ -3607,7 +3674,7 @@ export class TaskWorkspaceService {
                 'workflow or action files. No pull request was opened.'
             );
         }
-        if (diff.truncated) {
+        if (appWork ? appWorkDiffFileListIncomplete(diff) : diff.truncated) {
             return (
                 `The diff of \`${args.branch}\` is too large to check for GitHub workflow or action files. ` +
                 'No pull request was opened.'
@@ -3920,6 +3987,11 @@ export class TaskWorkspaceService {
             const verdict = await this.appChangeGate.evaluate({
                 work,
                 taskOrigin: task.origin ?? null,
+                taskId: task.id,
+                // Telemetry only: this re-judgement runs after every pull-request status
+                // read (the merge sweep included), so an unchanged refusal is not reported
+                // again here — the branch judgements that run first already reported it.
+                reportRefusal: false,
                 owner,
                 repo,
                 gitOptions,
@@ -4043,17 +4115,59 @@ export class TaskWorkspaceService {
         }
     }
 
+    /**
+     * APW-08 T26 / T54 (FR-43) — the pull request this finalize just recorded, posted once into
+     * an App Work Task's thread (`pullRequestOpenedPost` compares against the number the Task
+     * carried before the write). Best-effort: the pull request is open whatever happens here.
+     */
+    private async postPullRequestOpened(
+        task: Task,
+        work: Work,
+        agentId: string,
+        prNumber: number,
+    ): Promise<void> {
+        if (!this.lifecycle) return;
+        const post = pullRequestOpenedPost(task.prNumber ?? null, prNumber);
+        if (!post) return;
+        try {
+            await this.lifecycle.post({
+                task,
+                post,
+                agentId: agentId || null,
+                workKind: work.kind ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: the pull-request-opened post failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Post a platform message into the Task's thread, as the run's Agent.
+     *
+     * APW-08 T54 — accepts a keyed post (`{ key, params }`, see `task-thread-posts.ts`) IN
+     * ADDITION TO a plain `body` string. A keyed post stores the key and its params, so the Task
+     * page renders it in the reader's locale, and writes the pre-rendered English into `body` (or
+     * the caller's own `body`), so every reader that does not know keys is unchanged. Every
+     * existing caller passes a string and gets exactly the row it always did.
+     */
     private async postSystemMessage(
         input: { task: Task; userId: string; agentId: string },
-        body: string,
+        message: string | (TaskThreadPost & { body?: string }),
     ): Promise<void> {
         if (!this.taskChat) return;
+        const keyed = typeof message === 'string' ? null : message;
+        const body = keyed ? (keyed.body ?? renderTaskThreadPost(keyed)) : (message as string);
         try {
             await this.taskChat.post(input.userId, {
                 taskId: input.task.id,
                 authorType: 'agent',
                 authorId: input.agentId,
                 body,
+                ...(keyed ? { messageKey: keyed.key, messageParams: keyed.params ?? null } : {}),
             });
         } catch (error) {
             this.logger.warn(

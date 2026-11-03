@@ -5,6 +5,7 @@ import { Category, ItemData } from '@/lib/api/types-only';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
+import { sanitizeInlineSvg } from '@/lib/utils/inline-svg';
 import { useTranslations } from 'next-intl';
 import { FolderTree, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
@@ -34,58 +35,9 @@ function safeImageUrl(raw: string | undefined | null): string | undefined {
     }
 }
 
-/**
- * M-09: defense-in-depth render-time SVG hardening. The agent-side
- * `sanitizeSvg` already strips script/event-handler/foreignObject on writes,
- * but pre-seeded or imported categories (account import, restored backups,
- * older code paths) can land unsanitized SVG in the DB and bypass that
- * guarantee on read. Run a conservative regex pass here too — if anything
- * dangerous slips through, swap this client copy for `isomorphic-dompurify`
- * when adding it as a dep.
- */
-// Security: align the client deny-lists with the server-side
-// `svg-sanitizer.ts` (packages/agent) and close the bypasses an audit
-// flagged. The previous tag pattern only stripped `<use ... xlink:href>`
-// (missing the modern SVG2 `<use href>` form) and omitted CSS / link /
-// SMIL-animation vectors. Inline icon SVGs never legitimately contain
-// any of these elements, so stripping them wholesale is safe for all
-// real icons. This stays a defense-in-depth regex pass behind the
-// server sanitizer; swap for `isomorphic-dompurify` if it is ever
-// added as a web dependency.
-const SVG_DANGEROUS_TAG_RE =
-    /<\/?\s*(?:script|iframe|object|embed|foreignObject|use|a|style|image|set|handler|listener|animate|animateTransform|animateMotion|feImage)\b[^>]*>/gi;
-// Security: strip whole `<style>…</style>` blocks (open tag, CSS body, and
-// close tag) so CSS-based payloads such as `*{background:url('javascript:…')}`
-// or `@import` cannot survive as an applied stylesheet.
-const SVG_STYLE_BLOCK_RE = /<\s*style\b[^>]*>[\s\S]*?<\s*\/\s*style\s*>/gi;
-// Security: event-handler / href stripping now also fires when the
-// attribute is separated by `/` (e.g. `<svg/onload=alert(1)>`), not only
-// by whitespace, closing the slash-delimited bypass. Real icons carry no
-// on* handlers or href attributes, so this never affects legitimate SVG.
-const SVG_DANGEROUS_ATTR_RE =
-    /[\s/](?:on[a-z]+|xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
-// Security: reject inline SVG carrying a dangerous URL scheme anywhere in
-// the body (belt-and-braces against `javascript:`/`vbscript:` survivors and
-// `data:`/`file:` references), mirroring the server sanitizer's check.
-const SVG_DANGEROUS_URL_RE = /\b(?:javascript|vbscript|data|file)\s*:/i;
-
-function sanitizeSvgClient(svg: string): string {
-    if (typeof svg !== 'string') return '';
-    // Trim XML processing instructions / DOCTYPE that don't belong inline.
-    const cleaned = svg
-        .replace(/<\?xml[^>]*\?>/gi, '')
-        .replace(/<!DOCTYPE[^>]*>/gi, '')
-        // Security: drop comments / CDATA so payloads cannot hide inside them.
-        .replace(/<!--[\s\S]*?-->/g, '')
-        .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
-        .replace(SVG_STYLE_BLOCK_RE, '')
-        .replace(SVG_DANGEROUS_TAG_RE, '')
-        .replace(SVG_DANGEROUS_ATTR_RE, '');
-    // Security: fail closed — if a dangerous URL scheme still survived the
-    // attribute/tag scrub, render nothing rather than risk execution.
-    if (SVG_DANGEROUS_URL_RE.test(cleaned)) return '';
-    return cleaned;
-}
+// M-09: defense-in-depth render-time SVG hardening behind the agent-side
+// `sanitizeSvg` (pre-seeded, imported or restored categories can skip it).
+// Shared with PluginIcon: `@/lib/utils/inline-svg`.
 
 /**
  * Render the category's icon. Resolution order:
@@ -103,7 +55,7 @@ function CategoryIcon({ category }: { category: Category }) {
             <span
                 aria-hidden="true"
                 className="inline-flex w-6 h-6 items-center justify-center text-text-secondary dark:text-text-secondary-dark shrink-0 [&>svg]:w-full [&>svg]:h-full"
-                dangerouslySetInnerHTML={{ __html: sanitizeSvgClient(category.icon_svg) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeInlineSvg(category.icon_svg) }}
             />
         );
     }

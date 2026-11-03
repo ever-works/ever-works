@@ -97,13 +97,16 @@ export default async function WorkOverviewPage({ params }: Params) {
     // spec state and the latest Builds. Both reads fail soft (a missing route or
     // a fresh Work answers `null`), and neither is asked for any other kind.
     // APW-04 T25 — the provisioning card's first read, same fail-soft posture.
-    const [appSpec, appBuilds, appProvisioning] = isApp
+    // APW-08 T49 — the operator's switches, for the read-only banner. Fail soft: an unreadable
+    // answer shows no banner (a request is still refused by the API while changes are off).
+    const [appSpec, appBuilds, appProvisioning, appSwitches] = isApp
         ? await Promise.all([
               workAppSpecAPI.get(id).catch(() => null),
               listLatestAppBuilds(id).catch(() => null),
               appProvisioningAPI.get(id).catch(() => null),
+              workAPI.getAppWorkSwitches().catch(() => null),
           ])
-        : [null, null, null];
+        : [null, null, null, null];
 
     // An App Work has nothing to generate, so the generation status card —
     // which would read "not generated yet" forever — is replaced by the App
@@ -142,6 +145,7 @@ export default async function WorkOverviewPage({ params }: Params) {
                         workName={work.name}
                         upstreamState={upstreamState}
                         appSpec={appSpec}
+                        changesPaused={appSwitches?.changesEnabled === false}
                     />
                     <AppBuildsOverviewCard
                         workId={id}

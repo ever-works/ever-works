@@ -105,9 +105,14 @@ export class TaskMergeGateService {
     async onPullRequestStatusRefreshed(
         task: Task,
         status: GitPullRequestStatus,
+        // APW-08 T16 — an App Work pull request's advisory legs, as the status read classified
+        // them (`status.ciState` is already the advisory-adjusted roll-up). Handed on to the
+        // merge so the facade's LIVE check applies the same classification. Optional: every
+        // other caller and kind merges under the strict provider roll-up, unchanged.
+        context?: { advisoryCheckLegs?: ReadonlySet<string> | null },
     ): Promise<TaskMergeGateOutcome> {
         try {
-            return await this.evaluate(task, status);
+            return await this.evaluate(task, status, context);
         } catch (error) {
             this.logger.warn(
                 `Task ${task.id}: post-CI merge evaluation failed (PR status still recorded): ${
@@ -121,7 +126,12 @@ export class TaskMergeGateService {
     private async evaluate(
         task: Task,
         status: GitPullRequestStatus,
+        context?: { advisoryCheckLegs?: ReadonlySet<string> | null },
     ): Promise<TaskMergeGateOutcome> {
+        const advisory =
+            context?.advisoryCheckLegs && context.advisoryCheckLegs.size > 0
+                ? { advisoryCheckLegs: [...context.advisoryCheckLegs] }
+                : {};
         if (!task.prNumber || !task.workId) {
             return { action: 'skipped', reason: 'no-pull-request' };
         }
@@ -326,6 +336,7 @@ export class TaskMergeGateService {
                 agentId,
                 gateStatus: 'green',
                 headSha,
+                ...advisory,
             });
             return { action: 'merge-attempted', merge };
         }
@@ -351,6 +362,7 @@ export class TaskMergeGateService {
                 baseRef: promotion?.baseBranch ?? revertBase,
                 requireHumanApproval:
                     promotion !== null || revertBase !== null || floorTarget || humanMergeRequired,
+                ...advisory,
             });
             return { action: 'merge-attempted', merge };
         }

@@ -177,8 +177,21 @@ export interface TaskCheckResult {
 	/**
 	 * `green`/`red` mirror the exit code; `timeout` = killed at
 	 * `timeoutSec`; `error` = the check could not be executed at all.
+	 *
+	 * `not-admitted` (APW-08 T13, FR-14) — an App spec check whose command
+	 * the Work owner has not admitted for their machines. It was never
+	 * executed (`exitCode: null`, `durationMs: 0`), and it is not green, so a
+	 * REQUIRED one keeps the gate from grading green on the strength of the
+	 * checks that did run. Additive: no other Work kind produces it.
 	 */
-	status: 'green' | 'red' | 'timeout' | 'error';
+	status: 'green' | 'red' | 'timeout' | 'error' | 'not-admitted';
+	/**
+	 * APW-08 T51 (FR-61, S36) — why an `error` is one: `missingTool` when a Fleet node's shell
+	 * answered "command not found" (exit 127 POSIX / 9009 Windows), so the gate row reads "a tool
+	 * this check needs is missing on this machine" and that machine is not offered the Task again.
+	 * Absent otherwise. Additive.
+	 */
+	reason?: 'missingTool';
 	/** Wall-clock duration of the check. */
 	durationMs: number;
 	/** Last lines of combined stdout/stderr, for the run report. */

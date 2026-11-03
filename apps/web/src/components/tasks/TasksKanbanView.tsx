@@ -32,10 +32,12 @@ import {
 import { TaskBranchChip } from './TaskBranchChip';
 import { TaskRunChip } from './TaskRunChip';
 import { GateChip } from './GateChip';
+import { TaskDeliveryChips } from './TaskDeliveryChips';
 import { TaskPrPill } from './TaskPrPill';
 import { TaskDueChip } from './TaskDueChip';
 import { TaskDiffSheet } from './TaskDiffSheet';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
+import { isRunRefused } from './run-refusal';
 import { FixOnComputerButton } from './FixOnComputerButton';
 import { useFleetTaskHandoffEnabled } from '@/components/fleet/tasks/handoff-context';
 import {
@@ -314,7 +316,11 @@ function TaskKanbanCard({
                 gate verdict · kanban M5 — PR review pill with the CI dot,
                 the one chip that answers "is this reviewable right now?".
                 */}
-            {(task.branchRef || task.run || task.prNumber != null || task.dueAt) && (
+            {(task.branchRef ||
+                task.run ||
+                task.prNumber != null ||
+                task.dueAt ||
+                task.delivery) && (
                 <div className="flex flex-wrap gap-1">
                     {/* EW-P2-3 — due date, red once past (open Tasks only). */}
                     {task.dueAt && <TaskDueChip task={task} />}
@@ -322,6 +328,9 @@ function TaskKanbanCard({
                     {task.prNumber != null && <TaskPrPill task={task} />}
                     {task.run && <TaskRunChip task={task} />}
                     {task.run?.gateStatus && <GateChip status={task.run.gateStatus} />}
+                    {/* APW-08 T27 — where a merged App Work change stands (list rows read
+                        with `includeDelivery`; absent everywhere else). */}
+                    {task.delivery && <TaskDeliveryChips delivery={task.delivery} />}
                 </div>
             )}
 
@@ -525,7 +534,8 @@ function TaskKanbanColumn({
             const { results } = await runTasksBatchAction(
                 runAllTargets.map((task) => ({ taskId: task.id })),
             );
-            const started = results.filter((row) => row.ok).length;
+            // APW-08 T12 — a refused run (2xx, nothing started) is not "started".
+            const started = results.filter((row) => row.ok && !isRunRefused(row.run)).length;
             setBatchSummary(t('board.runAllSummary', { started, total: results.length }));
         } finally {
             setBatchBusy(false);

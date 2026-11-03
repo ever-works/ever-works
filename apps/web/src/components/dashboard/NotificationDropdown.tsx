@@ -306,7 +306,10 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         <div className={cn('relative', className)} ref={dropdownRef}>
             <Tooltip content={t('notifications.title')} position="bottom">
                 <button
+                    type="button"
                     onClick={() => setIsOpen(!isOpen)}
+                    aria-label={t('notifications.title')}
+                    aria-expanded={isOpen}
                     className={cn(
                         'p-1 rounded-md relative cursor-pointer',
                         'text-text-secondary dark:text-text-secondary-dark',
@@ -314,7 +317,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                         'hover:bg-surface dark:hover:bg-surface-secondary-dark',
                     )}
                 >
-                    <Bell className="w-3.5 h-3.5" />
+                    <Bell className="w-3.5 h-3.5" aria-hidden="true" />
 
                     <HeaderCountBadge count={unreadCount} max={99} />
                 </button>

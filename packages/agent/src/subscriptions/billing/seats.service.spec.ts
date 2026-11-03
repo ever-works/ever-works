@@ -28,7 +28,7 @@ const PRO_PLAN = {
 
 const ENTERPRISE_UNBOUNDED = {
     code: 'premium',
-    displayName: 'Enterprise',
+    displayName: 'Unlimited',
     hosting: 'cloud',
     seatsIncluded: null,
     seatMonthlyPrice: null,

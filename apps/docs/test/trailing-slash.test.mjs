@@ -84,10 +84,14 @@ function trimSlash(route) {
 
 /** Remove fenced code blocks, HTML comments and inline code - links there are not rendered. */
 function stripNonRendered(markdown) {
-	return markdown
-		.replace(/^[ \t]*(```|~~~)[\s\S]*?^[ \t]*\1[^\n]*$/gm, '')
-		.replace(/<!--[\s\S]*?-->/g, '')
-		.replace(/(`+)[\s\S]*?\1/g, '');
+	let body = markdown.replace(/^[ \t]*(```|~~~)[\s\S]*?^[ \t]*\1[^\n]*$/gm, '');
+	// Until stable: removing `<!<!-- x -->-- y -->` once leaves a new comment behind.
+	let previous;
+	do {
+		previous = body;
+		body = body.replace(/<!--[\s\S]*?-->/g, '');
+	} while (body !== previous);
+	return body.replace(/(`+)[\s\S]*?\1/g, '');
 }
 
 /** Every link target on the page: inline `[x](t)`, reference `[id]: t` and JSX/HTML `href="t"`. */

@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+	INBOX_EXTERNAL_CHOICE_KINDS,
+	INBOX_EXTERNAL_ITEM_KINDS,
 	INBOX_ITEM_KINDS,
+	INBOX_ITEM_ORIGINS,
 	INBOX_ITEM_SOURCE_TYPES,
 	INBOX_ITEM_STATUSES,
 	INBOX_MAX_OPTIONS,
 	INBOX_MAX_OPTION_ID_CHARS,
 	INBOX_MAX_OPTION_LABEL_CHARS,
 	INBOX_SOURCE_META_MAX_FIELD_CHARS,
+	isSafeInboxSourceUrl,
+	normalizeInboxEmailMeta,
 	normalizeInboxOptions,
 	normalizeInboxSourceMeta
 } from '../inbox.types.js';
@@ -114,13 +119,97 @@ describe('closed value sets', () => {
 			'system',
 			'work',
 			'fleet-run',
-			'fleet-session'
+			'fleet-session',
+			'integration'
 		]);
 		expect(INBOX_ITEM_SOURCE_TYPES.indexOf('fleet-run')).toBe(5);
 	});
 
-	it('lists fleet-session (FL-05) after fleet-run, appended last', () => {
-		expect(INBOX_ITEM_SOURCE_TYPES[INBOX_ITEM_SOURCE_TYPES.length - 1]).toBe('fleet-session');
+	it('lists fleet-session (FL-05) after fleet-run, and integration (the inbox push) appended last', () => {
+		expect(INBOX_ITEM_SOURCE_TYPES.indexOf('fleet-session')).toBe(6);
+		expect(INBOX_ITEM_SOURCE_TYPES[INBOX_ITEM_SOURCE_TYPES.length - 1]).toBe('integration');
+	});
+
+	it('appends the integration kinds; an integration files every kind but escalation', () => {
+		expect(INBOX_ITEM_KINDS.slice(0, 4)).toEqual(['question', 'approval', 'escalation', 'notice']);
+		expect(INBOX_ITEM_KINDS.slice(4)).toEqual(['mention', 'assignment', 'email', 'other']);
+		expect([...INBOX_EXTERNAL_ITEM_KINDS].sort()).toEqual(
+			INBOX_ITEM_KINDS.filter((kind) => kind !== 'escalation').sort()
+		);
+		expect(INBOX_EXTERNAL_CHOICE_KINDS).toEqual(['question', 'approval']);
+		expect(INBOX_ITEM_ORIGINS).toEqual(['platform', 'integration']);
+		// `origin` is varchar(16) like `kind`.
+		expect(Math.max(...INBOX_ITEM_ORIGINS.map((v) => v.length))).toBeLessThanOrEqual(16);
+	});
+});
+
+/**
+ * The integration inbox push: `sourceUrl` becomes a link in the member's
+ * Inbox, so anything but an absolute https URL without credentials dies here
+ * (and again in the web's `safeHttpsUrl`).
+ */
+describe('isSafeInboxSourceUrl', () => {
+	it('accepts an absolute https URL, fragments and queries included', () => {
+		for (const url of [
+			'https://app.gauzy.co/#/pages/inbox/1',
+			'https://app.gauzy.co/inbox?id=1&tab=all',
+			'HTTPS://app.gauzy.co/inbox'
+		]) {
+			expect([url, isSafeInboxSourceUrl(url)]).toEqual([url, true]);
+		}
+	});
+
+	it('refuses every other scheme, relative URLs, credentials, whitespace and the oversize', () => {
+		for (const url of [
+			'http://app.gauzy.co/inbox/1',
+			'javascript:alert(1)',
+			' javascript:alert(1)',
+			'jAvAsCrIpT:alert(1)',
+			'data:text/html,<b>x</b>',
+			'vbscript:msgbox(1)',
+			'file:///etc/passwd',
+			'//app.gauzy.co/inbox',
+			'/inbox/1',
+			'https://user:pass@app.gauzy.co/',
+			'https://user@app.gauzy.co/',
+			'https://app.gauzy.co/a b',
+			'https://app.gauzy.co/\tinbox',
+			'https://app.gauzy.co/\u0000',
+			`https://app.gauzy.co/${'a'.repeat(2000)}`,
+			'',
+			null,
+			42
+		]) {
+			expect([url, isSafeInboxSourceUrl(url)]).toEqual([url, false]);
+		}
+	});
+});
+
+describe('normalizeInboxEmailMeta', () => {
+	it('keeps the four fields, trimmed and capped, and drops the rest', () => {
+		expect(
+			normalizeInboxEmailMeta({
+				from: '  Billing <billing@example.com> ',
+				to: '',
+				subject: ' Invoice #42 ',
+				receivedAt: '2026-10-28T09:00:00Z',
+				html: '<script>x</script>'
+			})
+		).toEqual({
+			from: 'Billing <billing@example.com>',
+			to: null,
+			subject: 'Invoice #42',
+			receivedAt: '2026-10-28T09:00:00Z'
+		});
+		expect(normalizeInboxEmailMeta({ from: 'a', subject: 'x'.repeat(400), receivedAt: '' })?.subject).toHaveLength(
+			300
+		);
+	});
+
+	it('answers null without a sender or a subject', () => {
+		for (const value of [null, 'x', [], { from: 'a' }, { subject: 's' }, { from: ' ', subject: 's' }]) {
+			expect(normalizeInboxEmailMeta(value)).toBeNull();
+		}
 	});
 });
 

@@ -76,6 +76,33 @@ describe('AgentEscalationRepository Task resolution ownership', () => {
         expect(qb.andWhere).toHaveBeenCalledWith('status = :open', { open: 'open' });
     });
 
+    it('CAS-resolves an Organization-stamped escalation on a legacy Task (no ownership clause; taskId + userId bind it)', async () => {
+        // #2213 `escalation-cas-legacy`: a legacy (null/null) Task run by an Organization Agent
+        // carries an escalation stamped T/O from that run. The controller now passes the
+        // Task's RELATION scope (`undefined` for a legacy Task) instead of its raw stamp, which
+        // matched legacy rows only and answered 404.
+        const { repository, qb } = build();
+
+        await expect(
+            repository.resolveForTask(
+                'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+                'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                undefined,
+                null,
+            ),
+        ).resolves.toBe(true);
+
+        expect(qb.andWhere).toHaveBeenCalledWith('userId = :userId', {
+            userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        });
+        expect(qb.andWhere).toHaveBeenCalledWith('taskId = :taskId', {
+            taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        });
+        const clauses = qb.andWhere.mock.calls.map((call) => String(call[0]));
+        expect(clauses.some((clause) => clause.includes('tenantId'))).toBe(false);
+    });
+
     it('uses explicit legacy-compatible personal ownership and preserves single-winner CAS', async () => {
         const { repository, qb } = build();
         qb.execute.mockResolvedValueOnce({ affected: 1 }).mockResolvedValueOnce({ affected: 0 });

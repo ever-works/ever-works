@@ -1,6 +1,6 @@
 import { fenceUntrusted, neutralizeControlTokens } from '../utils/untrusted-content';
-import { ALWAYS_PROTECTED } from './app-change-guard';
-import type { AppWorkRules } from './app-work-rules.service';
+import { ALWAYS_PROTECTED, MAX_FILES, REFUSAL_MULTIPLE } from './app-change-guard';
+import { clampFileGuidance, type AppWorkRules } from './app-work-rules.service';
 
 /**
  * APW-08 T18 (FR-20…FR-24, R-17, ACC-08-13) — the App Work run brief, built from the App rules.
@@ -38,6 +38,18 @@ export const APP_RUN_BRIEF_LIMITS = Object.freeze({
 export const APP_RUN_BRIEF_PUSH_LINE =
     'This Task pushes its branch and opens the pull request for you when your run finishes: never push, ' +
     'merge or open a pull request yourself, and never change the default branch.';
+
+/**
+ * APW-08 T12 / T48 (FR-13, GAP-21) — the honest statement of what containment does NOT cover. A
+ * Fleet node gives the MODEL step an isolated home (environment construction only); the run's
+ * setup steps and App checks deliberately run with the machine's real home and toolchain, so the
+ * owner's admission of each check (FR-14) is their control. Every App Work run that receives this
+ * brief runs on a Fleet node: the cloud executor refuses App Work runs (T12 site 2).
+ */
+export const APP_RUN_BRIEF_REAL_HOME_LINE =
+    "On the owner's machine your model step runs with an isolated home, but this Task's setup steps " +
+    "and App checks run with the machine's real home directory and toolchain; only checks the owner " +
+    'admitted run, and containment never widens your tools, protected paths or target branch.';
 
 /** Why an instruction file was not included. Codes only. */
 export type AppRunInstructionFileRefusal =
@@ -134,6 +146,8 @@ export function buildAppRunRulesBlock(
         '',
         APP_RUN_BRIEF_PUSH_LINE,
         '',
+        APP_RUN_BRIEF_REAL_HOME_LINE,
+        '',
         'Protected paths — never create, edit, rename or delete a file matching these; the platform refuses the pull request if you do:',
         // The guard's own always-protected list first (not a copy of it), then the spec's.
         ...ALWAYS_PROTECTED.map((path) => `- ${codePath(path)} (always protected)`),
@@ -145,9 +159,22 @@ export function buildAppRunRulesBlock(
         ...listOrNone(rules.humanMergePaths, '- (none declared)'),
         '',
         `Size guidance: keep the change under ${rules.sizeGuidance} changed lines. A pull request over ${refusedAt} changed lines is refused; split a larger change into several Tasks.`,
+        // APW08-G22 — the App spec's own file guidance (`agents.maxPullRequestChangedFiles`,
+        // default 50), told the same way, beside FR-21's platform ceiling it never replaces.
+        fileGuidanceLine(rules),
         '',
         'In `.works/works.yml`, never change `source`, `blueprint`, `license` or `upstreamSync`, never remove a protected or human-merge path, and never switch on `upstreamPullRequests.enabled` or `provisioning.autoReprovision`: only a person may.',
     ].join('\n');
+}
+
+/** APW08-G22 — the file-count half of the size guidance, with the guard's own numbers. */
+function fileGuidanceLine(rules: AppWorkRules): string {
+    const files = clampFileGuidance(rules.fileGuidance);
+    return (
+        `File guidance: keep the change to at most ${files} changed files. A pull request touching ` +
+        `more than ${files * REFUSAL_MULTIPLE} files is refused, and one touching ${MAX_FILES} or more ` +
+        'cannot be checked at all; split a larger change into several Tasks.'
+    );
 }
 
 /** The App spec at the base commit could not be read: say so instead of inventing rules. */
@@ -156,6 +183,8 @@ export function buildAppRunRulesUnreadableBlock(meta: { branch: string; reason: 
         '# APP RULES (could not be read)',
         '',
         APP_RUN_BRIEF_PUSH_LINE,
+        '',
+        APP_RUN_BRIEF_REAL_HOME_LINE,
         '',
         `The App spec (\`.works/works.yml\`) on ${codePath(meta.branch)} could not be read (${neutralizeControlTokens(meta.reason).slice(0, 200)}), so this App Work's protected paths are unknown and the platform will refuse a pull request until it can read them. Change nothing under \`.github/\` or \`.works/\`, and say in your final message that the App spec needs attention.`,
     ].join('\n');

@@ -1441,6 +1441,46 @@ describe('FleetAgentTaskPlannerService', () => {
                 expect(plan).not.toHaveProperty('setup');
             });
 
+            // APW-08 T13 (FR-14, ACC-08-10) — an App Work's un-admitted checks
+            // are never planned to run, and ride the plan (no command) so the
+            // reconciler can keep the gate from grading green because of them.
+            it('carries App checks the owner has not admitted beside the frozen set, never in it', async () => {
+                works.findById.mockResolvedValue({ id: 'work-1', checksPolicy: 'required' });
+                taskWorkspace.readFleetRepoDeclaredCommands.mockResolvedValue({
+                    setup: [],
+                    checks: [
+                        {
+                            id: 'repo/check-2',
+                            name: 'e2e',
+                            kind: 'custom',
+                            command: 'pnpm e2e',
+                            required: false,
+                            phase: 'check',
+                        },
+                    ],
+                    notAdmitted: [
+                        {
+                            id: 'repo/check-1',
+                            name: 'type-check',
+                            command: 'pnpm type-check',
+                            required: true,
+                        },
+                    ],
+                });
+                const plan = await build().plan(payload);
+                expect(plan?.acceptanceChecks.map((check) => check.id)).toEqual(['repo/check-2']);
+                expect(plan?.notAdmittedChecks).toEqual([
+                    { id: 'repo/check-1', name: 'type-check', required: true },
+                ]);
+                // Nothing a node could execute.
+                expect(JSON.stringify(plan?.notAdmittedChecks)).not.toContain('pnpm type-check');
+            });
+
+            it('carries no not-admitted key when nothing is not admitted', async () => {
+                const plan = await build().plan(payload);
+                expect(plan).not.toHaveProperty('notAdmittedChecks');
+            });
+
             it('splits an owner-authored setup step out of the acceptance checks and onto the plan', async () => {
                 works.findById.mockResolvedValue({
                     id: 'work-1',

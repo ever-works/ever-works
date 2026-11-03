@@ -64,10 +64,13 @@ import {
     TaskGateRunnerService,
     TaskReviewRejectionService,
     TaskPrStatusService,
+    TaskDeliveryService,
     TaskRunDenormService,
     TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
     TasksService,
+    AppWorkIsolationBackfillRunner,
+    type AppWorkIsolationBackfillOptions,
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import {
@@ -784,6 +787,18 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + `@Optional()` per the arity rule above.
         @Optional()
         private readonly desktopRecordingService?: DesktopRecordingService,
+        // APW-08 T23 — backs the `app-change-delivery` cron: the worker proxy calls
+        // `reconcile()` over the internal RPC channel, landing here where the git-provider
+        // plugins (commit ancestry) and the Build / Deployment rows are. Provided and exported by
+        // the agent `TasksDomainModule`. Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly taskDeliveryService?: TaskDeliveryService,
+        // APW-08 T50 — backs the one-shot `app-work-isolation-backfill` task: the worker proxy
+        // calls `run()` over the internal RPC channel, landing here where the git facade (the
+        // Work Repository's default branch) and the Work rows are. Provided and exported by the
+        // agent `TasksDomainModule`. Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly appWorkIsolationBackfillRunner?: AppWorkIsolationBackfillRunner,
     ) {}
 
     onModuleInit() {
@@ -970,6 +985,24 @@ export class TriggerInternalController implements OnModuleInit {
             // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
             // calls `syncDuePrStatuses()` here (allow-list auto-derived).
             TaskPrStatusService: this.taskPrStatusService,
+            // APW-08 T23 — `app-change-delivery` calls `reconcile()` here, and only that: a
+            // one-member facade, so Close anyway / Try once more (the person's routes) never
+            // reach the worker. `undefined` (a loud "Unknown remote target") without the chain.
+            TaskDeliveryService: this.taskDeliveryService
+                ? {
+                      reconcile: (opts?: { limit?: number }) =>
+                          this.taskDeliveryService!.reconcile(opts ?? {}),
+                  }
+                : undefined,
+            // APW-08 T50 — the one-shot `app-work-isolation-backfill` task calls `run()` here, one
+            // page per call, and only that: a one-member facade, so nothing else on the runner is
+            // reachable from the worker. `undefined` (a loud "Unknown remote target") without it.
+            AppWorkIsolationBackfillRunner: this.appWorkIsolationBackfillRunner
+                ? {
+                      run: (opts?: AppWorkIsolationBackfillOptions) =>
+                          this.appWorkIsolationBackfillRunner!.run(opts ?? {}),
+                  }
+                : undefined,
             // Memory facts (AW-07) — `memory-fact-embed` calls `embedFact()`
             // and `memory-fact-gc` calls `sweep()` here (allow-list
             // auto-derived).

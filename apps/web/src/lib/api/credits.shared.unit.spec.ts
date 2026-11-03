@@ -15,12 +15,19 @@ import {
     formatSignedCredits,
     formatUsageMonthLabel,
     CLOUD_PLAN_TRIAL_DAYS,
+    estimatePlanCheckoutTotal,
     isFreePlan,
     isUsageMonthPeriod,
     isUsagePeriod,
     ledgerKindTone,
     parseUsagePeriod,
+    planCheckoutInterval,
+    planCyclePricePerMonth,
+    planExtraSeats,
     planOffersTrial,
+    planSeatPricePerCycle,
+    planSellsAnnual,
+    planSellsExtraSeats,
     recentUsageMonths,
     USAGE_ROLLING_PERIODS,
 } from './credits.shared';
@@ -230,5 +237,69 @@ describe('buildUsageExportQuery — workspace carrier', () => {
 
     it('leaves the carrier off for a null scope', () => {
         expect(buildUsageExportQuery({ scope: null })).toBe('');
+    });
+});
+
+describe('billing cycle + seats at checkout (Gauzy Ever Works #126)', () => {
+    // Cloud Pro after the 2026-10-05 repricing: $49/mo or $408/yr, 25 Members included, $5/seat/mo.
+    const pro = {
+        monthlyPrice: '49',
+        annualPrice: '408',
+        seatsIncluded: 25,
+        seatMonthlyPrice: '5',
+    };
+    const monthlyOnly = { ...pro, annualPrice: null };
+    const free = { monthlyPrice: '0', annualPrice: '0', seatsIncluded: 1, seatMonthlyPrice: null };
+
+    it('sells annual only on a paid plan with a positive yearly price', () => {
+        expect(planSellsAnnual(pro)).toBe(true);
+        expect(planSellsAnnual(monthlyOnly)).toBe(false);
+        expect(planSellsAnnual({ ...pro, annualPrice: '0' })).toBe(false);
+        expect(planSellsAnnual(free)).toBe(false);
+    });
+
+    it('never sends annual for a plan that does not sell it (the server would 400)', () => {
+        expect(planCheckoutInterval(pro, 'annual')).toBe('annual');
+        expect(planCheckoutInterval(pro, 'monthly')).toBe('monthly');
+        expect(planCheckoutInterval(monthlyOnly, 'annual')).toBe('monthly');
+    });
+
+    it('shows a twelfth of the YEARLY total next to /mo on the annual cycle', () => {
+        expect(planCyclePricePerMonth(pro, 'annual')).toBe('34');
+        expect(planCyclePricePerMonth({ ...pro, annualPrice: '100' }, 'annual')).toBe('8.33');
+        expect(planCyclePricePerMonth(pro, 'monthly')).toBe('49');
+        expect(planCyclePricePerMonth(monthlyOnly, 'annual')).toBe('49');
+    });
+
+    it('offers a Members count only on paid plans with an allowance and a seat price', () => {
+        expect(planSellsExtraSeats(pro)).toBe(true);
+        expect(planSellsExtraSeats({ ...pro, seatMonthlyPrice: null })).toBe(false);
+        expect(planSellsExtraSeats({ ...pro, seatsIncluded: null })).toBe(false);
+        expect(planSellsExtraSeats(free)).toBe(false);
+    });
+
+    it('bills only the seats beyond the allowance, like the server `billableSeats`', () => {
+        expect(planExtraSeats(pro, 25)).toBe(0);
+        expect(planExtraSeats(pro, 10)).toBe(0);
+        expect(planExtraSeats(pro, 27.9)).toBe(2);
+        expect(planExtraSeats(pro, Number.NaN)).toBe(0);
+        expect(planExtraSeats({ seatsIncluded: null }, 100)).toBe(0);
+    });
+
+    it('prices an annual seat at exactly 12x the monthly rate (no annual seat discount)', () => {
+        expect(planSeatPricePerCycle(pro, 'monthly')).toBe(5);
+        expect(planSeatPricePerCycle(pro, 'annual')).toBe(60);
+        // A monthly-only plan bought on the annual toggle is billed monthly, seats included.
+        expect(planSeatPricePerCycle(monthlyOnly, 'annual')).toBe(5);
+    });
+
+    it('estimates one period of plan + extra seats', () => {
+        expect(estimatePlanCheckoutTotal(pro, 'monthly', null)).toBe(49);
+        expect(estimatePlanCheckoutTotal(pro, 'monthly', 27)).toBe(59);
+        expect(estimatePlanCheckoutTotal(pro, 'annual', 27)).toBe(528);
+        expect(estimatePlanCheckoutTotal(pro, 'annual', 20)).toBe(408);
+        expect(
+            estimatePlanCheckoutTotal({ ...pro, monthlyPrice: 'oops' }, 'monthly', 30),
+        ).toBeNull();
     });
 });

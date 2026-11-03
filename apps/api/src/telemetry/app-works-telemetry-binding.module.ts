@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_WORKS_TELEMETRY_SINK } from '@ever-works/agent/app-works';
+import { APP_SPEC_TELEMETRY_SINK } from '@ever-works/agent/app-spec';
 import { AnalyticsService } from '@ever-works/monitoring';
 
 /**
@@ -25,7 +26,13 @@ import { AnalyticsService } from '@ever-works/monitoring';
             provide: APP_WORKS_TELEMETRY_SINK,
             useExisting: AnalyticsService,
         },
+        // APW-03 T49 (plan section 9.1) - the App spec, Blueprint and licence events' own
+        // port, aliased to the same client the same way.
+        {
+            provide: APP_SPEC_TELEMETRY_SINK,
+            useExisting: AnalyticsService,
+        },
     ],
-    exports: [APP_WORKS_TELEMETRY_SINK],
+    exports: [APP_WORKS_TELEMETRY_SINK, APP_SPEC_TELEMETRY_SINK],
 })
 export class AppWorksTelemetryBindingModule {}

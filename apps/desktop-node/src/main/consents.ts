@@ -1,3 +1,4 @@
+import { replaceFileAtomically, supportsAtomicWrites, type StateFileSystem } from 'ever-works-node';
 import { DEFAULT_DESKTOP_CONSENTS, type DesktopConsentsView } from '../shared/ipc-contract';
 
 /**
@@ -21,10 +22,14 @@ export function normalizeDesktopConsents(value: unknown): DesktopConsentsView {
 	return { work: pick('work'), attend: pick('attend'), manage: pick('manage') };
 }
 
-export interface ConsentsFs {
+/**
+ * The real config filesystem (`createConfigFileSystem`) carries the atomic primitives, so a save
+ * replaces the file through a temp + rename like the node's other state records; a double with
+ * only `writeFile` keeps the in-place write.
+ */
+export type ConsentsFs = StateFileSystem & {
 	readFile(filePath: string): Promise<string | null>;
-	writeFile(filePath: string, content: string): Promise<void>;
-}
+};
 
 /** The stored consents, or the defaults when there is no file (an install older than this). Never throws. */
 export async function loadDesktopConsents(fs: ConsentsFs, filePath: string): Promise<DesktopConsentsView> {
@@ -37,13 +42,31 @@ export async function loadDesktopConsents(fs: ConsentsFs, filePath: string): Pro
 	}
 }
 
+/**
+ * Atomic since Gauzy Ever Works #380: the tray writes this file while the app may be killed (an
+ * upgrade, a force-quit), and an in-place rewrite torn by that kill read back as the defaults —
+ * silently undoing whatever the owner had chosen.
+ *
+ * STRICTLY atomic, unlike the node's own state records (`writeStateFile`), which fall back to an
+ * in-place rewrite when the OS refuses the temp file or the rename: here a refused save rejects
+ * with the old file whole, and the caller keeps the consents it had and says the save failed.
+ */
 export async function saveDesktopConsents(
 	fs: ConsentsFs,
 	filePath: string,
-	consents: DesktopConsentsView
+	consents: DesktopConsentsView,
+	options: { platform?: string } = {}
 ): Promise<void> {
 	const value = normalizeDesktopConsents(consents);
-	await fs.writeFile(filePath, `${JSON.stringify({ version: 1, ...value }, null, 2)}\n`);
+	const content = `${JSON.stringify({ version: 1, ...value }, null, 2)}\n`;
+	if (!supportsAtomicWrites(fs)) {
+		// Test doubles only: the real config filesystem always carries the atomic primitives.
+		await fs.writeFile(filePath, content);
+		return;
+	}
+	await replaceFileAtomically(fs, filePath, content, {
+		...(options.platform ? { platform: options.platform } : {})
+	});
 }
 
 /**

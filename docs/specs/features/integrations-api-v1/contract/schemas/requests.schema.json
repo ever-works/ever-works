@@ -381,6 +381,106 @@
 			"minProperties": 1,
 			"additionalProperties": false
 		},
+		"CreateInboxItem": {
+			"description": "POST /inbox/items (P3, CR-15, inbox:write): the integration files one of ITS OWN Inbox items (Ever Gauzy pushes its notices, questions, approvals, mentions, assignments and emails) into a member's Ever Works Inbox. Answers 201 with the inbox item DTO (origin integration, ETag). externalId is unique per tenant and integration key, forever: a replay answers 200 with the existing item UNCHANGED, never a duplicate; the same externalId in another pinned organization of the key answers 409 duplicate_external_ref. recipientUserId must be an active member of the pinned organization, and every related id a Task / Work / Goal the key can read there, else 422 domain_rule; linking one needs its read scope (tasks:read / works:read / goals:read), else 403 scope_missing. body is markdown stored and shown as plain text (never HTML). sourceUrl must be an absolute https URL without credentials (400 otherwise). email is only for kind email, choices only for question / approval (400 otherwise); choices come back as the DTO's options. Idempotency-Key is optional (externalId already de-duplicates) and, when sent, replays the first response for 24 h. The member answers the item in Ever Works like any other: no run is started, and the answer is recorded as inbox.item.updated in the same transaction (a PATCH at the version read before it answers 412). Send X-Sync-Origin so excludeOrigin keeps this key's own writes out of its change feed.",
+			"type": "object",
+			"required": ["externalId", "recipientUserId", "kind", "title"],
+			"properties": {
+				"externalId": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"recipientUserId": { "$ref": "common.schema.json#/$defs/Uuid" },
+				"kind": {
+					"type": "string",
+					"enum": ["notice", "question", "approval", "mention", "assignment", "email", "other"]
+				},
+				"title": { "type": "string", "minLength": 1, "maxLength": 300 },
+				"body": { "type": ["string", "null"], "maxLength": 20000 },
+				"sourceUrl": {
+					"description": "https only, no credentials.",
+					"type": ["string", "null"],
+					"format": "uri",
+					"pattern": "^https://",
+					"maxLength": 2000
+				},
+				"sourceLabel": {
+					"description": "The badge text; defaults to the integration's name (\"Ever Gauzy\" for an ever-gauzy key, else the key name).",
+					"type": ["string", "null"],
+					"minLength": 1,
+					"maxLength": 80
+				},
+				"related": {
+					"description": "Ever Works ids of the pinned organization the item is about.",
+					"type": ["object", "null"],
+					"properties": {
+						"taskId": { "$ref": "common.schema.json#/$defs/NullableUuid" },
+						"workId": { "$ref": "common.schema.json#/$defs/NullableUuid" },
+						"goalId": { "$ref": "common.schema.json#/$defs/NullableUuid" }
+					},
+					"additionalProperties": false
+				},
+				"email": {
+					"description": "Only for kind email: the header block shown above the body.",
+					"type": ["object", "null"],
+					"required": ["from", "subject", "receivedAt"],
+					"properties": {
+						"from": { "type": "string", "minLength": 1, "maxLength": 320 },
+						"to": { "type": ["string", "null"], "maxLength": 1000 },
+						"subject": { "type": "string", "minLength": 1, "maxLength": 300 },
+						"receivedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
+					},
+					"additionalProperties": false
+				},
+				"choices": {
+					"description": "Only for kind question / approval: the answer buttons (ids unique).",
+					"type": ["array", "null"],
+					"maxItems": 10,
+					"items": {
+						"type": "object",
+						"required": ["id", "label"],
+						"properties": {
+							"id": { "type": "string", "minLength": 1, "maxLength": 64 },
+							"label": { "type": "string", "minLength": 1, "maxLength": 200 }
+						},
+						"additionalProperties": false
+					}
+				},
+				"occurredAt": { "$ref": "common.schema.json#/$defs/NullableDateTime" }
+			},
+			"additionalProperties": false
+		},
+		"UpdateInboxItem": {
+			"description": "PATCH /inbox/items/:id (P3, CR-15, inbox:write): the integration changes one of its OWN items. Only an item this integration key created (any other item, a platform item included, answers 404 not_found). If-Match: \"<version>\" is required (400 validation_failed without it, 412 version_mismatch when it is not the current version); the write is a compare-and-set, so of two writers at one version only one lands. At least one field. state resolved is stored as status answered (resolution becomes the answer: answerOptionId = choiceId, which must be one of the item's choices, and answerText = text; without a resolution an answer the member already gave is kept); open clears the answer; archived archives. Answers the inbox item DTO with its new ETag and records inbox.item.updated.",
+			"type": "object",
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 300 },
+				"body": { "type": "string", "maxLength": 20000 },
+				"choices": {
+					"description": "Replaces the choices; null clears them. Only for kind question / approval.",
+					"type": ["array", "null"],
+					"maxItems": 10,
+					"items": {
+						"type": "object",
+						"required": ["id", "label"],
+						"properties": {
+							"id": { "type": "string", "minLength": 1, "maxLength": 64 },
+							"label": { "type": "string", "minLength": 1, "maxLength": 200 }
+						},
+						"additionalProperties": false
+					}
+				},
+				"state": { "type": "string", "enum": ["open", "resolved", "archived"] },
+				"resolution": {
+					"description": "Only with state resolved.",
+					"type": ["object", "null"],
+					"properties": {
+						"choiceId": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+						"text": { "type": ["string", "null"], "maxLength": 8000 }
+					},
+					"additionalProperties": false
+				}
+			},
+			"minProperties": 1,
+			"additionalProperties": false
+		},
 		"CreateKbDocument": {
 			"description": "POST /kb/documents (P3, EW-P3-2). Idempotency-Key required; externalRef de-duplicates (200 with the existing document). scope.type organization: scope.id must be the pinned organization and the writer an organization admin; scope.type work: a Work of the pinned organization the writer may edit. Every class is allowed at organization scope (only legal, style and seo are inherited into Works). folderId is checked before the write (404 for a folder outside the organization's library, nothing created); an organization document's path must be relative without '..' (400). A refusal by the app's rules answers 422 domain_rule (CR-7).",
 			"type": "object",

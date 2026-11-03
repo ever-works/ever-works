@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     type DeliveryResult,
     type StateMarkerPayload,
@@ -50,7 +50,11 @@ export class OnboardingTerminalService {
         private readonly onboardingRepo: OnboardingRequestRepository,
         private readonly webhookSubs: WebhookSubscriptionRepository,
         private readonly delivery: WebhookDeliveryService,
-        @Optional() private readonly stateMarker: StateMarkerService | null = null,
+        // An explicit token (C-9): `X | null` is emitted as `Object`, so a future binding (T9d) would
+        // otherwise never arrive. Not bound today.
+        @Optional()
+        @Inject(StateMarkerService)
+        private readonly stateMarker: StateMarkerService | null = null,
     ) {}
 
     async notify(input: TerminalNotification): Promise<TerminalFanoutResult> {

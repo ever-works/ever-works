@@ -33,6 +33,7 @@ import type {
     TaskAcceptanceCheck,
     WorkChecksPolicy,
     WorkExternalRefs,
+    WorkRepoDeclaredCommandPolicy,
     AppDeployTargetChoice,
     AppRepositoryMode,
     AppSourceInspectRequest,
@@ -166,6 +167,9 @@ export interface UpdateWorkDto {
     checksPolicy?: WorkChecksPolicy;
     /** Default gate-attempt budget (1..5) for Tasks without their own. */
     maxGateAttempts?: number;
+    /** EW-807 — the commands this Work's machines may run from its repository's own
+     *  declarations (`.works/works.yml`); `null` resets to off. APW-08 T14 writes it. */
+    repoDeclaredCommands?: WorkRepoDeclaredCommandPolicy | null;
     /** Merge-policy matrix (Wave 3, D4) — the Work-scoped PARTIAL override.
      *  Omitted fields inherit organization → tenant → platform default;
      *  `null` clears the Work override entirely. */
@@ -404,6 +408,9 @@ export interface Work {
     checkDefaults?: TaskAcceptanceCheck[] | null;
     checksPolicy?: WorkChecksPolicy;
     maxGateAttempts?: number;
+    // EW-807 — repository-declared commands. Absent/null means `off`: nothing
+    // the repository declares is read (APW-08 T14's card reads it).
+    repoDeclaredCommands?: WorkRepoDeclaredCommandPolicy | null;
     // Merge-policy matrix (Wave 3, D4). Absent/null means the Work
     // declares nothing and inherits organization → tenant → default.
     mergePolicy?: MergePolicyOverride | null;
@@ -778,6 +785,9 @@ export interface AppUpstreamDispatchResult {
     runId: string | null;
 }
 
+/** APW-08 T49 — how long the Overview waits for the operator switches before rendering without them. */
+const APP_WORK_SWITCHES_TIMEOUT_MS = 3_000;
+
 export const workAPI = {
     // Get all works with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -1001,6 +1011,22 @@ export const workAPI = {
     /** Read one App Work's upstream state (`plan.md:494`, FR-46/FR-56). */
     getUpstream: async (id: string): Promise<AppUpstreamStateResponse> => {
         return serverFetch<AppUpstreamStateResponse>(`/works/${id}/upstream`);
+    },
+
+    /**
+     * APW-08 T49 (FR-74, R-30) — the operator's App Works switches, for the read-only banner. The
+     * dispatchers enforce them on their own; this only lets the page say so first.
+     */
+    getAppWorkSwitches: async (): Promise<{
+        changesEnabled: boolean;
+        autoDeployEnabled: boolean;
+    }> => {
+        return serverFetch<{ changesEnabled: boolean; autoDeployEnabled: boolean }>(
+            `/app-works/switches`,
+            // Bounded (CodeRabbit on #3046): a stalled read must not hold the Overview; the page's
+            // fail-soft catch then renders it without the banner.
+            { signal: AbortSignal.timeout(APP_WORK_SWITCHES_TIMEOUT_MS) },
+        );
     },
 
     /**

@@ -7,6 +7,14 @@ import type { ManifestRenderInputs } from './types.js';
  */
 export const FIELD_MANAGER = 'ever-works-k8s-plugin';
 
+/**
+ * A run-as uid / gid is only trustworthy when it is a positive integer: 0 would contradict
+ * `runAsNonRoot`, and anything else would render an invalid pod spec.
+ */
+function nonRootId(value: number | undefined): number | undefined {
+	return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
 const COMMON_LABELS = (workId: string, slug: string): Record<string, string> => ({
 	'ever-works.io/managed': 'true',
 	'ever-works.io/work-id': workId,
@@ -25,6 +33,26 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 	const labels = COMMON_LABELS(input.workId, input.workSlug);
 	const selector = SELECTOR_LABELS(input.workSlug);
 
+	// Every site gets the parts that are safe for a process that starts as root: no SA token,
+	// RuntimeDefault seccomp and no privilege escalation (no_new_privs does not stop a root nginx
+	// master's setuid to its workers). Non-root + drop ALL is a SEAM: enforced only when a caller
+	// passes the image's numeric `runAsUser`, and no production caller does today. Forcing a uid
+	// from what a deploy believes about an image is unsafe while the image is a MUTABLE branch alias:
+	// the minimal (Astro) templates serve stock `nginx:<ver>-alpine` as root, which crash-loops under
+	// a forced uid (no write to /var/cache/nginx or its pid file) or with ALL capabilities dropped (no
+	// setuid to its workers), and every Work repo carries its own Dockerfile copy. Enforcing it needs
+	// digest-pinned deploys plus templates with a numeric USER first.
+	const runAsUser = nonRootId(input.runAsUser);
+	const runAsGroup = runAsUser === undefined ? undefined : (nonRootId(input.runAsGroup) ?? runAsUser);
+	const podSecurityContext: Record<string, unknown> =
+		runAsUser === undefined
+			? { seccompProfile: { type: 'RuntimeDefault' } }
+			: { runAsNonRoot: true, runAsUser, runAsGroup, seccompProfile: { type: 'RuntimeDefault' } };
+	const containerSecurityContext: Record<string, unknown> =
+		runAsUser === undefined
+			? { allowPrivilegeEscalation: false }
+			: { allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'] } };
+
 	const podSpec: Record<string, unknown> = {
 		// Prefer spreading replicas across failure domains when the cluster has
 		// them. This stays soft: older clusters do not understand
@@ -38,6 +66,9 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				labelSelector: { matchLabels: selector }
 			}
 		],
+		// A Work site never calls the Kubernetes API, so it gets no ServiceAccount token.
+		automountServiceAccountToken: false,
+		securityContext: podSecurityContext,
 		containers: [
 			{
 				name: 'app',
@@ -48,6 +79,11 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				// side-load an image (the kind-based e2e runbook) opt back out.
 				imagePullPolicy: input.imagePullPolicy ?? 'Always',
 				ports: [{ containerPort: input.containerPort, name: 'http' }],
+				// Never privilege escalation; no capability at all when non-root is enforced (the site listens
+				// on an unprivileged port). The root filesystem stays WRITABLE on purpose: the Next.js server
+				// writes its cache under `.next/` at runtime (the image declares `.next/cache` a VOLUME) and
+				// nginx writes /var/cache/nginx; read-only needs those paths mapped first.
+				securityContext: containerSecurityContext,
 				// A directory Work renders its whole catalogue on first request, so
 				// the default 1s probe timeout could never pass on a large one — the
 				// pod stayed 0/1 forever while the app was healthy. Readiness stays

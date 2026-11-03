@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    Inject,
     Injectable,
     Logger,
     Optional,
@@ -47,6 +48,11 @@ import { FleetNodeRepository } from './fleet-node.repository';
 import { matchNodeCredential, verifyNodeSecret } from './fleet-node-credential';
 import { FleetAgentNodeAffinityRepository } from './fleet-agent-node-affinity.repository';
 import { FleetKillSwitchService } from './fleet-kill-switch.service';
+// APW-08 T12 / T48 — a leaf (a Symbol and an interface).
+import {
+    FLEET_APP_WORK_LEASE_ADMISSION,
+    type FleetAppWorkLeaseAdmission,
+} from './fleet-app-work-lease-admission.port';
 
 /** Upper bound on the queued rows `queuedForUser` returns (cancel-in-flight with `includeQueued`). */
 export const FLEET_JOB_QUEUED_SCAN_LIMIT = 500;
@@ -248,7 +254,80 @@ export class FleetJobService {
         // present, `lease()` answers `[]` while the flag is set OR cannot
         // be read — the service folds read failures into "stopped".
         @Optional() private readonly killSwitch?: FleetKillSwitchService,
+        // APW-08 T12 / T48 — the lease half of isolated-run admission: an App Work job is
+        // offered only to a node whose containment (or the owner's allowance) admits it.
+        // Appended LAST + @Optional() + by token (positional-arity rule). Asked only for a job
+        // that carries `appWorkId`; absent, every other job leases byte-for-byte as before.
+        @Optional()
+        @Inject(FLEET_APP_WORK_LEASE_ADMISSION)
+        private readonly appWorkLeaseAdmission?: FleetAppWorkLeaseAdmission,
     ) {}
+
+    /**
+     * APW-08 T12 / T48 — may `node` lease this candidate? True for every job that is not an App
+     * Work `agent-task` (no query at all). For one that is, the port judges THIS node; a port
+     * that is missing or throws refuses (fail closed): the job stays queued for another node.
+     */
+    /**
+     * APW-08 T43 — an App Work job this node just WON: tell the admission binding, which emits
+     * `app.change.run_admitted`. Fire-and-forget — telemetry never delays or fails a lease — and
+     * only for a job the platform marked `appWorkId`, so every other lease asks nothing.
+     */
+    private reportAppWorkLeased(candidate: FleetJob, node: { id: string; userId: string }): void {
+        if (candidate.kind !== 'agent-task' || !this.appWorkLeaseAdmission?.onLeased) return;
+        const payload = candidate.payload as
+            | { appWorkId?: unknown; taskId?: unknown }
+            | null
+            | undefined;
+        const workId = payload?.appWorkId;
+        if (typeof workId !== 'string' || workId.length === 0) return;
+        const taskId =
+            typeof payload?.taskId === 'string' && payload.taskId.length > 0
+                ? payload.taskId
+                : null;
+        void this.appWorkLeaseAdmission
+            .onLeased({ userId: node.userId, nodeId: node.id, workId, jobId: candidate.id, taskId })
+            .catch(() => undefined);
+    }
+
+    private async appWorkLeaseAdmits(
+        candidate: FleetJob,
+        node: { id: string; userId: string },
+    ): Promise<boolean> {
+        if (candidate.kind !== 'agent-task') return true;
+        const workId = (candidate.payload as { appWorkId?: unknown } | null | undefined)?.appWorkId;
+        if (typeof workId !== 'string' || workId.length === 0) return true;
+        if (!this.appWorkLeaseAdmission) {
+            this.logger.warn(
+                `fleet lease: App Work job ${candidate.id} not offered to node ${node.id} — no lease admission is wired (fail closed).`,
+            );
+            return false;
+        }
+        try {
+            const taskId = (candidate.payload as { taskId?: unknown } | null | undefined)?.taskId;
+            const admitted = await this.appWorkLeaseAdmission.admitsLease({
+                userId: node.userId,
+                nodeId: node.id,
+                workId,
+                jobId: candidate.id,
+                // APW-08 T51 — so a node that reported a missing tool for this Task is passed over.
+                taskId: typeof taskId === 'string' && taskId.length > 0 ? taskId : null,
+            });
+            if (!admitted) {
+                this.logger.debug(
+                    `fleet lease: App Work job ${candidate.id} not offered to node ${node.id} — its containment is not admitted for that App Work.`,
+                );
+            }
+            return admitted === true;
+        } catch (error) {
+            this.logger.warn(
+                `fleet lease: App Work job ${candidate.id} not offered to node ${node.id} — lease admission failed (fail closed): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return false;
+        }
+    }
 
     /**
      * Write a lease-able job. Re-enqueuing the same `idempotencyKey`
@@ -559,6 +638,10 @@ export class FleetJobService {
             if (blockedByModelThrottle(candidate, throttledClis)) {
                 continue;
             }
+            // APW-08 T12 / T48 — the node that actually leases an App Work job is judged here.
+            if (!(await this.appWorkLeaseAdmits(candidate, node))) {
+                continue;
+            }
             const leaseExpiresAt = new Date(Date.now() + ttlSec * 1000);
             const attempts = (candidate.attempts ?? 0) + 1;
             // Every claim — a first lease or a re-lease after a lapse —
@@ -599,6 +682,7 @@ export class FleetJobService {
                 FleetJobLeasedEvent.EVENT_NAME,
                 new FleetJobLeasedEvent(view, node.id, node.userId),
             );
+            this.reportAppWorkLeased(candidate, node);
         }
 
         return leased;

@@ -1,5 +1,6 @@
 import {
     getWorkCapabilities,
+    normalizeInboxEmailMeta,
     RECIPIENT_EVENT_VISIBILITY,
     type IntegrationAgentDto,
     type IntegrationGoalDto,
@@ -738,6 +739,15 @@ export function toIntegrationInboxItemDto(row: InboxItem): IntegrationInboxItemD
         updatedAt: isoRequired(row.updatedAt ?? row.createdAt),
         recipientUserId: row.userId,
         kind: row.kind,
+        // Integration inbox push: who filed it, and the integration's own handle on it.
+        origin: row.origin === 'integration' ? 'integration' : 'platform',
+        externalId: row.externalId ?? null,
+        integrationKeyId: row.origin === 'integration' ? (row.integrationKeyId ?? null) : null,
+        sourceUrl: row.sourceUrl ?? null,
+        sourceLabel: row.sourceLabel ?? null,
+        email: inboxEmailMeta(row),
+        occurredAt: iso(row.occurredAt),
+        goalId: row.goalId ?? null,
         title: row.title,
         body: row.body,
         options,
@@ -755,6 +765,22 @@ export function toIntegrationInboxItemDto(row: InboxItem): IntegrationInboxItemD
         proposalId: row.proposalId ?? null,
         // The Inbox deep link the bell and channel messages use (`/inbox?id=`).
         webUrl: webUrl(`/inbox?id=${encodeURIComponent(row.id)}`),
+    };
+}
+
+/**
+ * The email header block of an integration item, closed to its four fields
+ * (`to` only when set, so the DTO matches the published schema exactly).
+ */
+function inboxEmailMeta(row: InboxItem): IntegrationInboxItemDto['email'] {
+    if (row.kind !== 'email') return null;
+    const meta = normalizeInboxEmailMeta(row.emailMeta);
+    if (!meta) return null;
+    return {
+        from: meta.from,
+        ...(meta.to ? { to: meta.to } : {}),
+        subject: meta.subject,
+        receivedAt: meta.receivedAt,
     };
 }
 

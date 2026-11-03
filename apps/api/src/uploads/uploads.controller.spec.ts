@@ -562,7 +562,7 @@ describe('UploadsController', () => {
 
             await expect(
                 ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
-            ).rejects.toBeDefined();
+            ).rejects.toBeInstanceOf(NotFoundException);
             expect(ctx.anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
             expect(ctx.uploads.saveImage).not.toHaveBeenCalled();
         });

@@ -123,6 +123,20 @@ export const BACKUP_DROPPED_ENTITIES: readonly string[] = Object.freeze([
     // Internal caches and metering plumbing.
     'CacheEntry',
     'CreditMeterEvent',
+    // Self-serve account deletion (#2986): the deletion audit row and its
+    // one-time link (`emailHash`, `tokenHash`). It describes the deletion of an
+    // ACCOUNT, not workspace content, and a restore must never bring back — let
+    // alone replay — a deletion request or a still-valid deletion token.
+    'AccountDeletionRequest',
+    // Ever Connect: this installation's connection to Ever Platform, its
+    // integrations (with the sign-in client they hand over), the report outbox,
+    // the worker lease and the answers to people's data requests. They belong to
+    // the installation, not to a workspace; a restore must never replay them.
+    'EverConnectConnection',
+    'EverConnectIntegration',
+    'EverConnectOutbox',
+    'EverConnectLease',
+    'EverConnectPersonRequest',
 ]);
 
 const DROPPED_ENTITY_SET = new Set(BACKUP_DROPPED_ENTITIES);

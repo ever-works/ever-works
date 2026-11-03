@@ -1639,7 +1639,8 @@
                 "openIdea": "Открыть эту Идею",
                 "openAgent": "Открыть этого Агента",
                 "extraRepos": "Also in",
-                "extraReposUpdateError": "Failed to update the extra repositories"
+                "extraReposUpdateError": "Failed to update the extra repositories",
+                "systemAuthor": "Ever Works"
             },
             "recurring": {
                 "section": "Повторяющееся расписание",
@@ -1763,7 +1764,9 @@
                     "green": "Passed",
                     "red": "Failed",
                     "timeout": "Timeout",
-                    "error": "Error"
+                    "error": "Error",
+                    "notAdmitted": "Not admitted",
+                    "missingTool": "Error — a tool this check needs is missing on this machine"
                 }
             },
             "checksEditor": {
@@ -1850,6 +1853,141 @@
                     "openPerUpstream": "You already have {count, plural, one {# open pull request} other {# open pull requests}} on {upstream}.",
                     "window": "You've reached this limit for now (limit: {count} per 24 hours). Next one available at {time}."
                 }
+            },
+            "delivery": {
+                "sectionTitle": "Delivery",
+                "loading": "Loading delivery…",
+                "unavailable": "Delivery could not be read.",
+                "merged": "Pull request #{number} merged into {branch}",
+                "mergedNoBranch": "Pull request #{number} merged",
+                "build": "Build #{number} of {shortSha}",
+                "buildUnnumbered": "Build of {shortSha}",
+                "buildLogs": "Build logs",
+                "deployment": "Deployment #{number}",
+                "deploymentUnnumbered": "Deployment",
+                "openBuilds": "Builds",
+                "openDeployments": "Deployments",
+                "liveAt": "Live at {url}",
+                "chipMerged": "Merged ✓ · Waiting for a build",
+                "chipBuilding": "Build ⟳",
+                "chipBuildFailed": "Build failed ✗",
+                "chipBuilt": "Built ✓ · Waiting for a deployment",
+                "chipDeploying": "Deploying ⟳",
+                "chipDeployFailed": "Deploy failed ✗ ({outcome})",
+                "chipDeployFailedPlain": "Deploy failed ✗",
+                "chipLive": "Live ✓",
+                "chipLiveWarnings": "Live ✓ (with warnings)",
+                "chipCarried": "Live ✓ (with a later change)",
+                "chipClosed": "Closed without deploying",
+                "outcome": {
+                    "failed": "failed",
+                    "rolledBack": "rolled back",
+                    "rollbackFailed": "rollback failed",
+                    "liveWithWarnings": "live with warnings"
+                },
+                "warnings": "The deployment reported warnings. Check the live app.",
+                "notDeployedBranch": "Merged into {branch} — not deployed by this app",
+                "deployNow": "Deploy now",
+                "closeWithoutDeploying": "Close without deploying",
+                "closeAnyway": "Close anyway",
+                "closeConfirm": "Close this Task even though its change isn't live? The failure stays on record.",
+                "keepOpen": "Keep open",
+                "closing": "Closing…",
+                "createFixTask": "Create a fix Task",
+                "followUp": "Follow-up: {slug} {title} ({status})",
+                "followUpRow": "Follow-up: {slug} ({status})",
+                "followUpCancelled": "No longer needed — a later deployment containing this change is live.",
+                "tryOnceMore": "Try once more",
+                "tryOnceMoreHint": "The automatic follow-ups for this change are used up. Open one more follow-up Task?",
+                "followUpOpened": "A follow-up Task was opened.",
+                "pollingStopped": "Stopped checking for updates. Reload the page to check again.",
+                "ariaBuildSucceeded": "Build succeeded",
+                "ariaDeployFailed": "Deployment failed, {outcome}",
+                "filterLabel": "Delivery",
+                "filterAny": "Any",
+                "filterWaiting": "Waiting to merge",
+                "filterBuilding": "Building",
+                "filterDeploying": "Deploying",
+                "filterLive": "Live",
+                "filterFailed": "Failed",
+                "filterClosed": "Closed without deploying",
+                "filterApply": "Apply",
+                "errors": {
+                    "notClosable": "This change can't be closed in its current state.",
+                    "followUpLimit": "No more follow-ups can be opened for this change.",
+                    "generic": "That didn't work. Try again.",
+                    "fixTaskUnavailable": "A fix Task can't be created for this change right now."
+                },
+                "deployNowHint": "Auto-deploy is off for this app, so this build waits for you to deploy it.",
+                "createFixTaskConfirm": "Create a Task to fix this failure? When this change has an Agent, Ever Works tries to start it on the fix right away (a paused agent or a spend limit can hold it); its run is billed to your workspace.",
+                "cancel": "Cancel",
+                "creatingFixTask": "Creating…",
+                "fixTaskCreated": "Fix Task {slug} was created.",
+                "fixTaskCreatedUnnamed": "A fix Task was created.",
+                "fixTaskExists": "A fix Task for this failure already exists: {slug}.",
+                "openFixTask": "Open the fix Task"
+            },
+            "cost": {
+                "sectionTitle": "Cost",
+                "loading": "Loading cost…",
+                "unavailable": "Cost could not be read.",
+                "runs": "Runs {count} · {amount}",
+                "builds": "Builds {count} · {minutes} runner minutes ({payer})",
+                "paidByGithub": "Paid by your GitHub account",
+                "paidByEverWorks": "Billed to your workspace",
+                "unknown": "unknown",
+                "total": "Total {amount}",
+                "noRuns": "No runs yet.",
+                "runLabel": "Run {id}",
+                "receipt": "Receipt",
+                "runsTruncated": "Showing the newest {count} runs.",
+                "containment": {
+                    "title": "Containment",
+                    "lastRun": "Latest Fleet run on {node}",
+                    "nextRun": "Won't receive this Task's runs until you allow it: {node}",
+                    "nodesUnreadable": "Your machines could not be read, so this Task's next Fleet run is held. Try again in a moment.",
+                    "unknownMachine": "an unknown machine",
+                    "pathHardened": "Hardened executor",
+                    "pathOrdinary": "Ordinary command runner",
+                    "isolatedHomeApplied": "Isolated home applied to the model step",
+                    "isolatedHomeNotApplied": "Isolated home not applied to the model step",
+                    "notReported": "This machine hasn't reported its containment yet.",
+                    "downgrades": "Downgrades the machine declared",
+                    "noDowngrades": "No downgrades declared.",
+                    "allowed": "You allowed this machine's downgrade for this app.",
+                    "acceptedDowngrade": "Accepted: {reason}",
+                    "withdraw": "Withdraw",
+                    "saving": "Saving…",
+                    "saveFailed": "Couldn't save the allowance. Try again.",
+                    "realHome": "Setup steps and app checks on your machines run with the machine's real home and toolchain; the checks you admit are what control them."
+                }
+            },
+            "appRules": {
+                "containmentDowngrade": "This machine runs app changes without an isolated home. Allow it once, or run this Task in an isolated sandbox.",
+                "allowOnThisMachine": "Allow on this machine"
+            },
+            "deliveryPosts": {
+                "runStarted": "Run started.",
+                "prOpened": "Opened pull request #{number}.",
+                "checksPassed": "Checks passed.",
+                "checksFailed": "Checks failed: {names}.",
+                "checksFailedUnnamed": "Checks failed.",
+                "merged": "Merged into {branch}.",
+                "mergedNoBranch": "Merged.",
+                "buildStarted": "Build #{number} started.",
+                "buildStartedUnnumbered": "Build started.",
+                "buildSucceeded": "Build #{number} succeeded.",
+                "buildSucceededUnnumbered": "Build succeeded.",
+                "buildFailed": "Build #{number} failed: {reason}.",
+                "buildFailedUnnumbered": "Build failed: {reason}.",
+                "buildFailedNoReason": "Build #{number} failed.",
+                "buildFailedUnnumberedNoReason": "Build failed.",
+                "deploying": "Deploying.",
+                "live": "Live at {url}.",
+                "liveNoUrl": "Live.",
+                "deployFailed": "Deployment failed: {outcome}.",
+                "followUpOpened": "Opened follow-up {taskSlug}.",
+                "closedWithoutDeploy": "Closed without deploying."
             }
         },
         "skillsPage": {
@@ -2192,7 +2330,10 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Задачи созданы в App Works миссии.",
+                    "no-tasks": "Нечего нового создать в App Works миссии.",
+                    "spawned-and-tasks-filed": "Созданы новые идеи и задачи в App Works миссии."
                 }
             },
             "goals": {
@@ -2224,6 +2365,26 @@
                     "detached": "Цель откреплена",
                     "detachError": "Не удалось открепить Цель"
                 }
+            },
+            "output": {
+                "title": "Результат",
+                "ideas": "Идеи",
+                "tasks": "Задачи в прикреплённых App Works",
+                "both": "И то и другое",
+                "tasksPerTick": "Задач за цикл",
+                "openCap": "Лимит открытых задач на Work",
+                "appliesTo": "Относится к Works, прикреплённым как «Улучшает» или «Эксплуатирует».",
+                "noAppWork": "Прикрепите App Work как «Улучшает» или «Эксплуатирует», чтобы создавать в нём задачи.",
+                "tasksOnWorks": "Задачи в прикреплённых Works",
+                "nothingToFile": "Нет прикреплённого App Work, в котором можно создавать задачи.",
+                "tasksOnWorksEmpty": "Задач пока нет.",
+                "save": "Сохранить",
+                "saved": "Результат сохранён",
+                "saveError": "Не удалось сохранить результат",
+                "loading": "Загрузка…",
+                "unavailable": "Не удалось загрузить задачи.",
+                "previous": "Назад",
+                "next": "Далее"
             }
         },
         "ideasPage": {
@@ -2521,7 +2682,8 @@
                     "identityUnlinked": "Удостоверение отключено",
                     "logout": "Выход",
                     "delegatedAccess": "Делегированный доступ",
-                    "identityProviderConfigChanged": "Поставщик удостоверений настроен"
+                    "identityProviderConfigChanged": "Поставщик удостоверений настроен",
+                    "appChange": "App change"
                 },
                 "statuses": {
                     "allStatuses": "Все статусы",
@@ -2589,6 +2751,11 @@
             "viewToggle": {
                 "log": "Журнал",
                 "schedules": "Расписания"
+            }
+        },
+        "feed": {
+            "narration": {
+                "missionNothingToFile": "<b>{actor}</b> сегодня не нашёл ничего нового для создания в App Works миссии"
             }
         },
         "works": {
@@ -3150,7 +3317,22 @@
                     "upgrade": "Upgrade",
                     "upgradeHint": "Paid plans are activated through billing once payments launch.",
                     "changeSuccess": "Plan updated to {name}",
-                    "changeError": "Failed to change plan"
+                    "changeError": "Failed to change plan",
+                    "perYear": "/yr",
+                    "cycle": {
+                        "label": "Billing cycle",
+                        "monthly": "Monthly",
+                        "annual": "Annual"
+                    },
+                    "billedYearly": "Billed {amount} yearly",
+                    "monthlyOnly": "Billed monthly (no annual option for this plan)",
+                    "checkoutSeats": {
+                        "label": "Members (Employees and Agents)",
+                        "extra": "{count} extra Members at {price}{period} each",
+                        "total": "Total {amount}{period}"
+                    },
+                    "manageSubscription": "Manage subscription",
+                    "subscribedNote": "You already have a subscription, so a second checkout is not offered. Change or cancel it from the billing portal."
                 },
                 "credits": {
                     "title": "Credits",
@@ -4125,6 +4307,7 @@
                         "title": "Откуда берётся каждое значение",
                         "admin": "Настройки плагина",
                         "env": "Окружение",
+                        "platform": "Ever Platform",
                         "default": "По умолчанию",
                         "unset": "Не задано"
                     },
@@ -4408,6 +4591,13 @@
             "createButton": "Создать работа"
         },
         "workDetail": {
+            "appCost": {
+                "unknown": "Unknown",
+                "tasksTitle": "This month's costliest changes",
+                "tasksHint": "What each change cost, with its runs and receipts, is on its Task's Cost section.",
+                "untitledTask": "Untitled Task",
+                "openTaskCost": "Open the Cost section of {title}"
+            },
             "missions": {
                 "title": "Missions",
                 "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
@@ -4622,8 +4812,8 @@
                     "plans": {
                         "free": "Бесплатный",
                         "pro": "Pro",
-                        "standard": "Стандартный",
-                        "premium": "Премиум",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Неограниченный"
                     },
                     "usageRequired": "Переключитесь на оплату по факту, чтобы использовать эту периодичность.",
@@ -6201,7 +6391,22 @@
                     "maxAttemptsDescription": "How many times a run may retry after a red gate before it gives up and asks for help (1–5).",
                     "defaultsLabel": "Default checks",
                     "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
-                    "defaultsSave": "Save default checks"
+                    "defaultsSave": "Save default checks",
+                    "appChecks": {
+                        "title": "App checks on your machines",
+                        "subtitle": "The checks this app's App spec declares. A Fleet node runs a check only once you admit its exact command for your machines; until then it is reported Not admitted and the gate is never green because of it.",
+                        "loading": "Loading the App spec checks…",
+                        "loadFailed": "The App spec checks could not be loaded. Try again later.",
+                        "empty": "This App spec declares no checks.",
+                        "required": "required",
+                        "advisory": "advisory",
+                        "admitted": "Admitted",
+                        "notAdmitted": "Not admitted",
+                        "admit": "Admit for my machines",
+                        "admitSaved": "Command admitted for your machines",
+                        "admitFailed": "The command could not be admitted",
+                        "allowListFull": "This Work already admits {max} commands, the most allowed."
+                    }
                 },
                 "externalRefs": {
                     "title": "Ingest routing claims",
@@ -7011,6 +7216,7 @@
                     "other": "Что-то пошло не так при настройке репозитория."
                 },
                 "overview": {
+                    "changesPaused": "Изменения в приложениях приостановлены оператором.",
                     "title": "Приложение",
                     "repository": "Репозиторий Work",
                     "upstream": "Upstream",
@@ -7974,6 +8180,14 @@
                     "targetNone": "Для этого приложения ещё не задана цель развертывания. Выберите цель развертывания, чтобы подготовить его зависимости.",
                     "targetNotChecked": "Ваш кластер ещё не прошёл проверку. Проверьте подключение, затем попробуйте ещё раз."
                 }
+            },
+            "requestChange": {
+                "title": "Start a change on {work}?",
+                "titleUnnamed": "Start this change?",
+                "body": "{agent} will work on it. An agent run will start; runs are billed to your workspace.",
+                "bodyNoAgent": "An agent will work on it. An agent run will start; runs are billed to your workspace.",
+                "start": "Start",
+                "cancel": "Cancel"
             }
         },
         "newPage": {
@@ -8888,6 +9102,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Без Work",
+                "hint": "Необязательно. Цикл создаёт каждую итерацию в этом Work. В App Work у каждой итерации своя ветка и пул-реквест."
             }
         },
         "goalDetail": {
@@ -9130,6 +9349,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Без Work",
+                "unnamed": "Work, который вы больше не можете открыть",
+                "changeLabel": "Сменить Work",
+                "hint": "Цикл создаёт каждую итерацию в этом Work.",
+                "lockedWhileRunning": "Приостановите цикл, чтобы сменить его Work.",
+                "saved": "Work сохранён",
+                "saveError": "Не удалось сменить Work"
             }
         },
         "sidebar": {
@@ -9292,6 +9521,25 @@
                 "loadError": "Не удалось загрузить модели",
                 "noModels": "Нет доступных моделей",
                 "context": "контекст {value}"
+            },
+            "changeCard": {
+                "starting": "Starting…",
+                "cancelled": "Cancelled",
+                "started": "Started {slug} on {work}.",
+                "startedUnnamed": "Started {slug}.",
+                "awaitingOwner": "Filed for the App Work's owner, who decides when it starts.",
+                "refused": "The change could not be started.",
+                "openTask": "Open the Task",
+                "stepRun": "Run",
+                "stepPullRequest": "Pull request",
+                "stepBuild": "Build",
+                "stepDeployment": "Deployment",
+                "stepLive": "Live",
+                "stateDone": "{step}: done",
+                "stateActive": "{step}: in progress",
+                "stateFailed": "{step}: failed",
+                "statePending": "{step}: not started",
+                "pollingStopped": "Stopped checking for updates. Open the Task to see where it stands."
             }
         },
         "plugins": {

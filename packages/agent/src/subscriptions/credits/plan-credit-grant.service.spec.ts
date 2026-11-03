@@ -131,7 +131,7 @@ describe('PlanCreditGrantService.grantCurrentAllowance', () => {
             proSubscription({
                 plan: {
                     code: 'premium',
-                    displayName: 'Enterprise',
+                    displayName: 'Unlimited',
                     hosting: 'cloud',
                     monthlyCredits: 25000,
                 },
@@ -191,7 +191,7 @@ describe('PlanCreditGrantService.grantCurrentAllowance', () => {
             proSubscription({
                 plan: {
                     code: 'premium',
-                    displayName: 'Enterprise',
+                    displayName: 'Unlimited',
                     hosting: 'cloud',
                     monthlyCredits: 25000,
                 },

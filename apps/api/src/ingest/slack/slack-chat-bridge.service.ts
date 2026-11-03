@@ -747,10 +747,14 @@ export class SlackChatBridgeService {
         return registered.plugin;
     }
 
-    /** Strip `<@U…>` mention tokens (and stray whitespace) from the text. */
+    /**
+     * Strip `<@U…>` mention tokens (and stray whitespace) from the text. The
+     * token body stops at the next `<` too, so a message of unclosed `<@` is
+     * scanned once, not once per opener (CodeQL js/polynomial-redos).
+     */
     private stripMentions(text: string): string {
         return text
-            .replace(/<@[^>]+>/g, ' ')
+            .replace(/<@[^<>]+>/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
     }

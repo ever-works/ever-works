@@ -1,4 +1,5 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, type Type } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import {
     TasksDomainModule,
     AGENT_TASK_EXECUTE_DISPATCHER,
@@ -7,6 +8,7 @@ import {
 import { AgentRunRepository, DatabaseModule } from '@ever-works/agent/database';
 import { AGENT_CONVERSATION_REPLY_DISPATCHER } from '@ever-works/agent/conversations';
 import { UsageModule } from '@ever-works/agent/usage';
+import { FacadesModule } from '@ever-works/agent/facades';
 // Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
 // AgentRepository so the TasksController + TaskChatController can
 // inject it for mention-lookup population. Without this import the
@@ -74,6 +76,33 @@ import { FleetAgentTaskReconcilerService } from '../fleet/fleet-agent-task-recon
 import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolver';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
+import { isE2eAppLauncherSeedEnabled } from '../app-launcher/e2e-seed.controller';
+// APW-08 T12 + T48 — isolated-run admission, the containment recorder and the Cost view reader.
+import {
+    ISOLATED_RUN_ADMISSION_PROVIDERS,
+    ISOLATED_RUN_ADMISSION_TOKENS,
+    lazyAppWorkRunAdmission,
+} from './isolated-run-admission.providers';
+
+/**
+ * APW-08 T29 — the controllers this module declares. The two product controllers are always
+ * mounted; `POST /api/e2e/app-works/task-seed` (the evolve-loop e2e fixture route) is appended
+ * only when the APW-11 seed gate is open at boot — the same registration rule as
+ * `app-launcher.module.ts` (production first: `NODE_ENV=production` never mounts it), and its
+ * `E2eSeedEnabledGuard` re-reads the gate on every request. It is loaded lazily so a process with
+ * the gate closed (every production boot, and the module specs) never loads the fixture code.
+ */
+function tasksControllers(): Type<unknown>[] {
+    const controllers: Type<unknown>[] = [TasksController, TaskChatController];
+    if (isE2eAppLauncherSeedEnabled()) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { E2eTaskSeedController } = require('./e2e-task-seed.controller') as {
+            E2eTaskSeedController: Type<unknown>;
+        };
+        controllers.push(E2eTaskSeedController);
+    }
+    return controllers;
+}
 
 /**
  * Tasks feature — Phases 12 + 13 + 15. API-side module.
@@ -112,8 +141,13 @@ import { TaskChatController } from './task-chat.controller';
         KnowledgeBaseModule,
         FleetApiModule,
         AgentActivityLogModule,
+        // APW-08 T53 (FR-72) — `GitFacadeService`, for the isolated-run admission's repository-size
+        // read (APW-01 Inspect's `getRepository(...).sizeKb`). The same import the App Works and
+        // Works modules use; without it the read would be unbound and, once the checkout stage
+        // has a limit, every App Work run would be refused as unmeasurable.
+        FacadesModule,
     ],
-    controllers: [TasksController, TaskChatController],
+    controllers: tasksControllers(),
     providers: [
         // AUDIT A46/A24 — routing binding, not a replacement: the
         // Trigger.dev adapter is still the dispatcher for every install
@@ -151,11 +185,22 @@ import { TaskChatController } from './task-chat.controller';
                 // (`runnerKind`), so the Task page can tell a fleet run from a
                 // cloud one. Display-only; from the imported DatabaseModule.
                 runs: AgentRunRepository | undefined,
+                // APW-08 T12 / T48 (review of #3040) — the Fleet half of isolated-run admission
+                // for every Fleet enqueue, resolved LAZILY: the admission reads placement
+                // through this very dispatcher, so an eager injection would be a cycle.
+                moduleRef: ModuleRef,
             ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
-                    { scopeResolver, notifications, planner, killSwitch, runs },
+                    {
+                        scopeResolver,
+                        notifications,
+                        planner,
+                        killSwitch,
+                        runs,
+                        appWorkAdmission: lazyAppWorkRunAdmission(moduleRef),
+                    },
                 ),
             inject: [
                 FleetRunRouterService,
@@ -164,6 +209,7 @@ import { TaskChatController } from './task-chat.controller';
                 FleetAgentTaskPlannerService,
                 FleetKillSwitchService,
                 { token: AgentRunRepository, optional: true },
+                ModuleRef,
             ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
@@ -199,6 +245,10 @@ import { TaskChatController } from './task-chat.controller';
             provide: SUB_AGENT_DELEGATION_DEPTH_RESOLVER,
             useExisting: SubAgentDelegationDepthResolverService,
         },
+        // APW-08 T12 + T48 — HERE because this @Global() module owns the dispatcher whose
+        // `previewPlacement` the admission reads, and imports the fleet graph (push credentials,
+        // nodes, jobs). See `isolated-run-admission.providers.ts`.
+        ...ISOLATED_RUN_ADMISSION_PROVIDERS,
     ],
     exports: [
         AGENT_TASK_EXECUTE_DISPATCHER,
@@ -207,6 +257,7 @@ import { TaskChatController } from './task-chat.controller';
         SUB_AGENT_DELEGATION_RUNNER,
         SUB_AGENT_DELEGATION_DEPTH_RESOLVER,
         WORKFLOW_NODE_RUNNER,
+        ...ISOLATED_RUN_ADMISSION_TOKENS,
     ],
 })
 export class TasksModule {}

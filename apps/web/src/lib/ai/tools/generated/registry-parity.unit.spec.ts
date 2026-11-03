@@ -85,3 +85,30 @@ describe('naming convention for NEW tools', () => {
         expect(offenders).toEqual([]);
     });
 });
+
+describe('request_app_change is reachable on a change request (APW-08 T26, ACC-08-46, APW08-G20)', () => {
+    it.each([
+        ['add an SMS reminder to my app'],
+        ['Add an SMS reminder to my app, the day before each booking'],
+        ['can you change the code of this app so the footer shows our phone number'],
+        ['add a feature to the app: export bookings as CSV'],
+        ['fix the bug in my app where the login page loops'],
+    ])('%j reaches request_app_change', (text) => {
+        expect(selectActiveToolNames(ALL_TOOL_NAMES, { text })).toContain('request_app_change');
+    });
+
+    it.each([
+        ['rotate my api key'],
+        ['what is in my daily digest'],
+        ['approve the pending item'],
+        ['send an SMS to my team about the offsite'],
+        ['what happened yesterday'],
+    ])('%j does not reach it', (text) => {
+        expect(selectActiveToolNames(ALL_TOOL_NAMES, { text })).not.toContain('request_app_change');
+    });
+
+    it('is registered exactly once, behind confirmation', () => {
+        expect(ALL_TOOL_NAMES.filter((name) => name === 'request_app_change')).toHaveLength(1);
+        expect(byName('request_app_change')?.requiresConfirmation).toBe(true);
+    });
+});

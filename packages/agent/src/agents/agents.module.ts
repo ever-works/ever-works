@@ -60,6 +60,11 @@ import { SkillsModule } from '../skills/skills.module';
 import { PolicyModule } from '../policy/policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { FacadesModule } from '../facades/facades.module';
+import { BudgetsModule } from '../budgets/budgets.module';
+import {
+    AppWorkBudgetAdmissionInstaller,
+    AppWorkBudgetService,
+} from '../app-works/app-work-budget';
 
 /**
  * Agents/Skills/Tasks — Phase 3 (PR #1017 specs). The agent-side
@@ -139,6 +144,11 @@ import { FacadesModule } from '../facades/facades.module';
         // resolves to undefined in production and the wiring never
         // fires (Codex P1 on PR #1084).
         FacadesModule,
+        // APW-08 T56 (FR-73) — `BudgetGuardService` / `BudgetService` for the App Work budget the
+        // run admission chain books every App Work run against. Imported, never re-provided (a
+        // second guard would hold its own alert wiring). A leaf: it imports only DatabaseModule,
+        // and FacadesModule above already imports it.
+        BudgetsModule,
     ],
     providers: [
         AgentRepository,
@@ -185,6 +195,12 @@ import { FacadesModule } from '../facades/facades.module';
         // AGENT_TASK_EXECUTE_DISPATCHER it drains through is @Optional()
         // and bound by the api-side @Global() TasksModule.
         RunDispatchGateService,
+        // APW-08 T56 (XC-19, FR-73, FR-66) — one budget per App Work: the booking door, and the
+        // installer that puts its middleware into THIS gate's admission chain at module init
+        // (`withAdmissionChain`), so a run of an App Work whose budget is spent is parked
+        // `work-budget` — a wait — on every dispatch path. Other Work kinds are untouched.
+        AppWorkBudgetService,
+        AppWorkBudgetAdmissionInstaller,
         // Wave 4 M5 — steer / interrupt / resume. Reuses the gate for resume
         // admission and the existing cancel path for stop.
         RunSteeringService,
@@ -247,6 +263,7 @@ import { FacadesModule } from '../facades/facades.module';
         PromptAssemblerService,
         AgentRunService,
         RunDispatchGateService,
+        AppWorkBudgetService,
         RunSteeringService,
         TerminalSessionLauncher,
         AgentToolService,

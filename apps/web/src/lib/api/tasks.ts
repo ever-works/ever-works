@@ -1,11 +1,19 @@
 import 'server-only';
 import type {
+    AgentEscalationDto,
     DecisionConflictReportDto,
     GateStatus,
     RecordListView,
     TaskAcceptanceCheck,
     TaskBoardSort,
     TaskBoardTerminalWindow,
+    TaskCostView,
+    TaskDeliveryEmbed,
+    TaskDeliveryFixTaskResponse,
+    TaskDeliveryFollowUpResponse,
+    TaskDeliveryState,
+    TaskDeliveryStateFilter,
+    TaskDeliveryView,
     TaskExtraRepo,
 } from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
@@ -276,6 +284,16 @@ export interface Task {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Gate-attempt budget; `null` = inherit the Work default. */
     maxGateAttempts?: number | null;
+    /**
+     * APW-08 — where a merged App Work change stands (`merged` → … → `live`); null / absent for
+     * a Task the delivery chain does not track.
+     */
+    deliveryState?: TaskDeliveryState | null;
+    /**
+     * APW-08 T24 — the board chip's inputs, present only on `includeDelivery=true` list rows;
+     * `null` for an untracked Task.
+     */
+    delivery?: TaskDeliveryEmbed | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -298,6 +316,15 @@ export interface ListTasksQuery {
     offset?: number;
     /** Kanban run cockpit (Wave 2) — embed each row's latest AgentRun. */
     includeRun?: boolean;
+    /**
+     * APW-08 T24 — the App Work Tasks tab's Delivery filter: delivery states and/or `waiting`
+     * (not merged yet), OR-ed.
+     */
+    deliveryState?: TaskDeliveryStateFilter | readonly TaskDeliveryStateFilter[];
+    /** APW-08 T24 — attach each row's `delivery` (the board chips' inputs). */
+    includeDelivery?: boolean;
+    /** Row order: `updatedAt` (the API default — omitted) or `createdAt` (newest first). */
+    orderBy?: 'updatedAt' | 'createdAt';
 }
 
 function buildQuery(q: ListTasksQuery = {}): string {
@@ -314,7 +341,13 @@ function buildQuery(q: ListTasksQuery = {}): string {
     if (q.limit !== undefined) params.set('limit', String(q.limit));
     if (q.offset !== undefined) params.set('offset', String(q.offset));
     if (q.includeRun) params.set('includeRun', 'true');
+    if (q.deliveryState) {
+        const tokens = typeof q.deliveryState === 'string' ? [q.deliveryState] : q.deliveryState;
+        if (tokens.length > 0) params.set('deliveryState', tokens.join(','));
+    }
+    if (q.includeDelivery) params.set('includeDelivery', 'true');
     if (q.view && q.view !== 'mine') params.set('view', q.view);
+    if (q.orderBy === 'createdAt') params.set('orderBy', 'createdAt');
     const s = params.toString();
     return s ? `?${s}` : '';
 }
@@ -749,6 +782,58 @@ export const tasksAPI = {
         );
     },
 
+    // ── App Works delivery and cost (APW-08 T24 / T27) ─────────────
+
+    /** `GET /api/tasks/:id/delivery` — where the merged change stands (`state: null` = untracked). */
+    async delivery(id: string) {
+        return serverFetch<TaskDeliveryView>(`/tasks/${id}/delivery`, { method: 'GET' });
+    },
+
+    /** **Close anyway** / **Close without deploying** — 422 `notClosable` unless merged, built or failed. */
+    async closeDelivery(id: string, note?: string | null) {
+        return serverMutation<TaskDeliveryView>({
+            endpoint: `/tasks/${id}/delivery/close`,
+            data: note ? { note } : {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** **Try once more** — consumes the Task's open `delivery-failed` escalation (202). */
+    async deliveryFollowUp(id: string, escalationId: string) {
+        return serverMutation<TaskDeliveryFollowUpResponse>({
+            endpoint: `/tasks/${id}/delivery/follow-up`,
+            data: { escalationId },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * APW-08 T27 — **Create a fix Task**: the follow-up Task for the change's current failure
+     * (201; `created: false` = the one already filed). 422 `fixTaskUnavailable` otherwise.
+     */
+    async deliveryFixTask(id: string) {
+        return serverMutation<TaskDeliveryFixTaskResponse>({
+            endpoint: `/tasks/${id}/delivery/fix-task`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** `GET /api/tasks/:id/cost` — the Task's runs and what they cost (`null` = unknown). */
+    async cost(id: string) {
+        return serverFetch<TaskCostView>(`/tasks/${id}/cost`, { method: 'GET' });
+    },
+
+    /** Judgment layer G3 — the escalations recorded for this Task (newest first). */
+    async listEscalations(id: string) {
+        return serverFetch<{ data: AgentEscalationDto[] }>(`/tasks/${id}/escalations`, {
+            method: 'GET',
+        });
+    },
+
     /** Per-Task activity feed (rows stamped resourceType='task'). */
     async listActivity(id: string, opts: { limit?: number; offset?: number } = {}) {
         const params = new URLSearchParams();
@@ -851,14 +936,30 @@ export interface TaskChatMention {
     slug?: string;
 }
 
+/**
+ * APW-08 T54 — who wrote a chat message: {@link TaskAuthorType} plus `'system'`, a platform post
+ * (a delivery-chain progress line) on a Task with no Agent, which carries no author id.
+ */
+export type TaskChatAuthorType = TaskAuthorType | 'system';
+
 export interface TaskChatMessage {
     id: string;
     taskId: string;
-    authorType: TaskAuthorType;
-    authorId: string;
+    authorType: TaskChatAuthorType;
+    /** `null` only on a `'system'` post. */
+    authorId: string | null;
     /** EW-P1-2 — display attribution for an `'integration'` author. */
     externalAuthor?: { name: string; avatarUrl?: string | null; source: string } | null;
+    /** For a keyed post, the pre-rendered English — shown when the key cannot be rendered. */
     body: string;
+    /**
+     * APW-08 T54 (FR-43) — a platform post's copy key, relative to `dashboard.tasksPage`
+     * (`deliveryPosts.live`), rendered in the reader's locale. Absent / null on every message a
+     * person, an agent or an integration wrote.
+     */
+    messageKey?: string | null;
+    /** APW-08 T54 — the values `messageKey`'s copy takes. */
+    messageParams?: Record<string, string | number> | null;
     mentions: TaskChatMention[] | null;
     attachments: { uploadId: string }[] | null;
     editedAt: string | null;

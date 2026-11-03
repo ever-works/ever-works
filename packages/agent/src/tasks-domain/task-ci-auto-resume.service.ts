@@ -34,6 +34,12 @@ import type { TaskAutoResumeTrigger } from '../entities/task-ci-auto-resume-atte
 import type { AgentRun } from '../entities/agent-run.entity';
 import { isAgentReviewRunScope } from './task-agent-review';
 import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
+import { TASK_APP_CHECKS, type TaskAppChecks } from './task-app-checks.port';
+import {
+    APP_CHECK_LEG_PREFIX,
+    APP_CHECK_REPORTER_SLUG,
+    isAdvisoryAppCheckLeg,
+} from './app-check-legs';
 import {
     REVIEW_FEEDBACK_DATA_NOTICE,
     fenceReviewFeedback,
@@ -90,6 +96,23 @@ export interface CiCheckResultInput {
      * and for push-triggered workflow runs.
      */
     prHeads?: readonly { number: number; headSha: string | null }[];
+    /**
+     * APW-08 T16 — `check_run.pull_requests[].base.ref`, per pull request:
+     * the branch each one merges INTO, as the provider reports it. Read only
+     * to classify an App Work's advisory `Ever Works check: {name}` legs at
+     * the PR's real base (the same branch the sweep reads,
+     * `GitPullRequestStatus.baseRef`). Absent on suite / workflow deliveries
+     * and from an older intake: the Work's base branch is used then.
+     */
+    prBaseRefs?: readonly { number: number; baseRef: string }[];
+    /**
+     * APW-08 T16 — set only by `TaskPrStatusService`'s two-minute re-offer: the
+     * delivery IS the sweep's own reading of the pull request, whose roll-up
+     * already counted an App Work's advisory legs as passing and whose failing
+     * check list already left them out. It is therefore never reclassified
+     * (and costs no Work read). The webhook intake never sets it.
+     */
+    fromPullRequestPoll?: boolean;
     /**
      * When the PROVIDER says this result happened, or `null` when the
      * delivery carried no usable timestamp.
@@ -219,6 +242,24 @@ export interface ReviewRejectionSignalInput {
  * per-Task lifetime ceiling. Each attempt is one `agent-task-execute`
  * run — the same order of model spend as the run that opened the pull
  * request. See `docs/features/ci-auto-resume.md`.
+ *
+ * ## An App Work Task (APW-08 T16, FR-17)
+ *
+ * Four differences, all behind `TASK_APP_CHECKS` and all a branch on the
+ * Work being `kind: 'app'` — every other kind is decided exactly as above:
+ *
+ *  * a CI red is budgeted by the Work's gate-attempt budget (1–5, default 2),
+ *    counted over CI attempts only, not by the env var. The env var's `0`
+ *    still means OFF for every kind: it is the operator's switch for the
+ *    whole loop, not a budget. A review-triggered resume keeps today's rule;
+ *  * the repeat-failure stop does not apply: FR-17 sends the Agent back once
+ *    per attempt "up to the Work's gate-attempt budget", and the sweep's
+ *    failure fingerprint is names-only, so the same red `type-check` would
+ *    otherwise stop the loop after one attempt and never reach the budget;
+ *  * a red ADVISORY `Ever Works check: {name}` leg, and any red suite /
+ *    workflow-level delivery, is not a failure — see `classifyAppDelivery`;
+ *  * a spent budget moves the Task to `BLOCKED` with the `gate-exhausted`
+ *    escalation instead of filing only the Inbox notice.
  */
 @Injectable()
 export class TaskCiAutoResumeService {
@@ -258,6 +299,13 @@ export class TaskCiAutoResumeService {
         // nothing.
         @Optional() private readonly approvers?: TaskApproverRepository,
         @Optional() private readonly assignees?: TaskAssigneeRepository,
+        // APW-08 T16 (FR-17) — an App Work Task's budget, advisory legs and
+        // exhaustion (see the class doc). Appended LAST + @Optional() and
+        // injected by TOKEN (positional-spec arity rule; the port imports
+        // nothing at runtime). Absent, every Task is decided as before.
+        @Optional()
+        @Inject(TASK_APP_CHECKS)
+        private readonly appChecks?: TaskAppChecks,
     ) {}
 
     /**
@@ -346,7 +394,16 @@ export class TaskCiAutoResumeService {
             return { reason: 'unverified-branch', taskId: task.id };
         }
 
-        const failing = input.verdict === 'failing';
+        // APW-08 T16 (FR-16) — on an App Work Task two kinds of red delivery
+        // FROM THE APP-CHECK REPORTER (`github-actions`) are not failures here,
+        // and must neither mark the head red nor spend an attempt: a red
+        // ADVISORY `Ever Works check: {name}` leg, and a suite / workflow-level
+        // delivery (its `checkName` is an app slug or a workflow name, so it
+        // cannot say which leg failed — the advisory-adjusted roll-up of the
+        // two-minute sweep speaks for it instead). Any other reporter, and
+        // anything unreadable, keeps the delivery red.
+        const appDelivery = await this.classifyAppDelivery(task, input, prNumber);
+        const failing = input.verdict === 'failing' && !appDelivery.notAFailure;
         const decision = decideCiHead(task, {
             headSha,
             // The pull request THIS Task owns, never simply the first entry
@@ -387,6 +444,9 @@ export class TaskCiAutoResumeService {
             claimKey: ciAutoResumeClaimKey(headSha),
             headSha,
             failureKey: input.failureKey ?? null,
+            // Already read for a suite / workflow delivery; `undefined` = read
+            // it lazily, after the stop checks (so a stopped Task stays a read).
+            appBudget: appDelivery.appBudget,
             detail: `${input.granularity}:${input.checkName}`,
             feedback: {
                 text: feedback,
@@ -486,11 +546,13 @@ export class TaskCiAutoResumeService {
             prUrl: string | null;
         } | null;
         notice: { repoFullName: string; prNumber: number | null; headSha: string | null };
+        /** APW-08 T16 — an App Work budget the caller already read (`undefined` = not read). */
+        appBudget?: number | null;
     }): Promise<AutoResumeOutcome> {
         const { task } = ctx;
-        const maxAttempts = config.agents.getCiAutoResumeMaxAttempts();
-        if (maxAttempts <= 0) {
-            return { reason: 'disabled', taskId: task.id, maxAttempts };
+        const platformMaxAttempts = config.agents.getCiAutoResumeMaxAttempts();
+        if (platformMaxAttempts <= 0) {
+            return { reason: 'disabled', taskId: task.id, maxAttempts: platformMaxAttempts };
         }
         if (task.status === TaskStatus.DONE || task.status === TaskStatus.CANCELLED) {
             return { reason: 'task-finished', taskId: task.id };
@@ -503,7 +565,13 @@ export class TaskCiAutoResumeService {
         // guaranteed-zero-row UPDATE against the busiest table in the
         // schema, forever, per Task, across six machines.
         if (task.ciAutoResumeNoticedAt) {
-            return { reason: 'stopped', taskId: task.id, maxAttempts };
+            // Still a pure read (APW-08 T16 review): an App Work's budget is not
+            // looked up just to say "stopped" — it is reported when already known.
+            return {
+                reason: 'stopped',
+                taskId: task.id,
+                maxAttempts: (ctx.trigger === 'ci' ? ctx.appBudget : null) ?? platformMaxAttempts,
+            };
         }
         // A merged or closed pull request has nothing left to push a fix
         // to. `TaskStatus` alone does not cover this: the merged -> DONE
@@ -525,10 +593,30 @@ export class TaskCiAutoResumeService {
             return { reason: 'no-steering', taskId: task.id };
         }
 
+        // APW-08 T16 (FR-17) — a CI red on an App Work Task is budgeted by its
+        // Work's gate-attempt budget, counted over CI attempts only, and runs
+        // to that budget (no repeat-failure stop: FR-17 sends the Agent back
+        // "up to the Work's gate-attempt budget", then Blocks). Read HERE,
+        // below every stop check, so a stopped or finished Task of any kind
+        // costs no Work read. A review-triggered resume, and every other Work
+        // kind, keep the env-var budget over all attempts, unchanged.
+        const appBudget =
+            ctx.trigger !== 'ci'
+                ? null
+                : ctx.appBudget !== undefined
+                  ? ctx.appBudget
+                  : await this.appResumeBudget(task);
+        const appWork = appBudget !== null;
+        const maxAttempts = appBudget ?? platformMaxAttempts;
+        const countAttempts = () =>
+            appWork
+                ? this.attempts.countForTask(task.id, 'ci')
+                : this.attempts.countForTask(task.id);
+
         // ── the budget, from durable state, counted per ATTEMPT ──────
         let attemptsUsed: number;
         try {
-            attemptsUsed = await this.attempts.countForTask(task.id);
+            attemptsUsed = await countAttempts();
         } catch (error) {
             // A budget nobody can count is not a budget. STOP.
             this.logger.warn(
@@ -550,11 +638,12 @@ export class TaskCiAutoResumeService {
                     'budget-spent',
                     attemptsUsed,
                     maxAttempts,
+                    appWork,
                 ),
             };
         }
 
-        if (ctx.failureKey) {
+        if (ctx.failureKey && !appWork) {
             let repeated: boolean;
             try {
                 repeated = await this.attempts.hasFailureKey(task.id, ctx.failureKey);
@@ -652,7 +741,7 @@ export class TaskCiAutoResumeService {
         // which is the direction that matters here.
         let settled: number;
         try {
-            settled = await this.attempts.countForTask(task.id);
+            settled = await countAttempts();
         } catch (error) {
             this.logger.warn(
                 `Task ${task.id}: budget unreadable after claiming attempt ${claimed.id} — not dispatching: ${
@@ -670,7 +759,13 @@ export class TaskCiAutoResumeService {
                 taskId: task.id,
                 attemptsUsed: settled,
                 maxAttempts,
-                noticeFiled: await this.fileStopNotice(ctx, 'budget-spent', settled, maxAttempts),
+                noticeFiled: await this.fileStopNotice(
+                    ctx,
+                    'budget-spent',
+                    settled,
+                    maxAttempts,
+                    appWork,
+                ),
             };
         }
 
@@ -1003,6 +1098,8 @@ export class TaskCiAutoResumeService {
         reason: Extract<AutoResumeOutcomeReason, 'budget-spent' | 'repeat-failure'>,
         attemptsUsed: number,
         maxAttempts: number,
+        // APW-08 T16 — the Task is on an App Work (its budget came from the Work).
+        appWork = false,
     ): Promise<boolean> {
         // Already stopped — nothing to claim and nothing to file. Checked
         // against the row in hand so the post-stop steady state issues no
@@ -1026,6 +1123,35 @@ export class TaskCiAutoResumeService {
         // the loop rather than re-deciding the same terminal condition on
         // every future delivery.
         ctx.task.ciAutoResumeNoticedAt = new Date();
+        // APW-08 T16 (FR-17) — an App Work Task whose budget is SPENT is
+        // Blocked and escalated (`gate-exhausted`) instead. After the marker,
+        // so it happens once however many deliveries rediscover the spend.
+        if (appWork && reason === 'budget-spent' && this.appChecks) {
+            const escalated = await this.appChecks
+                .escalateExhausted(ctx.task, {
+                    attemptsUsed,
+                    maxAttempts,
+                    repoFullName: ctx.notice.repoFullName,
+                    prNumber: ctx.notice.prNumber,
+                    headSha: ctx.notice.headSha,
+                })
+                .catch((error: unknown) => {
+                    this.logger.warn(
+                        `Task ${ctx.task.id}: the gate-exhausted escalation failed: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                    return false;
+                });
+            // Only a RECORDED escalation replaces the notice (CodeRabbit on #3038). The marker is
+            // already claimed, so an escalation that was not recorded — its Work unreadable,
+            // escalation logging off, no escalation service bound — must not leave the owner
+            // with nothing: fall through to the Inbox notice below.
+            if (escalated) return true;
+            this.logger.warn(
+                `Task ${ctx.task.id}: the gate-exhausted escalation was not recorded — filing the Inbox notice instead.`,
+            );
+        }
         if (!this.inbox) return false;
 
         const { title, body } = composeBudgetSpentNotice({
@@ -1054,6 +1180,85 @@ export class TaskCiAutoResumeService {
             );
             return false;
         }
+    }
+
+    /**
+     * APW-08 T16 — the Work's gate-attempt budget for an App Work Task, or
+     * `null` (not an App Work, no port bound, or a read that failed — the env
+     * var's budget then applies, which is itself bounded).
+     */
+    private async appResumeBudget(task: Task): Promise<number | null> {
+        if (!this.appChecks) return null;
+        try {
+            return await this.appChecks.resumeBudget(task);
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: App Work budget unreadable — using the platform budget: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * APW-08 T16 — what a RED delivery means for an App Work Task.
+     *
+     *  - **`check_run`** (one leg): not a failure when it is an ADVISORY App
+     *    leg under the rules at the PR's base (the delivery's own
+     *    `pull_requests[].base.ref` for this Task's pull request, else the
+     *    Work's base branch). Only a check named like an App leg is asked
+     *    about, so no other check — and no other kind — costs a read.
+     *  - **`check_suite` / `workflow_run`**: never a failure for an App Work
+     *    Task. Their `checkName` is an app slug or a workflow name, so a red
+     *    one cannot say whether only an advisory leg failed; the per-leg
+     *    `check_run` deliveries and the sweep's advisory-adjusted roll-up are
+     *    what act. One Work read, for a red suite / workflow delivery only.
+     *
+     * Both rules apply ONLY to deliveries from the App-check reporter
+     * (`APP_CHECK_REPORTER_SLUG`, the app that runs APW-05's generated
+     * workflow). A name or a suite from any other app — trusted or not — is
+     * an ordinary CI signal: an app can call its run `Ever Works check: e2e`.
+     *
+     * Green deliveries are never asked about. Anything unreadable answers
+     * "a failure", as before this task.
+     */
+    private async classifyAppDelivery(
+        task: Task,
+        input: CiCheckResultInput,
+        prNumber: number | null,
+    ): Promise<{ notAFailure: boolean; appBudget: number | null | undefined }> {
+        if (!this.appChecks || input.verdict !== 'failing' || input.fromPullRequestPoll === true) {
+            return { notAFailure: false, appBudget: undefined };
+        }
+        // Only the App-check reporter speaks for App legs (CodeRabbit on #3038). Another app on
+        // `GITHUB_TRUSTED_CHECK_APPS` that reports `Ever Works check: …` — or a suite of its own —
+        // stays an ordinary CI signal, exactly as before this task.
+        const fromAppCheckReporter =
+            (input.appSlug ?? '').trim().toLowerCase() === APP_CHECK_REPORTER_SLUG;
+        if (!fromAppCheckReporter) return { notAFailure: false, appBudget: undefined };
+        if (input.granularity === 'check_run') {
+            const name = typeof input.checkName === 'string' ? input.checkName : '';
+            if (!name.startsWith(APP_CHECK_LEG_PREFIX)) {
+                return { notAFailure: false, appBudget: undefined };
+            }
+            const wanted = prNumber ?? task.prNumber ?? null;
+            const baseRef =
+                (wanted !== null
+                    ? input.prBaseRefs?.find((entry) => entry.number === wanted)?.baseRef
+                    : undefined) ?? null;
+            try {
+                const advisory = await this.appChecks.advisoryLegs(task, baseRef);
+                return {
+                    notAFailure: isAdvisoryAppCheckLeg({ name, appSlug: input.appSlug }, advisory),
+                    appBudget: undefined,
+                };
+            } catch {
+                return { notAFailure: false, appBudget: undefined };
+            }
+        }
+        const appBudget = await this.appResumeBudget(task);
+        return { notAFailure: appBudget !== null, appBudget };
     }
 
     /** Fail-closed read of the global stop flag, mirroring the fan-out driver. */

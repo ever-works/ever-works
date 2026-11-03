@@ -271,6 +271,14 @@ describe('k8s-inline-mailpit — the in-namespace mail sink', () => {
 		expect(declaredFrom(context(), cluster)).toBe('no-reply@my-app.invalid');
 	});
 
+	it('trims and collapses dash runs in the slug, and falls back to `app` when nothing is left', () => {
+		const from = (workSlug: string) =>
+			declaredFrom(context(), { kubeconfig: KUBECONFIG, namespace: NAMESPACE, workSlug });
+		expect(from('--my---app--')).toBe('no-reply@my-app.invalid');
+		expect(from('!!!')).toBe('no-reply@app.invalid');
+		expect(from('-'.repeat(50_000))).toBe('no-reply@app.invalid');
+	});
+
 	it('re-reads its outputs from the cluster', async () => {
 		const cluster = new FakeDependencyCluster();
 		const outcome = await provider(cluster).provision(SMTP_PROVIDER_ID, context());

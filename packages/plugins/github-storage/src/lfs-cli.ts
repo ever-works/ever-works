@@ -227,7 +227,7 @@ export async function commitWithLfsCli(
  * `uploads`.
  */
 function sanitizeTrackPattern(pathPrefix: string): string {
-	const safe = pathPrefix.replace(/(^\/+|\/+$)/g, '');
+	const safe = pathPrefix.replace(/(^\/+|(?<!\/)\/+$)/g, '');
 	if (safe.length === 0) return '*';
 	// Security: reject `..` path components so a misconfigured
 	// `GITHUB_STORAGE_PATH_PREFIX` (e.g. `uploads/../.github/workflows`)

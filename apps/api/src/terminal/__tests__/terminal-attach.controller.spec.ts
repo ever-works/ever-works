@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { TerminalAttachController } from '../terminal-attach.controller';
+import { TerminalAttachController, terminalSessionsEnabled } from '../terminal-attach.controller';
 import { TerminalAttachService, resolveRequestedAttachRole } from '../terminal-attach.service';
 import { TerminalRelayRegistry } from '../terminal-relay.registry';
 import type { AgentsService, TerminalSessionLauncher } from '@ever-works/agent/agents';
@@ -134,6 +134,7 @@ describe('TerminalAttachController — run-scoped authorization', () => {
      * a session nothing ever launched.
      */
     describe('POST start', () => {
+        const savedSessionsFlag = process.env.TERMINAL_SESSIONS_ENABLED;
         let launcher: { startForRun: jest.Mock };
 
         function makeController(withLauncher = true) {
@@ -147,11 +148,18 @@ describe('TerminalAttachController — run-scoped authorization', () => {
         }
 
         beforeEach(() => {
+            // Sessions are opt-in; the cases below exercise an install that opted in.
+            process.env.TERMINAL_SESSIONS_ENABLED = 'true';
             launcher = {
                 startForRun: jest
                     .fn()
                     .mockResolvedValue({ started: true, runId: RUN, jobRunId: 'job_1' }),
             };
+        });
+
+        afterEach(() => {
+            if (savedSessionsFlag === undefined) delete process.env.TERMINAL_SESSIONS_ENABLED;
+            else process.env.TERMINAL_SESSIONS_ENABLED = savedSessionsFlag;
         });
 
         it('starts a session for the run owner and flags the run persistent', async () => {
@@ -204,6 +212,34 @@ describe('TerminalAttachController — run-scoped authorization', () => {
             await expect(makeController().start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
                 ServiceUnavailableException,
             );
+        });
+
+        it('503s when terminal sessions are disabled (the default) and never dispatches', async () => {
+            delete process.env.TERMINAL_SESSIONS_ENABLED;
+            await expect(makeController().start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
+                ServiceUnavailableException,
+            );
+            expect(agents.getOne).toHaveBeenCalledWith('user-1', AGENT);
+            expect(launcher.startForRun).not.toHaveBeenCalled();
+        });
+
+        it('still 404s a stranger while disabled — ownership is checked first (no existence leak)', async () => {
+            delete process.env.TERMINAL_SESSIONS_ENABLED;
+            runs.findByIdAndUser.mockResolvedValueOnce(null);
+            await expect(makeController().start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(launcher.startForRun).not.toHaveBeenCalled();
+        });
+
+        it('terminalSessionsEnabled is opt-in only: "true" (any case, padded) enables, anything else is off', () => {
+            expect(terminalSessionsEnabled({})).toBe(false);
+            expect(terminalSessionsEnabled({ TERMINAL_SESSIONS_ENABLED: '' })).toBe(false);
+            expect(terminalSessionsEnabled({ TERMINAL_SESSIONS_ENABLED: '1' })).toBe(false);
+            expect(terminalSessionsEnabled({ TERMINAL_SESSIONS_ENABLED: 'yes' })).toBe(false);
+            expect(terminalSessionsEnabled({ TERMINAL_SESSIONS_ENABLED: 'false' })).toBe(false);
+            expect(terminalSessionsEnabled({ TERMINAL_SESSIONS_ENABLED: 'true' })).toBe(true);
+            expect(terminalSessionsEnabled({ TERMINAL_SESSIONS_ENABLED: ' TRUE ' })).toBe(true);
         });
     });
 });

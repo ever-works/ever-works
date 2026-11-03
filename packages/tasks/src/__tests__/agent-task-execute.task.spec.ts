@@ -198,6 +198,18 @@ vi.mock('@ever-works/agent/tasks-domain', () => ({
     isAgentReviewRunScope: isAgentReviewRunScopeMock,
 }));
 
+// APW-08 T12 — the REAL cloud pre-flight of isolated-run admission (a leaf: contracts and the T48
+// containment leaf only), so these specs pin what the worker actually refuses.
+vi.mock('@ever-works/agent/app-works', async () => {
+    const leaf = await vi.importActual<
+        typeof import('../../../agent/src/app-works/isolated-run-admission')
+    >('../../../agent/src/app-works/isolated-run-admission');
+    return {
+        appWorkCloudRunRefusal: leaf.appWorkCloudRunRefusal,
+        describeAppWorkUnreadableDispatch: leaf.describeAppWorkUnreadableDispatch,
+    };
+});
+
 vi.mock('../trigger/worker/modules/trigger-internal.module', () => ({
     TriggerInternalModule: StubInternalModule,
 }));
@@ -745,6 +757,43 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
             expect(gateRunner.runChecks).not.toHaveBeenCalled();
             expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
             expect(result).toMatchObject({ status: 'completed', workspaceOutcome: 'pr-opened' });
+        });
+
+        // Review of #3050 (APW-08 T46) — the runtime's own success (`dispatched`) mirrored its end
+        // nowhere: the Task kept `latestRunStatus: running` and T46's stop handler was never asked.
+        it('a dispatched run mirrors its end AFTER its pull request is opened', async () => {
+            useWorkTask();
+            runner.execute.mockResolvedValue({ status: 'dispatched' });
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            taskWorkspace.finalizeRun.mockResolvedValue({ outcome: 'pr-opened', prNumber: 7 });
+            resolveChecksPolicyMock.mockReturnValue('off');
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(result).toMatchObject({ status: 'completed', workspaceOutcome: 'pr-opened' });
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(
+                OWNED_TASK_ID,
+                'run-1',
+                'completed',
+            );
+            expect(taskWorkspace.finalizeRun.mock.invocationCallOrder[0]).toBeLessThan(
+                runDenorm.recordTerminal.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('a dispatched run with no workspace mirrors its end too', async () => {
+            useWorkTask();
+            runner.execute.mockResolvedValue({ status: 'dispatched' });
+            resolveChecksPolicyMock.mockReturnValue('off');
+
+            await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(
+                OWNED_TASK_ID,
+                'run-1',
+                'completed',
+            );
         });
 
         it("red gate + policy 'required' → NO finalize/PR, run completes naming the failing check, task chat notified", async () => {
@@ -1574,6 +1623,108 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 expect(taskWorkspace.provisionForRun).toHaveBeenCalledTimes(1);
                 expect(gateRunner.runChecks).toHaveBeenCalled();
                 expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+            });
+        });
+
+        // APW-08 T12 (FR-12) — isolated-run admission, site 2: the cloud worker is the cloud
+        // placement, and its runtime enforces no network policy, so an App Work run that reaches
+        // it is refused before anything is provisioned or any model is called.
+        describe('isolated-run admission pre-flight (APW-08 T12, site 2)', () => {
+            const runPayload = () => ({ ...basePayload(OWNED_TASK_ID), runId: 'run-1' });
+            const queuedRun = (over: Record<string, unknown> = {}) => ({
+                id: 'run-1',
+                agentId: AGENT_ID,
+                taskId: OWNED_TASK_ID,
+                status: 'queued',
+                workId: WORK_ID,
+                delegationScope: null,
+                ...over,
+            });
+
+            it('refuses an App Work run with the noIsolatedRuntime copy: no workspace, no model call', async () => {
+                useWorkTask();
+                works.findById.mockResolvedValue({ id: WORK_ID, kind: 'app' });
+                runs.findById.mockResolvedValue(queuedRun());
+
+                const out = await registeredConfig.run(runPayload());
+
+                expect(out).toEqual(
+                    expect.objectContaining({
+                        status: 'failed',
+                        reason: 'app-work-run-not-admitted',
+                    }),
+                );
+                expect(runs.markFailed).toHaveBeenCalledWith(
+                    'run-1',
+                    expect.stringMatching(/^noIsolatedRuntime: This app's code can only run/),
+                );
+                expect(taskWorkspace.provisionForRun).not.toHaveBeenCalled();
+                expect(runner.execute).not.toHaveBeenCalled();
+                expect(runDenorm.recordTerminal).toHaveBeenCalledWith(
+                    OWNED_TASK_ID,
+                    'run-1',
+                    'failed',
+                );
+                expect(dispatchGate.drainForWork).toHaveBeenCalledWith(WORK_ID);
+            });
+
+            it('lets a REVIEW run on an App Work through (a review is not a change)', async () => {
+                useWorkTask();
+                works.findById.mockResolvedValue({ id: WORK_ID, kind: 'app' });
+                const REVIEW = { allowedTools: ['submitTaskReview'] };
+                runs.findById.mockResolvedValue(queuedRun({ delegationScope: REVIEW }));
+                isAgentReviewRunScopeMock.mockImplementation((scope: unknown) => scope === REVIEW);
+
+                await registeredConfig.run(runPayload());
+
+                expect(runs.markFailed).not.toHaveBeenCalled();
+                expect(runner.execute).toHaveBeenCalledTimes(1);
+            });
+
+            it('review of #3040 (fail CLOSED): a Work that cannot be READ fails the run as work-unreadable — no workspace, no model call', async () => {
+                useWorkTask();
+                works.findById.mockRejectedValue(new Error('rpc down'));
+                runs.findById.mockResolvedValue(queuedRun());
+
+                const out = await registeredConfig.run(runPayload());
+
+                expect(out).toEqual(
+                    expect.objectContaining({
+                        status: 'failed',
+                        reason: 'app-work-run-not-admitted',
+                    }),
+                );
+                expect(runs.markFailed).toHaveBeenCalledWith(
+                    'run-1',
+                    expect.stringMatching(/^dispatch-failed: work-unreadable: /),
+                );
+                expect(taskWorkspace.provisionForRun).not.toHaveBeenCalled();
+                expect(runner.execute).not.toHaveBeenCalled();
+            });
+
+            it('a REVIEW run is not failed by an unreadable Work (a review is not a change)', async () => {
+                useWorkTask();
+                works.findById.mockRejectedValue(new Error('rpc down'));
+                const REVIEW = { allowedTools: ['submitTaskReview'] };
+                runs.findById.mockResolvedValue(queuedRun({ delegationScope: REVIEW }));
+                isAgentReviewRunScopeMock.mockImplementation((scope: unknown) => scope === REVIEW);
+
+                await registeredConfig.run(runPayload());
+
+                expect(runs.markFailed).not.toHaveBeenCalled();
+                expect(runner.execute).toHaveBeenCalledTimes(1);
+            });
+
+            it('leaves a run on every other kind exactly as before (control)', async () => {
+                useWorkTask();
+                works.findById.mockResolvedValue({ id: WORK_ID, kind: 'directory' });
+                runs.findById.mockResolvedValue(queuedRun());
+
+                await registeredConfig.run(runPayload());
+
+                expect(runs.markFailed).not.toHaveBeenCalled();
+                expect(taskWorkspace.provisionForRun).toHaveBeenCalledTimes(1);
+                expect(runner.execute).toHaveBeenCalledTimes(1);
             });
         });
     });

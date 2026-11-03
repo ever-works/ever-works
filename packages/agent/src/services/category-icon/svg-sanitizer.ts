@@ -217,8 +217,14 @@ export function sanitizeSvg(input: string | null | undefined): SanitizeResult {
         working = stripDelimitedBlocks(working, opener, closer);
     }
 
-    // Strip forbidden elements wholesale (both paired and self-closing).
-    working = working.replace(FORBIDDEN_ELEMENT_RE, '');
+    // Strip forbidden elements wholesale (both paired and self-closing). As
+    // with handlers below, one that only appears once another is stripped —
+    // `<scr<script></script>ipt>` — was built to survive the scrub: fail closed.
+    const elementFree = stripUntilStable(working, FORBIDDEN_ELEMENT_RE);
+    if (elementFree.rounds > 1) {
+        return { ok: false, reason: 'dangerous-content' };
+    }
+    working = elementFree.text;
 
     // Strip event handler attributes anywhere they appear. A handler that only
     // appears once another is stripped was built to slip past the scrub: fail

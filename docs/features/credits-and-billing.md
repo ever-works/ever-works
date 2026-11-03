@@ -14,14 +14,14 @@ Credits are complementary to [Budgets](./budgets-and-usage.md), not a replacemen
 
 There is no separate balance column. Your balance is the **sum of your ledger movements**, so the number and its explanation can never disagree.
 
-| Entry kind    | Sign | What it is                                                                                       |
-| ------------- | ---- | ------------------------------------------------------------------------------------------------ |
-| `purchase`    | +    | A top-up or auto-recharge confirmed by the billing provider. Never expires.                      |
-| `grant`       | +    | The monthly plan allowance (3,000 Pro / 25,000 Enterprise), expiring at the allowance-month end. |
-| `daily-free`  | +    | The daily allowance (50 on every plan), topped up to the level — never accumulating.             |
-| `consumption` | −    | Metered usage, rolled up per run / Task.                                                         |
-| `adjustment`  | ±    | Platform correction (e.g. a refund reversal).                                                    |
-| `expiry`      | −    | The unconsumed part of an allowance bucket that lapsed.                                          |
+| Entry kind    | Sign | What it is                                                                                      |
+| ------------- | ---- | ----------------------------------------------------------------------------------------------- |
+| `purchase`    | +    | A top-up or auto-recharge confirmed by the billing provider. Never expires.                     |
+| `grant`       | +    | The monthly plan allowance (3,000 Pro / 25,000 Unlimited), expiring at the allowance-month end. |
+| `daily-free`  | +    | The daily allowance (50 on every plan), topped up to the level — never accumulating.            |
+| `consumption` | −    | Metered usage, rolled up per run / Task.                                                        |
+| `adjustment`  | ±    | Platform correction (e.g. a refund reversal).                                                   |
+| `expiry`      | −    | The unconsumed part of an allowance bucket that lapsed.                                         |
 
 ### Buckets and what gets spent first
 
@@ -30,7 +30,7 @@ Every positive row is a **bucket** with a remaining amount and an optional expir
 ### Allowances
 
 - **Daily** — 50 credits on every plan (the `daily-free-credits` entitlement; platform default `CREDITS_DAILY_FREE`). The sweep tops the balance up **to** 50; a balance already at or above 50 receives nothing. The first run of the day also grants it lazily, so a cron hiccup never parks a user.
-- **Monthly** — `monthlyCredits` of the plan (3,000 Pro, 25,000 Enterprise), granted the moment a paid checkout completes and at the start of every following _allowance month_ (anchored on the subscription start, not the calendar), expiring at the end of that month. Annual subscriptions receive twelve monthly grants.
+- **Monthly** — `monthlyCredits` of the plan (3,000 Pro, 25,000 Unlimited), granted the moment a paid checkout completes and at the start of every following _allowance month_ (anchored on the subscription start, not the calendar), expiring at the end of that month. Annual subscriptions receive twelve monthly grants.
 
 ```
 GET /api/credits/balance                    → { balanceCredits }

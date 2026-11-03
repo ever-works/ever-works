@@ -120,6 +120,15 @@ export interface GitCommit {
 	readonly date: string;
 }
 
+/**
+ * A commit of the LOCAL working copy and its parents (C-10 / APW-08 T12). Used to prove what a push
+ * will carry before it is sent.
+ */
+export interface GitLocalCommit {
+	readonly sha: string;
+	readonly parents: readonly string[];
+}
+
 export type GitFileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
 
 export interface GitFileChange {
@@ -598,6 +607,17 @@ export interface GitPullRequestStatus {
 	 * is absent.
 	 */
 	readonly baseRef?: string | null;
+	/**
+	 * The commit the merge produced on `baseRef` (GitHub `merge_commit_sha`)
+	 * once the pull request is merged; `null` while it is open or when the
+	 * provider reports none, `undefined` when this implementation does not
+	 * report it. Optional and additive (APW-08 T8, CONTRACTS §3).
+	 *
+	 * App Works delivery (APW-08 FR-29…FR-31) follows THIS commit until a
+	 * Build and a Deployment that contain it are live; without it a merged
+	 * change cannot be tracked, and the Task completes on merge as before.
+	 */
+	readonly mergeCommitSha?: string | null;
 	readonly reviewDecision?: GitReviewDecision | null;
 	/**
 	 * Roll-up over EVERY check the provider reports for the head commit —
@@ -865,6 +885,22 @@ export interface IGitOperations {
 	switchBranch(dir: string, branch: string, create?: boolean): Promise<string>;
 	getStatus(dir: string): Promise<GitFileChange[]>;
 	/**
+	 * The local commit `ref` (a full ref such as `refs/heads/x`) points at, with its parent shas, or
+	 * `null` when the ref does not exist. Read-only. Lets a caller prove that a push carries only the
+	 * commit it just made (C-10 / APW-08 T12).
+	 *
+	 * Optional so existing providers keep compiling. Callers MUST verify the method is present before
+	 * calling it — the lazy-plugin proxy over-reports optional methods (see `GitFacadeService`).
+	 */
+	readLocalCommit?(dir: string, ref: string): Promise<GitLocalCommit | null>;
+	/**
+	 * Point local branch `branch` at `sha` (a commit the working copy already has) and check it out,
+	 * discarding the working tree and index. Used to drop a commit this process just made when its push
+	 * failed, so the shared checkout is not left ahead of the remote (C-10). Optional, like
+	 * {@link readLocalCommit}.
+	 */
+	resetBranchTo?(dir: string, branch: string, sha: string): Promise<void>;
+	/**
 	 * Absolute path of the working copy for `owner/repo`.
 	 *
 	 * The name is derived from the provider identity, the owner and the repository name
@@ -1053,6 +1089,26 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		opts: GitDiffOptions | undefined,
 		token: string
 	): Promise<GitDiffResult>;
+
+	/**
+	 * APW-08 T8 (CONTRACTS §3) — is `ancestorSha` the same commit as, or an
+	 * ancestor of, `descendantSha`? The App Works delivery reconciler asks it
+	 * to decide whether a Build or Deployment of a later commit carries a
+	 * merged change along (FR-31).
+	 *
+	 * `true` — identical, or `descendantSha` is ahead of `ancestorSha`;
+	 * `false` — behind or diverged; `null` — the provider cannot say (either
+	 * commit is unknown to it). A broken read throws. OPTIONAL: without it the
+	 * reconciler accepts exact-sha matches only and never claims "live"
+	 * without proof.
+	 */
+	isAncestorCommit?(
+		owner: string,
+		repo: string,
+		ancestorSha: string,
+		descendantSha: string,
+		token: string
+	): Promise<boolean | null>;
 	createPullRequestComment?(
 		owner: string,
 		repo: string,

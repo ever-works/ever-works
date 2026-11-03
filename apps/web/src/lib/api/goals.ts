@@ -132,6 +132,10 @@ export interface Goal {
     archivedAt: string | null;
     createdAt: string;
     updatedAt: string;
+    /** APW-08 T31 (FR-45) — the one Work this Goal works on, or `null`. */
+    workId?: string | null;
+    /** The Work's name on the single-Goal read; `null` when none or gone. */
+    workName?: string | null;
 }
 
 /** One line of the per-Goal orchestrator log. */
@@ -245,6 +249,8 @@ export interface CreateGoalInput {
     checkFrequencyMinutes?: number;
     /** Required for a delivery Goal; an optional seed checklist for a metric one. */
     dodCriteria?: GoalDoDCriterion[];
+    /** APW-08 T31 (FR-45) — a Work reachable in the Goal's scope; `null` clears it (update). */
+    workId?: string | null;
 }
 
 export interface UpdateGoalInput {
@@ -259,6 +265,8 @@ export interface UpdateGoalInput {
     deadline?: string | null;
     checkFrequencyMinutes?: number;
     outcome?: GoalOutcome | null;
+    /** APW-08 T31 (FR-45) — a Work reachable in the Goal's scope; `null` clears it (update). */
+    workId?: string | null;
 }
 
 export interface ListGoalsInput {

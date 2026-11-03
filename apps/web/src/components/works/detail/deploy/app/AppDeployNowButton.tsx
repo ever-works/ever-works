@@ -22,6 +22,10 @@ export interface AppDeployNowButtonProps {
     disabled?: boolean;
     /** Called with the Deployment id once the API accepted the request. */
     onRequested?: (deploymentId: string | null) => void;
+    /** APW-08 T27 — the Task page's Delivery section renders it small, beside its other actions. */
+    size?: 'sm' | 'md';
+    /** Extra classes for the button (e.g. the Delivery section's dark-mode primary CTA). */
+    buttonClassName?: string;
 }
 
 type Outcome =
@@ -54,6 +58,8 @@ export function AppDeployNowButton({
     buildId,
     disabled,
     onRequested,
+    size,
+    buttonClassName,
 }: AppDeployNowButtonProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.deployNow');
     const tPre = useTranslations('dashboard.workDetail.appDeploy.preconditions');
@@ -143,7 +149,8 @@ export function AppDeployNowButton({
                 onClick={deploy}
                 disabled={disabled || pending}
                 loading={pending}
-                className="gap-1.5"
+                size={size}
+                className={buttonClassName ? `gap-1.5 ${buttonClassName}` : 'gap-1.5'}
                 data-testid="app-deploy-now-button"
             >
                 <Rocket className="h-4 w-4" aria-hidden="true" />

@@ -3,10 +3,13 @@ import type { AppSpec } from '@ever-works/contracts';
 import {
     AppSpecUnreadableError,
     AppWorkRulesService,
+    DEFAULT_FILE_GUIDANCE,
     DEFAULT_SIZE_GUIDANCE,
     MAX_CHECKS,
     MAX_INSTRUCTION_FILES,
+    MAX_FILE_GUIDANCE,
     MAX_SIZE_GUIDANCE,
+    MIN_FILE_GUIDANCE,
     MIN_SIZE_GUIDANCE,
 } from '../app-work-rules.service';
 import type { AppSpecService } from '../../app-spec/app-spec.service';
@@ -146,6 +149,8 @@ describe('AppWorkRulesService — what it returns', () => {
             humanMergePaths: ['Dockerfile'],
             instructionFiles: ['AGENTS.md'],
             sizeGuidance: 900,
+            // APW08-G22 — carried alongside `sizeGuidance`; the spec named none here.
+            fileGuidance: DEFAULT_FILE_GUIDANCE,
         });
     });
 
@@ -180,6 +185,7 @@ describe('AppWorkRulesService — what it returns', () => {
             humanMergePaths: [],
             instructionFiles: [],
             sizeGuidance: DEFAULT_SIZE_GUIDANCE,
+            fileGuidance: DEFAULT_FILE_GUIDANCE,
         });
     });
 });
@@ -225,6 +231,26 @@ describe('AppWorkRulesService — the run’s budget', () => {
         expect(await at(9_000_000)).toBe(MAX_SIZE_GUIDANCE);
         expect(await at(700)).toBe(700);
         expect(await at(700.9)).toBe(700);
+    });
+
+    it('carries agents.maxPullRequestChangedFiles as the file guidance, clamped to 1..500 (APW08-G22)', async () => {
+        const at = async (value: unknown) =>
+            (
+                await service({
+                    status: 'valid',
+                    spec: spec({ agents: { maxPullRequestChangedFiles: value } } as never),
+                }).rules.resolve(WORK, BASE)
+            ).fileGuidance;
+
+        expect(await at(20)).toBe(20);
+        expect(await at(0)).toBe(MIN_FILE_GUIDANCE);
+        expect(await at(9_000)).toBe(MAX_FILE_GUIDANCE);
+        expect(await at('35')).toBe(35);
+        expect(await at(12.7)).toBe(12);
+        // `Number(null)` is 0 — an absent value is the DEFAULT, never the minimum.
+        for (const value of [undefined, null, 'lots', NaN, Infinity]) {
+            expect(await at(value)).toBe(DEFAULT_FILE_GUIDANCE);
+        }
     });
 
     it('defaults a non-numeric guidance rather than clamping NaN', async () => {

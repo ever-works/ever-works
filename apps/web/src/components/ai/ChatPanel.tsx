@@ -5,6 +5,7 @@ import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
 import { ConversationPanelRouter } from './conversations/ConversationPanelRouter';
 import { Bot } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 const borderToggleClass = cn(
     'absolute -right-3 top-1/2 -translate-y-1/2 z-10',
@@ -63,9 +64,15 @@ export function ChatPanel({
 }
 
 export function ChatPanelExpandButton({ onClick }: { onClick: () => void }) {
+    const t = useTranslations('dashboard.aiChat');
     return (
-        <button onClick={onClick} className={borderToggleClass}>
-            <Bot className="w-3.5 h-3.5" />
+        <button
+            type="button"
+            onClick={onClick}
+            aria-label={t('expandChat')}
+            className={borderToggleClass}
+        >
+            <Bot className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
     );
 }

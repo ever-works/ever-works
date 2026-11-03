@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { useChatContext } from './ChatProvider';
 import { useCanvasOptional } from './canvas/CanvasProvider';
 import { isCanvasToolOutput, type CanvasArtifact } from './canvas/types';
+import { APP_CHANGE_TOOL, ChatChangeCard, isAppChangeCardOutput } from './ChatChangeCard';
 
 interface ChatToolResultProps {
     toolCallId: string;
@@ -30,6 +31,8 @@ interface ChatToolResultProps {
     state: string;
     output?: unknown;
     errorText?: string;
+    /** The tool call's arguments, when the message part carries them (APW-08 T26's card). */
+    input?: unknown;
 }
 
 // ── Tool output types ───────────────────────────────────────────
@@ -212,6 +215,7 @@ export function ChatToolResult({
     state,
     output,
     errorText,
+    input,
 }: ChatToolResultProps) {
     const t = useTranslations('dashboard.aiChat');
     const locale = useLocale();
@@ -292,6 +296,13 @@ export function ChatToolResult({
                 <span>{t('opened')}</span>
             </Link>
         ) : null;
+    }
+
+    // APW-08 T26 — `request_app_change` has its own card: the §6.4 confirmation copy, then the
+    // filed Task's chain (Run → Pull request → Build → Deployment → Live). Its Start / Cancel
+    // send the same messages as the generic card below, so the confirmation check is unchanged.
+    if (toolName === APP_CHANGE_TOOL && isAppChangeCardOutput(output)) {
+        return <ChatChangeCard toolCallId={toolCallId} output={output} input={input} />;
     }
 
     // Confirmation gate — a destructive tool was called without `confirmed`.

@@ -8,6 +8,11 @@ import {
     APP_WORKS_TELEMETRY_SINK,
     AppWorksTelemetryService,
 } from '@ever-works/agent/app-works';
+import {
+    APP_SPEC_TELEMETRY_EVENTS,
+    APP_SPEC_TELEMETRY_SINK,
+    AppSpecTelemetry,
+} from '@ever-works/agent/app-spec';
 import { AppWorksTelemetryBindingModule } from './app-works-telemetry-binding.module';
 
 /**
@@ -46,15 +51,53 @@ class Emitter {
 @Module({ providers: [AppWorksTelemetryService, Emitter], exports: [Emitter] })
 class ConsumerModule {}
 
+/** APW-03 T49 - an App spec emitter, likewise in a module that imports nothing. */
+@Injectable()
+class SpecEmitter {
+    constructor(readonly telemetry: AppSpecTelemetry) {}
+}
+
+@Module({ providers: [AppSpecTelemetry, SpecEmitter], exports: [SpecEmitter] })
+class SpecConsumerModule {}
+
 describe('AppWorksTelemetryBindingModule', () => {
     it('is @Global() and aliases the sink token to AnalyticsService', () => {
         expect(Reflect.getMetadata('__module:global__', AppWorksTelemetryBindingModule)).toBe(true);
         expect(Reflect.getMetadata('providers', AppWorksTelemetryBindingModule)).toEqual([
             { provide: APP_WORKS_TELEMETRY_SINK, useExisting: AnalyticsService },
+            // APW-03 T49 - the App spec port, aliased the same way.
+            { provide: APP_SPEC_TELEMETRY_SINK, useExisting: AnalyticsService },
         ]);
         expect(Reflect.getMetadata('exports', AppWorksTelemetryBindingModule)).toEqual([
             APP_WORKS_TELEMETRY_SINK,
+            APP_SPEC_TELEMETRY_SINK,
         ]);
+    });
+
+    it('forwards an App spec event (APP_SPEC_TELEMETRY_SINK) to AnalyticsService.track', async () => {
+        const analytics = { track: jest.fn(), isAvailable: () => true };
+        const moduleRef = await Test.createTestingModule({
+            imports: [
+                monitoringModule(analytics),
+                AppWorksTelemetryBindingModule,
+                SpecConsumerModule,
+            ],
+        }).compile();
+
+        moduleRef
+            .get(SpecEmitter)
+            .telemetry.track(
+                APP_SPEC_TELEMETRY_EVENTS.licenseAttested,
+                { class: 'amber' },
+                'user-1',
+            );
+
+        expect(analytics.track).toHaveBeenCalledTimes(1);
+        expect(analytics.track).toHaveBeenCalledWith('user-1', 'app.license.attested', {
+            class: 'amber',
+        });
+
+        await moduleRef.close();
     });
 
     it('forwards an event from a module that never imported it to AnalyticsService.track', async () => {

@@ -351,6 +351,14 @@ describe('WorkspaceBackupService — download links (spec FR-12, S-15)', () => {
         expect(service.verifyDownloadToken(SCOPE, 'b1', forged)).toBe(false);
     });
 
+    it('refuses a repeated query parameter, which arrives as an array', () => {
+        const { service } = build();
+        const { token } = service.mintDownloadToken(SCOPE, 'b1');
+        for (const tampered of [[token], [token, token], { length: 1 }, 42, null, undefined]) {
+            expect(service.verifyDownloadToken(SCOPE, 'b1', tampered)).toBe(false);
+        }
+    });
+
     it('refuses garbage without throwing', () => {
         const { service } = build();
         for (const token of ['', '.', 'abc', 'notanumber.signature']) {

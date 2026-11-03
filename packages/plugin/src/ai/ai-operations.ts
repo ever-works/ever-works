@@ -314,7 +314,7 @@ export class AiOperations {
 			throw new Error('baseURL is required to list models');
 		}
 
-		const modelsUrl = `${config.baseURL.replace(/\/+$/, '')}/models`;
+		const modelsUrl = `${config.baseURL.replace(/(?<!\/)\/+$/, '')}/models`;
 
 		// Security (SSRF): this fetch carries the provider Bearer key to a
 		// user-controlled baseURL. Route it through safeFetchWithDnsPin, which

@@ -115,7 +115,7 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 
 	private apiBase(options: ChannelOptions): string {
 		const base = options.settings?.apiBase;
-		return typeof base === 'string' && base.length > 0 ? base.replace(/\/+$/, '') : DEFAULT_NOVU_API_BASE;
+		return typeof base === 'string' && base.length > 0 ? base.replace(/(?<!\/)\/+$/, '') : DEFAULT_NOVU_API_BASE;
 	}
 
 	/**
