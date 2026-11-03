@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { ExternalIdentity } from '@ever-works/agent/entities';
+import { ExternalIdentity, User } from '@ever-works/agent/entities';
 import {
     EverIdIdentityLinkedEvent,
     EverIdIdentityUnlinkedEvent,
@@ -168,7 +168,14 @@ export class PersonLinkReporter {
             if (!identity || identity.issuer !== issuer || identity.linkedVia === 'provisioning') {
                 return;
             }
-            await this.queue.enqueue(linkReport(identity));
+            // The account's tenant as it is now: the identity row's stamp is
+            // written once, when it is connected, and is not cleared with the
+            // account's (and a sign-up's is written before the account has one).
+            const account = await this.dataSource.getRepository(User).findOne({
+                where: { id: identity.userId },
+                select: { id: true, tenantId: true },
+            });
+            await this.queue.enqueue(linkReport(identity, account?.tenantId ?? null));
         } catch (error) {
             this.logger.warn(`Ever ID link not queued for Ever Platform: ${errorName(error)}`);
         }
@@ -201,7 +208,7 @@ export class PersonLinkReporter {
     }
 }
 
-function linkReport(identity: ExternalIdentity): PersonLinkReport {
+function linkReport(identity: ExternalIdentity, tenantId: string | null): PersonLinkReport {
     return {
         id: randomUUID(),
         op: 'link',
@@ -211,7 +218,7 @@ function linkReport(identity: ExternalIdentity): PersonLinkReport {
         // Every identity a person connects is an explicit link: by signing up
         // with it or by connecting it in Settings.
         linkMethod: 'explicit',
-        ...(identity.tenantId ? { tenantId: identity.tenantId } : {}),
+        ...(tenantId ? { tenantId } : {}),
     };
 }
 

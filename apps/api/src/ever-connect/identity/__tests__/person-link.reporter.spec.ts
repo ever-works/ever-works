@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
-import { ExternalIdentity } from '@ever-works/agent/entities';
+import { ExternalIdentity, User } from '@ever-works/agent/entities';
 import {
     EverIdIdentityLinkedEvent,
     EverIdIdentityUnlinkedEvent,
@@ -13,8 +14,9 @@ import { FakeIntegration, FakePlatform, FakeQueue, problem } from './fakes.helpe
  * Which local accounts are linked to an Ever ID, as reported to Ever Platform.
  *
  * - A link of Ever Platform's issuer is queued with identifiers only (account
- *   id, issuer, subject, `explicit`, the tenant) — never the e-mail address the
- *   identity row keeps; an unlink is queued by account id.
+ *   id, issuer, subject, `explicit`, the account's tenant as it is now) —
+ *   never the e-mail address the identity row keeps; an unlink is queued by
+ *   account id.
  * - Nothing is queued while the installation is not connected, `ever_id_login`
  *   is off or no client was handed over, for another provider's identity, or
  *   for a provisioned one; a queued report is dropped unsent once it is off.
@@ -58,11 +60,25 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
             linkedVia,
         });
 
+    /** A local account, with the tenant it has now. */
+    const insertAccount = async (tenantId: string | null) => {
+        const id = randomUUID();
+        await dataSource.getRepository(User).insert({
+            id,
+            username: `person-${id}`,
+            slug: `person-${id}`,
+            email: `${id}@example.test`,
+            tenantId,
+        } as never);
+        return id;
+    };
+
     it('queues a link with identifiers only', async () => {
+        const userId = await insertAccount('9b0a2c5e-6f0e-4d1e-9a4f-1c2b3d4e5f60');
         const identity = await insertIdentity(dataSource, {
+            userId,
             issuer: ISSUER,
             subject: 'sub-ada',
-            tenantId: '9b0a2c5e-6f0e-4d1e-9a4f-1c2b3d4e5f60',
         });
         await reporter.onIdentityLinked(linked(identity, 'sign-up'));
 
@@ -79,6 +95,34 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
         ]);
         expect(JSON.stringify(queue.reports)).not.toContain('@');
         expect(platform.calls).toEqual([]);
+    });
+
+    it("reports the account's tenant as it is now, not the identity's stamp", async () => {
+        const STAMPED = '1f6c1f1e-2b3a-4c5d-8e9f-0a1b2c3d4e5f';
+        const CURRENT = '7d3e2a10-4b5c-4d6e-9f80-a1b2c3d4e5f6';
+        // The account moved to another tenant since the identity was connected.
+        const moved = await insertIdentity(dataSource, {
+            userId: await insertAccount(CURRENT),
+            issuer: ISSUER,
+            subject: 'sub-ada',
+            tenantId: STAMPED,
+        });
+        // The account's last membership went: its tenant was cleared.
+        const cleared = await insertIdentity(dataSource, {
+            userId: await insertAccount(null),
+            issuer: ISSUER,
+            subject: 'sub-bob',
+            tenantId: STAMPED,
+        });
+        await reporter.onSignedIn(
+            new EverIdSignedInEvent({ identityId: moved.id, userId: moved.userId }),
+        );
+        await reporter.onSignedIn(
+            new EverIdSignedInEvent({ identityId: cleared.id, userId: cleared.userId }),
+        );
+        expect(queue.reports[0]).toMatchObject({ op: 'link', tenantId: CURRENT });
+        expect(queue.reports[1]).toMatchObject({ op: 'link', subject: 'sub-bob' });
+        expect(queue.reports[1]).not.toHaveProperty('tenantId');
     });
 
     it('sends the link and the unlink', async () => {
