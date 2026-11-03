@@ -16,6 +16,12 @@ import type {
 } from '@ever-works/contracts';
 import type { ReferenceEntry } from '@ever-works/plugin';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
+import {
+    DATA_REPO_RELEASE_WORKFLOW,
+    DATA_REPO_RELEASE_WORKFLOW_PATH,
+    DATA_REPO_RELEASE_WORKFLOW_VERSION,
+    parseReleaseWorkflowVersion,
+} from './release-workflow';
 
 // Security (path-traversal hardening): item/comparison slugs are used verbatim
 // as directory names under the cloned data repo, and the value reaching the
@@ -1053,6 +1059,56 @@ export class DataRepository {
     async writeLicense(content: string) {
         const filepath = path.join(this.dir, 'LICENSE.md');
         await fs.writeFile(filepath, content, 'utf-8');
+    }
+
+    /**
+     * Install (or upgrade) the GitHub Actions workflow that turns a data
+     * update into a `vX.Y.Z` tag plus a GitHub Release (EW-58).
+     *
+     * Write-once and additive by design:
+     *
+     *   - `created`   — the repository had no `.github/workflows/release.yml`.
+     *   - `updated`   — it had a platform-managed copy from an older revision.
+     *   - `unchanged` — the managed copy is already current, or the owner
+     *                   hand-edited it without bumping the version marker.
+     *   - `skipped`   — a workflow the platform does not own lives at that
+     *                   path; it is never overwritten.
+     *
+     * `resetFiles()` allow-lists `.github`, so a RECREATE keeps whatever is
+     * already installed.
+     */
+    async ensureReleaseWorkflow(): Promise<'created' | 'updated' | 'unchanged' | 'skipped'> {
+        const filepath = path.join(this.dir, ...DATA_REPO_RELEASE_WORKFLOW_PATH.split('/'));
+
+        let existing: string | null = null;
+        try {
+            existing = await fs.readFile(filepath, 'utf-8');
+        } catch (err) {
+            if (err?.code !== 'ENOENT') {
+                throw err;
+            }
+        }
+
+        if (existing === null) {
+            await fs.mkdir(path.dirname(filepath), { recursive: true });
+            await fs.writeFile(filepath, DATA_REPO_RELEASE_WORKFLOW, 'utf-8');
+            return 'created';
+        }
+
+        const installedVersion = parseReleaseWorkflowVersion(existing);
+        if (installedVersion === null) {
+            DataRepository.logger.debug(
+                `Leaving the existing ${DATA_REPO_RELEASE_WORKFLOW_PATH} alone: it is not managed by Ever Works.`,
+            );
+            return 'skipped';
+        }
+
+        if (installedVersion >= DATA_REPO_RELEASE_WORKFLOW_VERSION) {
+            return 'unchanged';
+        }
+
+        await fs.writeFile(filepath, DATA_REPO_RELEASE_WORKFLOW, 'utf-8');
+        return 'updated';
     }
 
     async removeItem(slug: string): Promise<boolean> {

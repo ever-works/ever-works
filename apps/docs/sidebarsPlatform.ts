@@ -104,6 +104,10 @@ const sidebars: SidebarsConfig = {
 				'features/comparisons',
 				'features/advanced-prompts',
 				'features/git-operations',
+				// EW-58 — automated tags/releases inside each data repo.
+				// Sits next to git-operations: both describe what the
+				// platform does to the Git repositories behind a Work.
+				'features/data-repo-releases',
 				'features/taxonomy-system',
 				'features/api-keys',
 				'features/custom-domains',

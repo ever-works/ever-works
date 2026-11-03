@@ -46,6 +46,9 @@ Every work in Ever Works maps to a Git repository with a standardized YAML layou
     <comparison-slug>/
       <comparison-slug>.yml   # Comparison metadata
       <comparison-slug>.md    # Comparison content
+  .github/
+    workflows/
+      release.yml       # Automated tag + GitHub Release on every data update
   README.md
   LICENSE.md
 ```
@@ -155,6 +158,37 @@ async getNextVersion(config?: IDataConfig) {
     return version.format();
 }
 ```
+
+The resulting version is written into `.works/works.yml`. On its own that is an
+in-repository value only -- it produces no Git tag and nothing a consumer can
+pin.
+
+### Tags and GitHub Releases
+
+`DataRepository.ensureReleaseWorkflow()` installs a GitHub Actions workflow at
+`.github/workflows/release.yml` in every data repository the generator creates,
+imports, or regenerates. The workflow turns each content update on the default
+branch into an annotated `vX.Y.Z` tag plus a GitHub Release with generated
+notes, applying exactly the rollover rules above so tags and `.works/works.yml`
+stay in step.
+
+| Concern               | Behaviour                                                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Seeding**           | `DataGeneratorService.seedReleaseWorkflow()` commits and pushes the file as its own commit, on the default branch only.                               |
+| **Best effort**       | Every failure is caught and logged as a warning -- seeding a convenience workflow never fails a generation.                                           |
+| **Idempotent**        | Write-once. A managed copy is only rewritten when the platform ships a newer revision; a copy without the platform's marker comment is never touched. |
+| **Survives RECREATE** | `resetFiles()` allowlists `.github`, so a full content rebuild keeps the workflow.                                                                    |
+
+The workflow YAML is authored as a real, lintable file at
+`packages/agent/src/generators/data-generator/assets/data-repo-release.yml` and
+embedded as a string constant in `release-workflow.ts` (SWC and the Trigger.dev
+esbuild bundle copy neither sibling assets nor a meaningful `__dirname`). Run
+`node scripts/generate-data-repo-release-workflow.mjs` after editing the YAML;
+`release-workflow.spec.ts` fails if the two drift apart.
+
+See [Data Repository Releases](../features/data-repo-releases.md) for the
+end-user view, manual installation, and the backfill script for repositories
+that predate this feature.
 
 ## Items Generator Integration
 

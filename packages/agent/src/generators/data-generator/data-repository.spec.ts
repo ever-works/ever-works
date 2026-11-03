@@ -2,6 +2,11 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { DataRepository, RuntimeYamlCompatibilityError } from './data-repository';
+import {
+    DATA_REPO_RELEASE_WORKFLOW,
+    DATA_REPO_RELEASE_WORKFLOW_PATH,
+    DATA_REPO_RELEASE_WORKFLOW_VERSION,
+} from './release-workflow';
 
 describe('DataRepository', () => {
     afterEach(async () => {
@@ -256,5 +261,98 @@ describe('DataRepository', () => {
         expect(referencesYaml).not.toContain('Content extraction failed');
 
         await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
+    describe('ensureReleaseWorkflow (EW-58)', () => {
+        const workflowPath = DATA_REPO_RELEASE_WORKFLOW_PATH.split('/');
+
+        const makeRepo = async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+            const repository = await DataRepository.create(repoDir);
+            return { repoDir, repository };
+        };
+
+        it('creates the workflow when the repository has no .github folder', async () => {
+            const { repoDir, repository } = await makeRepo();
+
+            await expect(repository.ensureReleaseWorkflow()).resolves.toBe('created');
+
+            const written = await fs.readFile(path.join(repoDir, ...workflowPath), 'utf-8');
+            expect(written).toBe(DATA_REPO_RELEASE_WORKFLOW);
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('is idempotent once the current revision is installed', async () => {
+            const { repoDir, repository } = await makeRepo();
+
+            await repository.ensureReleaseWorkflow();
+            await expect(repository.ensureReleaseWorkflow()).resolves.toBe('unchanged');
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('upgrades a managed copy left behind by an older platform build', async () => {
+            const { repoDir, repository } = await makeRepo();
+            const filepath = path.join(repoDir, ...workflowPath);
+            const stale = DATA_REPO_RELEASE_WORKFLOW.replace(
+                `x-ever-works-workflow-version: ${DATA_REPO_RELEASE_WORKFLOW_VERSION}`,
+                'x-ever-works-workflow-version: 0',
+            ).replace('name: Release data', 'name: Release data (old)');
+
+            await fs.mkdir(path.dirname(filepath), { recursive: true });
+            await fs.writeFile(filepath, stale, 'utf-8');
+
+            await expect(repository.ensureReleaseWorkflow()).resolves.toBe('updated');
+            await expect(fs.readFile(filepath, 'utf-8')).resolves.toBe(DATA_REPO_RELEASE_WORKFLOW);
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('never overwrites a release workflow the repository owner authored', async () => {
+            const { repoDir, repository } = await makeRepo();
+            const filepath = path.join(repoDir, ...workflowPath);
+            const owned = ['name: My own release', 'on:', '  workflow_dispatch:', ''].join('\n');
+
+            await fs.mkdir(path.dirname(filepath), { recursive: true });
+            await fs.writeFile(filepath, owned, 'utf-8');
+
+            await expect(repository.ensureReleaseWorkflow()).resolves.toBe('skipped');
+            await expect(fs.readFile(filepath, 'utf-8')).resolves.toBe(owned);
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('leaves a managed copy that was hand-edited at the current revision alone', async () => {
+            const { repoDir, repository } = await makeRepo();
+            const filepath = path.join(repoDir, ...workflowPath);
+            const tweaked = DATA_REPO_RELEASE_WORKFLOW.replace(
+                'timeout-minutes: 15',
+                'timeout-minutes: 30',
+            );
+
+            await fs.mkdir(path.dirname(filepath), { recursive: true });
+            await fs.writeFile(filepath, tweaked, 'utf-8');
+
+            await expect(repository.ensureReleaseWorkflow()).resolves.toBe('unchanged');
+            await expect(fs.readFile(filepath, 'utf-8')).resolves.toBe(tweaked);
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('survives resetFiles(), which a RECREATE runs before regenerating', async () => {
+            const { repoDir, repository } = await makeRepo();
+            const filepath = path.join(repoDir, ...workflowPath);
+
+            await repository.ensureReleaseWorkflow();
+            await fs.writeFile(path.join(repoDir, 'README.md'), '# gone after reset', 'utf-8');
+
+            await repository.resetFiles();
+
+            await expect(fs.readFile(filepath, 'utf-8')).resolves.toBe(DATA_REPO_RELEASE_WORKFLOW);
+            await expect(fs.access(path.join(repoDir, 'README.md'))).rejects.toThrow();
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
     });
 });

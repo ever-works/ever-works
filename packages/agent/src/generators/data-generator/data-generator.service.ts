@@ -14,6 +14,7 @@ import {
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
+import { DATA_REPO_RELEASE_WORKFLOW_PATH } from './release-workflow';
 import { WorkOperationsService } from '@src/work-operations';
 import { getWorkOwner } from '../../utils/work.utils';
 import pMap from 'p-map';
@@ -699,6 +700,21 @@ export class DataGeneratorService {
                 },
             );
             this.logger.log(`All processed and pushed to ${work.getRepoOwner()}/${repo}`);
+
+            // EW-58 — install the tag/release workflow on the default branch
+            // only. When the generation targets a PR branch the workflow would
+            // be reviewer noise on a data PR, and it could not run before the
+            // merge anyway.
+            if (!newBranchName) {
+                await this.seedReleaseWorkflow({
+                    work,
+                    user,
+                    data,
+                    provider,
+                    pushDir: dest,
+                    pushUserId: workOwner.id,
+                });
+            }
 
             // Update work items count
             await this.workOperations.updateWork(work.id, {
@@ -1620,6 +1636,66 @@ export class DataGeneratorService {
         await Promise.all([data.writeItem(item), data.writeItemMarkdown(item, md)]);
     }
 
+    /**
+     * EW-58 — make sure the data repository carries the GitHub Actions
+     * workflow that tags and releases every data update.
+     *
+     * Runs as its own commit AFTER the data push has already succeeded, and
+     * swallows every failure: seeding a convenience workflow must never turn a
+     * successful generation into a failed one. The realistic failure is a git
+     * token that predates the `workflow` OAuth scope — GitHub rejects a push
+     * that touches `.github/workflows/**` in that case, and the warning below
+     * tells the operator to re-authorise the connection.
+     *
+     * No-ops on every subsequent run: `ensureReleaseWorkflow()` reports
+     * `unchanged` once the current revision is installed, and `skipped` when
+     * the repository owner has taken ownership of the file.
+     */
+    private async seedReleaseWorkflow(params: {
+        work: Work;
+        user: User;
+        data: DataRepository;
+        provider: string;
+        pushDir: string;
+        pushUserId: string;
+    }): Promise<void> {
+        const { work, user, data, provider, pushDir, pushUserId } = params;
+
+        try {
+            const outcome = await data.ensureReleaseWorkflow();
+
+            if (outcome === 'unchanged' || outcome === 'skipped') {
+                this.logger.debug(
+                    `Release workflow for ${work.slug}: ${outcome} — nothing to commit.`,
+                );
+                return;
+            }
+
+            await this.gitFacade.add(provider, data.dir, DATA_REPO_RELEASE_WORKFLOW_PATH);
+            await this.gitFacade.commit(
+                provider,
+                data.dir,
+                outcome === 'created'
+                    ? 'add automated release workflow'
+                    : 'update automated release workflow',
+                work.resolveCommitter(user),
+            );
+            await this.gitFacade.push(
+                { dir: pushDir },
+                { userId: pushUserId, providerId: work.gitProvider, workId: work.id },
+            );
+
+            this.logger.log(`Release workflow ${outcome} for ${work.getRepoOwner()}/${work.slug}.`);
+        } catch (error: unknown) {
+            this.logger.warn(
+                `Could not install ${DATA_REPO_RELEASE_WORKFLOW_PATH} in the data repository for ${work.slug}. ` +
+                    'Data generation itself succeeded; releases will not be tagged until this is resolved ' +
+                    '(a git token without the GitHub "workflow" scope cannot push workflow files). ' +
+                    `Reason: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
     private getPRDetails(work: Work) {
         const title = `Update data - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
         const appName = config.branding.getAppName();
@@ -1882,6 +1958,17 @@ export class DataGeneratorService {
                 { userId: user.id, providerId: work.gitProvider, workId: work.id },
             );
 
+            // EW-58 — an imported data repository gets the same automated
+            // tag/release workflow as a generated one.
+            await this.seedReleaseWorkflow({
+                work,
+                user,
+                data,
+                provider: work.gitProvider,
+                pushDir: dest,
+                pushUserId: user.id,
+            });
+
             this.logger.log(
                 `Successfully initialized data repo with ${itemsWithSlugs.length} imported items`,
             );
@@ -2073,6 +2160,19 @@ export class DataGeneratorService {
                 { dir: dest },
                 { userId: user.id, providerId: work.gitProvider, workId: work.id },
             );
+
+            // EW-58 — same as the generate path: seed the tag/release
+            // workflow on the default branch only.
+            if (!newBranchName) {
+                await this.seedReleaseWorkflow({
+                    work,
+                    user,
+                    data,
+                    provider,
+                    pushDir: dest,
+                    pushUserId: user.id,
+                });
+            }
 
             // Update DB stats
             await this.workOperations.updateWork(work.id, {
