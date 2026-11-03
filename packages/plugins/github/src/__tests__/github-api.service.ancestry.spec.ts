@@ -130,14 +130,12 @@ describe('GitHubApiService — isAncestorCommit (APW-08 T8)', () => {
 
 	it('throws on any other failure — a broken read is never "not an ancestor"', async () => {
 		compareMock.mockRejectedValue(new RequestError('Server Error', 500, {} as never));
-		await expect(
-			new GitHubApiService().isAncestorCommit(OWNER, REPO, MERGE_SHA, 'later', TOKEN)
-		).rejects.toThrow('Server Error');
+		await expect(new GitHubApiService().isAncestorCommit(OWNER, REPO, MERGE_SHA, 'later', TOKEN)).rejects.toThrow(
+			'Server Error'
+		);
 	});
 
 	it('is delegated by the plugin class, so the lazy proxy sees it', () => {
-		expect(typeof (GitHubPlugin.prototype as { isAncestorCommit?: unknown }).isAncestorCommit).toBe(
-			'function'
-		);
+		expect(typeof (GitHubPlugin.prototype as { isAncestorCommit?: unknown }).isAncestorCommit).toBe('function');
 	});
 });

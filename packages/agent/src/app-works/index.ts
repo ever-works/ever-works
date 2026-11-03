@@ -202,6 +202,8 @@ export * from './app-work-run-classifier';
 
 // APW-08 T49 (XC-10, FR-74, R-30, lane B2) — the evolve loop's operator kill switches.
 export * from './app-work-switches';
+// APW-08 T46 — safety-rail holds on App Work runs (R-17).
+export * from './app-work-run-holds';
 
 // APW-08 T56 (XC-19, FR-73) — one budget per App Work: the booking door every App Work charge
 // goes through, the run-admission port it implements, and the installer that puts it in the gate.

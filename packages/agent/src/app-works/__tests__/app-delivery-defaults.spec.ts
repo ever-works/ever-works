@@ -34,17 +34,28 @@ describe('readAppDeliveryDefaults (APW08-G25)', () => {
                 EVER_WORKS_APP_FOLLOW_UPS_PER_CHANGE: '0',
                 EVER_WORKS_APP_FOLLOW_UPS_OPEN_PER_WORK: '10',
             }),
-        ).toEqual({ liveWithWarningsCloses: false, followUpsPerChange: 0, followUpsOpenPerWork: 10 });
+        ).toEqual({
+            liveWithWarningsCloses: false,
+            followUpsPerChange: 0,
+            followUpsOpenPerWork: 10,
+        });
     });
 
     it.each([
-        ['EVER_WORKS_APP_DELIVERY_LIVE_WITH_WARNINGS_CLOSES', 'flase', 'liveWithWarningsCloses', true],
+        [
+            'EVER_WORKS_APP_DELIVERY_LIVE_WITH_WARNINGS_CLOSES',
+            'flase',
+            'liveWithWarningsCloses',
+            true,
+        ],
         ['EVER_WORKS_APP_FOLLOW_UPS_PER_CHANGE', '6', 'followUpsPerChange', 2],
         ['EVER_WORKS_APP_FOLLOW_UPS_PER_CHANGE', '-1', 'followUpsPerChange', 2],
         ['EVER_WORKS_APP_FOLLOW_UPS_OPEN_PER_WORK', '11', 'followUpsOpenPerWork', 3],
         ['EVER_WORKS_APP_FOLLOW_UPS_OPEN_PER_WORK', 'many', 'followUpsOpenPerWork', 3],
         ['EVER_WORKS_APP_FOLLOW_UPS_OPEN_PER_WORK', '  ', 'followUpsOpenPerWork', 3],
     ])('%s=%j falls back to the default', (name, value, key, expected) => {
-        expect(readAppDeliveryDefaults({ [name]: value })[key as 'followUpsPerChange']).toBe(expected);
+        expect(readAppDeliveryDefaults({ [name]: value })[key as 'followUpsPerChange']).toBe(
+            expected,
+        );
     });
 });

@@ -29,7 +29,11 @@ import {
     openDeliveryFollowUpAction,
 } from '@/app/actions/tasks';
 import { AppDeployNowButton } from '@/components/works/detail/deploy/app/AppDeployNowButton';
-import { TaskDeliveryChips } from './TaskDeliveryChips';
+import {
+    TaskDeliveryChips,
+    useDeliveryChipText,
+    type TaskDeliveryChipInput,
+} from './TaskDeliveryChips';
 
 /** Plan §5.1 — `GET /delivery` every 10 s while the chain is open … */
 export const DELIVERY_POLL_INTERVAL_MS = 10_000;
@@ -132,6 +136,7 @@ type Load =
 export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId: string | null }) {
     const t = useTranslations('dashboard.tasksPage.delivery');
     const tStatus = useTranslations('dashboard.tasksPage.status');
+    const chipText = useDeliveryChipText();
     const format = useFormatter();
     const [load, setLoad] = useState<Load>({ kind: 'loading' });
     /** Bumped after every read, so a failed poll still schedules the next one. */
@@ -304,6 +309,15 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
             : null;
     const closeLabel =
         state && FAILED_STATES.has(state) ? t('closeAnyway') : t('closeWithoutDeploying');
+    const chip: TaskDeliveryChipInput | null = view?.state
+        ? {
+              state: view.state,
+              liveUrl: view.liveUrl,
+              outcome: view.deployment?.outcome ?? null,
+              liveWithWarnings: view.liveWithWarnings,
+              carriedByLaterChange: view.carriedByLaterChange,
+          }
+        : null;
 
     return (
         <section
@@ -321,18 +335,19 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                 >
                     {t('sectionTitle')}
                 </h2>
-                {view?.state && (
-                    <TaskDeliveryChips
-                        delivery={{
-                            state: view.state,
-                            liveUrl: view.liveUrl,
-                            outcome: view.deployment?.outcome ?? null,
-                            liveWithWarnings: view.liveWithWarnings,
-                            carriedByLaterChange: view.carriedByLaterChange,
-                        }}
-                    />
-                )}
+                {chip && <TaskDeliveryChips delivery={chip} />}
             </div>
+            {/* APW-08 T52 (FR-71) — progress and completion in a polite live region: the poll
+                moves the chain, and a screen reader hears the chip's new state. Always mounted,
+                so the region exists before its text changes. */}
+            <p
+                className="sr-only"
+                role="status"
+                aria-live="polite"
+                data-testid="task-delivery-announcer"
+            >
+                {chip ? chipText(chip).spoken : ''}
+            </p>
 
             {load.kind === 'loading' && (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('loading')}</p>
@@ -405,7 +420,7 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     data-testid="task-delivery-build-logs"
-                                    className="ml-2 text-text-muted hover:text-primary hover:underline"
+                                    className="ms-2 text-text-muted hover:text-primary hover:underline"
                                 >
                                     {t('buildLogs')} ↗
                                 </a>
@@ -414,7 +429,7 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                                 <Link
                                     href={ROUTES.DASHBOARD_WORK_BUILDS(workId)}
                                     data-testid="task-delivery-builds-link"
-                                    className="ml-2 text-text-muted hover:text-primary hover:underline"
+                                    className="ms-2 text-text-muted hover:text-primary hover:underline"
                                 >
                                     {t('openBuilds')}
                                 </Link>
@@ -437,7 +452,7 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                                 <Link
                                     href={ROUTES.DASHBOARD_WORK_DEPLOY(workId)}
                                     data-testid="task-delivery-deployments-link"
-                                    className="ml-2 text-text-muted hover:text-primary hover:underline"
+                                    className="ms-2 text-text-muted hover:text-primary hover:underline"
                                 >
                                     {t('openDeployments')}
                                 </Link>
@@ -483,7 +498,7 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                                 })}
                             </Link>
                             {followUp.status === 'cancelled' && view.state === 'live' && (
-                                <span className="ml-2 text-text-muted">
+                                <span className="ms-2 text-text-muted">
                                     {t('followUpCancelled')}
                                 </span>
                             )}
@@ -551,6 +566,7 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
             {pollingStopped && isDeliveryOpen(state) && (
                 <p
                     className="mt-3 text-xs text-text-muted"
+                    role="status"
                     data-testid="task-delivery-polling-stopped"
                 >
                     {t('pollingStopped')}
@@ -576,7 +592,7 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                     )}
                     {retryEscalationId && (
                         <>
-                            <span className="text-xs text-text-muted dark:text-text-muted-dark mr-auto">
+                            <span className="text-xs text-text-muted dark:text-text-muted-dark me-auto">
                                 {t('tryOnceMoreHint')}
                             </span>
                             <Button

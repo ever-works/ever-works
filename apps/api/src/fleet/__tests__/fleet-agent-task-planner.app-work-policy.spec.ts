@@ -83,7 +83,7 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
 
-    const build = (appRunBriefs?: unknown) =>
+    const build = (appRunBriefs?: unknown, appWorksSink?: unknown) =>
         new FleetAgentTaskPlannerService(
             tasks as never,
             agents as never,
@@ -113,6 +113,7 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
                 }),
             } as never,
             appRunBriefs as never,
+            appWorksSink as never,
         );
 
     beforeEach(() => {
@@ -151,6 +152,47 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
         const plan = await build().plan(payload);
 
         expect(plan!.mcp).toBeUndefined();
+    });
+
+    // APW-08 T43 (plan §8.1, XC-05) — the withheld bridge is reported as `app.change.tool_denied`
+    // with the group only, attributed to the App Work (the Task's, else the Agent's own).
+    describe('app.change.tool_denied (T43)', () => {
+        const sink = () => ({ track: jest.fn() });
+
+        it('is sent once, group `mcp`, for a Task on an App Work', async () => {
+            const telemetry = sink();
+            await build(undefined, telemetry).plan(payload);
+            expect(telemetry.track).toHaveBeenCalledTimes(1);
+            const [distinctId, event, properties] = telemetry.track.mock.calls[0];
+            expect(event).toBe('app.change.tool_denied');
+            expect(distinctId).toBe(task().userId);
+            expect(properties).toEqual({ workId: 'work-app', taskId: task().id, group: 'mcp' });
+        });
+
+        it('names the Agent’s App Work when the Task’s Work is another kind', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            agents.findByIdAndUser.mockResolvedValue(agent({ workId: 'work-app' }));
+            const telemetry = sink();
+            await build(undefined, telemetry).plan(payload);
+            expect(telemetry.track.mock.calls[0][2]).toMatchObject({ workId: 'work-app' });
+        });
+
+        it('is not sent when the bridge is withheld only because the Agent’s Work is unreadable', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            agents.findByIdAndUser.mockResolvedValue(agent({ workId: 'work-gone' }));
+            const telemetry = sink();
+            const plan = await build(undefined, telemetry).plan(payload);
+            // Still fail closed: no bridge. But no Work is named as the denied App Work.
+            expect(plan!.mcp).toBeUndefined();
+            expect(telemetry.track).not.toHaveBeenCalled();
+        });
+
+        it('is not sent for an ordinary Work (the bridge is stamped)', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const telemetry = sink();
+            await build(undefined, telemetry).plan(payload);
+            expect(telemetry.track).not.toHaveBeenCalled();
+        });
     });
 
     it('fails closed when the Agent’s Work cannot be read', async () => {

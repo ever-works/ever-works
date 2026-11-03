@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Darmowy",
                         "pro": "Pro",
-                        "standard": "Standardowy",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Bez limitu"
                     },
                     "usageRequired": "Przełącz na płatność za użycie, aby użyć tego interwału.",
@@ -7187,6 +7187,7 @@
                     "other": "Coś poszło nie tak podczas konfigurowania repozytorium."
                 },
                 "overview": {
+                    "changesPaused": "Zmiany w aplikacjach zostały wstrzymane przez operatora.",
                     "title": "Aplikacja",
                     "repository": "Repozytorium Work",
                     "upstream": "Upstream",

@@ -86,6 +86,12 @@ import {
     type AppWorkTaskToolDenial,
     type AppWorkTaskToolPolicyCounts,
 } from '../app-works/app-work-task-tool-policy';
+// APW-08 T43 — `app.change.tool_denied`. Leaves: the sanitizer imports the contracts only.
+import { AppChangeTelemetry } from '../app-works/app-change.telemetry';
+import {
+    APP_WORKS_TELEMETRY_SINK,
+    type AppWorksTelemetrySink,
+} from '../app-works/app-works-telemetry.service';
 // APW-08 T49 — a leaf (the Nest logger only).
 import {
     APP_WORK_SWITCH_ENV,
@@ -349,7 +355,49 @@ export class AgentRunService {
         @Optional()
         @Inject(APP_RUN_BRIEF_SOURCE)
         private readonly appRunBriefs?: AppRunBriefSource,
+        // APW-08 T43 — `app.change.tool_denied` when the App Work Task tool policy withholds or
+        // refuses a group. The API's @Global() PostHog alias; unbound, nothing is sent.
+        // Trailing + `@Optional()` (the positional-spec arity rule).
+        @Optional()
+        @Inject(APP_WORKS_TELEMETRY_SINK)
+        private readonly appWorksSink?: AppWorksTelemetrySink,
     ) {}
+
+    /** APW-08 T43 — the evolve-loop events over the App Works sanitizer (built on first use). */
+    private appChangeTelemetryInstance?: AppChangeTelemetry;
+    private get appChangeTelemetry(): AppChangeTelemetry {
+        return (this.appChangeTelemetryInstance ??= new AppChangeTelemetry(this.appWorksSink));
+    }
+
+    /**
+     * APW-08 T43 (plan §8.1, XC-05) — one `app.change.tool_denied` per denied group, the group
+     * only (never a tool name or argument), attributed to the run's App Work. Only for a run with
+     * a Task (the event names it). Fire-and-forget; never throws, never delays the run.
+     */
+    private trackAppWorkToolsDenied(input: {
+        taskId?: string | null;
+        agentWorkId?: string | null;
+        userId: string;
+        groups: readonly string[];
+    }): void {
+        const taskId = input.taskId?.trim();
+        if (!this.appWorksSink || !taskId || input.groups.length === 0) return;
+        const classifier = this.appWorkRuns;
+        if (!classifier?.appWorkIdOf) return;
+        void classifier
+            .appWorkIdOf({ taskId, agentWorkId: input.agentWorkId ?? null })
+            .then((workId) => {
+                if (!workId) return;
+                for (const group of new Set(input.groups)) {
+                    this.appChangeTelemetry.track(
+                        'app.change.tool_denied',
+                        { workId, taskId, group },
+                        input.userId,
+                    );
+                }
+            })
+            .catch(() => undefined);
+    }
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
         const agent = await this.agents.findById(context.agentId);
@@ -2410,6 +2458,12 @@ export class AgentRunService {
     ): Promise<void> {
         const groups = [...new Set(violations.map((violation) => violation.group))];
         this.logger.warn(`Run ${context.runId}: ${errorMessage}`);
+        this.trackAppWorkToolsDenied({
+            taskId: context.taskId,
+            agentWorkId: agent.workId ?? null,
+            userId: agent.userId,
+            groups,
+        });
         await this.runLogs
             .append({
                 runId: context.runId,
@@ -2484,6 +2538,14 @@ export class AgentRunService {
         );
         if (appWorkPolicy && appWorkPolicy.denied.length > 0) {
             this.recordAppWorkToolPolicyWithheld(runId, appWorkPolicy.denied, appWorkPolicy.counts);
+            this.trackAppWorkToolsDenied({
+                taskId,
+                agentWorkId: agent.workId ?? null,
+                userId: agent.userId,
+                groups: Object.entries(appWorkPolicy.counts)
+                    .filter(([, count]) => (count ?? 0) > 0)
+                    .map(([group]) => group),
+            });
         }
         for (const decision of refused) {
             void this.runLogs

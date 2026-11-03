@@ -1,5 +1,8 @@
 import { Logger } from '@nestjs/common';
-import { APP_FOLLOW_UPS_OPEN_PER_WORK_MAX, APP_FOLLOW_UPS_PER_CHANGE_MAX } from '@ever-works/contracts';
+import {
+    APP_FOLLOW_UPS_OPEN_PER_WORK_MAX,
+    APP_FOLLOW_UPS_PER_CHANGE_MAX,
+} from '@ever-works/contracts';
 
 /**
  * APW-08 — the delivery chain's **owner-decision defaults** (APW08-G25, spec §9's five

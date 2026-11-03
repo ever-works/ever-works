@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "무료",
                         "pro": "Pro",
-                        "standard": "스탠다드",
-                        "premium": "프리미엄",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "측정 없음"
                     },
                     "usageRequired": "이 주기를 사용하려면 사용량 기반으로 전환하세요.",
@@ -7187,6 +7187,7 @@
                     "other": "리포지토리를 설정하는 중에 문제가 발생했습니다."
                 },
                 "overview": {
+                    "changesPaused": "운영자가 앱 변경을 일시 중지했습니다.",
                     "title": "App",
                     "repository": "Work 리포지토리",
                     "upstream": "업스트림",

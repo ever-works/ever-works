@@ -50,9 +50,29 @@ export const MAX_INLINE_SVG_LENGTH = 8000;
  * never name every such tag, so anything not listed fails the icon.
  */
 const ALLOWED_ELEMENTS: ReadonlySet<string> = new Set([
-    'svg', 'g', 'defs', 'symbol', 'title', 'desc', 'path', 'circle', 'ellipse', 'line',
-    'polyline', 'polygon', 'rect', 'text', 'tspan', 'a', 'lineargradient',
-    'radialgradient', 'stop', 'clippath', 'mask', 'pattern', 'marker',
+    'svg',
+    'g',
+    'defs',
+    'symbol',
+    'title',
+    'desc',
+    'path',
+    'circle',
+    'ellipse',
+    'line',
+    'polyline',
+    'polygon',
+    'rect',
+    'text',
+    'tspan',
+    'a',
+    'lineargradient',
+    'radialgradient',
+    'stop',
+    'clippath',
+    'mask',
+    'pattern',
+    'marker',
 ]);
 // Every tag the HTML tokenizer opens or closes: `<` or `</`, an ASCII letter, a name.
 const TAG_NAME_RE = /<\/?([a-z][^\s/>]*)/gi;

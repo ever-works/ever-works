@@ -4852,8 +4852,8 @@
                     "plans": {
                         "free": "Gratis",
                         "pro": "Pro",
-                        "standard": "Estándar",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Sin medidor"
                     },
                     "usageRequired": "Cambia a pago por uso para usar esta cadencia.",
@@ -7256,6 +7256,7 @@
                     "other": "Algo salió mal al configurar el repositorio."
                 },
                 "overview": {
+                    "changesPaused": "El operador ha pausado los cambios en las aplicaciones.",
                     "title": "App",
                     "repository": "Repositorio del Trabajo",
                     "upstream": "Upstream",

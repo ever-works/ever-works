@@ -40,6 +40,8 @@ export * from './task-thread-poster.port';
 export * from './task-thread-posts';
 // APW-08 lane L7 — the run-side posts (Run started, Opened pull request, Checks passed / failed).
 export * from './task-lifecycle-poster.port';
+// APW-08 T46 — told when a run ends (R-17 safety-rail holds).
+export * from './task-run-stop.port';
 export * from './task-lifecycle-posts';
 export * from './task-lifecycle-posts.service';
 export {

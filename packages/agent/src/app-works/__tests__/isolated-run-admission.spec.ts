@@ -679,11 +679,36 @@ describe('isolated-run admission — the predicate and its facts', () => {
             // Ids deliberately ordered AGAINST the statuses, so neither the input order nor the id
             // order alone yields the expected sequence.
             nodes: [
-                { id: 'node-a-enrolling', userId: OWNER, status: 'enrolling', capabilities: ['git-push'] },
-                { id: 'node-e-online', userId: OWNER, status: 'online', capabilities: ['git-push'] },
-                { id: 'node-b-paused', userId: OWNER, status: 'paused', capabilities: ['git-push'] },
-                { id: 'node-d-offline', userId: OWNER, status: 'offline', capabilities: ['git-push'] },
-                { id: 'node-c-online', userId: OWNER, status: 'online', capabilities: ['git-push'] },
+                {
+                    id: 'node-a-enrolling',
+                    userId: OWNER,
+                    status: 'enrolling',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-e-online',
+                    userId: OWNER,
+                    status: 'online',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-b-paused',
+                    userId: OWNER,
+                    status: 'paused',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-d-offline',
+                    userId: OWNER,
+                    status: 'offline',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-c-online',
+                    userId: OWNER,
+                    status: 'online',
+                    capabilities: ['git-push'],
+                },
             ],
             reports: {},
         });
@@ -729,6 +754,29 @@ describe('isolated-run admission — the predicate and its facts', () => {
                 jobId: 'j1',
             }),
         ).toBe(true);
+    });
+
+    it('APW-08 T43: run_admitted describes the containment the winning node runs under — and whether only an allowance admitted it', async () => {
+        const world = makeWorld({
+            reports: { [NODE_A]: isolatedReport('hardened'), [NODE_B]: declinedReport() },
+        });
+        const admission = new IsolatedRunAdmissionService(readsFor(world));
+        const payload = (nodeId: string, taskId: string | null = 't1', workId = APP_WORK) =>
+            admission.runAdmittedPayload({ userId: OWNER, nodeId, workId, taskId });
+
+        expect(await payload(NODE_A)).toEqual({
+            workId: APP_WORK,
+            taskId: 't1',
+            placement: 'fleet',
+            containmentPath: 'hardened',
+            isolatedHome: true,
+            downgraded: false,
+        });
+        // NODE_B declined isolation: it runs only under the owner's allowance — a downgrade.
+        expect(await payload(NODE_B)).toMatchObject({ isolatedHome: false, downgraded: true });
+        // Nothing honest to report: no Task id, or not an App Work.
+        expect(await payload(NODE_A, null)).toBeNull();
+        expect(await payload(NODE_A, 't1', SITE_WORK)).toBeNull();
     });
 
     it('APW-08 T51 (ACC-08-44, second half): a node whose last recorded run of THIS Task reported a missing tool is not offered it again', async () => {

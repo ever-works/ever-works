@@ -178,7 +178,10 @@ export function containsMerge(
 
 /** The candidate shas the caller must ask the provider about (everything that is not exact). */
 export function ancestryQuestions(
-    input: Pick<DeliveryDecisionInput, 'mergeCommitSha' | 'sourceBranch' | 'builds' | 'deployments'>,
+    input: Pick<
+        DeliveryDecisionInput,
+        'mergeCommitSha' | 'sourceBranch' | 'builds' | 'deployments'
+    >,
 ): string[] {
     const shas = new Set<string>();
     for (const build of input.builds) {
@@ -228,7 +231,8 @@ export function decideDelivery(input: DeliveryDecisionInput): DeliveryDecision {
         .filter((build) => isCandidateBuild(build, input.sourceBranch) && contains(build.commitSha))
         .sort(
             (a, b) =>
-                time(b.createdAt) - time(a.createdAt) || Number(b.number ?? 0) - Number(a.number ?? 0),
+                time(b.createdAt) - time(a.createdAt) ||
+                Number(b.number ?? 0) - Number(a.number ?? 0),
         );
     const buildIds = new Set(builds.map((build) => build.id));
 
@@ -257,7 +261,11 @@ export function decideDelivery(input: DeliveryDecisionInput): DeliveryDecision {
         const linkedBuild = deployment.buildId
             ? input.builds.find((row) => row.id === deployment.buildId)
             : undefined;
-        const decidingSha = ((deployment.commitSha ?? '').trim() || linkedBuild?.commitSha || '').trim();
+        const decidingSha = (
+            (deployment.commitSha ?? '').trim() ||
+            linkedBuild?.commitSha ||
+            ''
+        ).trim();
         const carried = decidingSha !== merge;
         const ids = {
             deploymentId: deployment.id,
@@ -326,7 +334,9 @@ export function decideDelivery(input: DeliveryDecisionInput): DeliveryDecision {
                 }
                 return stateOf('built', {
                     ...ids,
-                    reason: input.autoDeploy ? 'built, deployment not started' : 'built, auto-deploy off',
+                    reason: input.autoDeploy
+                        ? 'built, deployment not started'
+                        : 'built, auto-deploy off',
                 });
             case 'failed':
             case 'blocked':
@@ -338,7 +348,10 @@ export function decideDelivery(input: DeliveryDecisionInput): DeliveryDecision {
             case 'cancelled':
                 return { kind: 'unchanged', reason: 'build cancelled; a newer build decides' };
             default:
-                return { kind: 'unchanged', reason: `build status ${build.status} is not in the table` };
+                return {
+                    kind: 'unchanged',
+                    reason: `build status ${build.status} is not in the table`,
+                };
         }
     }
 

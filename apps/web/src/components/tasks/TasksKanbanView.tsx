@@ -37,6 +37,7 @@ import { TaskPrPill } from './TaskPrPill';
 import { TaskDueChip } from './TaskDueChip';
 import { TaskDiffSheet } from './TaskDiffSheet';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
+import { isRunRefused } from './run-refusal';
 import { FixOnComputerButton } from './FixOnComputerButton';
 import { useFleetTaskHandoffEnabled } from '@/components/fleet/tasks/handoff-context';
 import {
@@ -533,7 +534,8 @@ function TaskKanbanColumn({
             const { results } = await runTasksBatchAction(
                 runAllTargets.map((task) => ({ taskId: task.id })),
             );
-            const started = results.filter((row) => row.ok).length;
+            // APW-08 T12 — a refused run (2xx, nothing started) is not "started".
+            const started = results.filter((row) => row.ok && !isRunRefused(row.run)).length;
             setBatchSummary(t('board.runAllSummary', { started, total: results.length }));
         } finally {
             setBatchBusy(false);

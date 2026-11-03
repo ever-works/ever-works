@@ -292,14 +292,17 @@ describe('fleet job lease generation — repository integration (better-sqlite3)
             const created = await jobs.create({ userId: OWNER, kind });
             await rows.update(created.id, {
                 nodeId,
-                completedAt: minutesAgo === null ? null : new Date(Date.now() - minutesAgo * 60_000),
+                completedAt:
+                    minutesAgo === null ? null : new Date(Date.now() - minutesAgo * 60_000),
                 result,
             });
             return created.id;
         }
 
         it('filters to completed agent-task rows BEFORE the limit, so newer jobs of other kinds never hide a report', async () => {
-            const reported = await jobOn(NODE_A, 'agent-task', 60, { containment: { isolatedHome: true } });
+            const reported = await jobOn(NODE_A, 'agent-task', 60, {
+                containment: { isolatedHome: true },
+            });
             // Newer than the report: other kinds, an open agent-task, another node's agent-task.
             for (let i = 0; i < 5; i += 1) await jobOn(NODE_A, 'acceptance-checks', 10 - i);
             await jobOn(NODE_A, 'agent-task', null);

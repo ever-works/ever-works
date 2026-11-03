@@ -213,11 +213,11 @@ The sync rules the platform implements:
 
 **The change guard** reads the diff — not what the agent says it did — against the rules in `.works/works.yml` **at the tip of the base branch**, so an agent can never be judged by rules it just loosened. It refuses a change that:
 
-1. is too big to read whole — 300 files or more, or a diff GitHub truncated;
+1. is too big to read whole — 300 files or more, or a file list the provider cut short (a long patch on its own, such as a large lockfile, is not a reason to refuse);
 2. touches a path in `display.protectedPaths` (a rename counts as touching the old path too) — this is how an app's branding files stay read-only to agents;
 3. touches `.github/workflows/**`, always, whatever the spec says;
 4. changes the `source`, `license` or `blueprint` blocks of the App spec, or **removes** entries from `display.protectedPaths` or `agents.requireHumanMergePaths` — adding entries is always allowed;
-5. is more than three times the size guidance, `agents.maxPullRequestChangedLines` (default 500 lines; lockfiles are not counted). Between the guidance and three times it, the change goes through with a note.
+5. is more than three times the size guidance — `agents.maxPullRequestChangedLines` (default 500 lines; lockfiles are not counted) or `agents.maxPullRequestChangedFiles` (default 50 files). Between the guidance and three times it, the change goes through with a note.
 
 A refused change opens no pull request; the Task is **blocked** with the reason.
 
@@ -226,6 +226,8 @@ A refused change opens no pull request; the Task is **blocked** with the reason.
 **Every Task is isolated, on the branch the app is built from.** On an App Work, Task isolation is always on — a Task cannot opt out — and an Agent that may not commit is refused before it starts: _"This agent can't commit, and changes to an app always go through a branch."_ Each time the App spec changes, the Work's Task settings follow it: Tasks branch from, and open their pull requests into, the spec's `source.branch` — or, when the spec names none, the branch the App spec is read from, and failing that the Work Repository's default branch. A spec that declares a required check switches the Work's quality gate to **required** (a gate you set to **warn** stays **warn**). Every App spec update, whatever checks it declares, also sets the Work to read the checks your repository declares through its allow-list. This applies even if you had switched that reading off, and it keeps the commands you already admitted. An empty allow-list admits nothing: each check runs only after you admit it. When the spec's checks change, you get one notification linking to the App checks card in the Work's settings.
 
 App Works created before this existed are brought in line by a one-off job, `app-work-isolation-backfill` (an operator runs it; pass `{ "dryRun": true }` to see what it would change). It fills the base branch the same way for every App Work that has none, and leaves alone any whose repository it cannot read. Running it twice changes nothing the second time.
+
+How a change is asked for, where its runs may execute, the checks it must pass and how it is built, deployed and closed are on [Evolving the app](./app-works-evolve.md).
 
 ## Deleting an App Work
 

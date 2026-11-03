@@ -94,7 +94,7 @@ export function TaskRunContainmentNotice({
                                 {t('downgrades')}
                             </p>
                             <ul
-                                className="list-disc pl-5"
+                                className="list-disc ps-5"
                                 data-testid="task-containment-downgrades"
                             >
                                 {view.downgrades.map((entry, index) => (

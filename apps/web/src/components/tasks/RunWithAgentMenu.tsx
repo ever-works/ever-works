@@ -14,6 +14,7 @@ import {
     RUN_NO_AGENT,
     type RunCandidateAgent,
 } from '@/lib/api/tasks.shared';
+import { isRunRefused, runRefusalText } from './run-refusal';
 
 /**
  * Board dispatch (kanban M3) — the "Run" affordance and its agent picker.
@@ -44,7 +45,7 @@ export interface RunWithAgentMenuProps {
     /** Controlled picker state — the board uses this for the drag case. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    /** Fired after a run is accepted (dispatched or parked). */
+    /** Fired after a run is accepted (dispatched or parked) — never for a refused one. */
     onRunStarted?: (result: Extract<RunTaskActionResult, { ok: true }>) => void;
     className?: string;
 }
@@ -118,6 +119,14 @@ export function RunWithAgentMenu({
             setMessage(null);
             try {
                 const result = await runTaskAction(taskId, agentId ?? null);
+                if (result.ok && isRunRefused(result.run)) {
+                    // APW-08 T12 — refused before any run row (no isolated runtime, no commit
+                    // permission, App changes paused): say why, never "Run started".
+                    setOpen(false);
+                    setTone('error');
+                    setMessage(runRefusalText(result.run.error));
+                    return;
+                }
                 if (result.ok) {
                     setOpen(false);
                     setTone('ok');
@@ -224,6 +233,8 @@ export function RunWithAgentMenu({
                         tone === 'error' ? 'text-danger' : 'text-text-muted',
                     )}
                     role={tone === 'error' ? 'alert' : 'status'}
+                    data-testid="task-run-message"
+                    data-tone={tone}
                 >
                     {message}
                 </p>

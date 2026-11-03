@@ -41,7 +41,9 @@ describe('APW-08 T53 — repository size limits from the shared table', () => {
             );
             // The run's checkout stage is `sandbox`, which the table leaves without a size today.
             expect(APP_WORK_RUN_CHECKOUT_STAGE).toBe('sandbox');
-            expect(appWorkRunStageSizeLimitKb()).toBe(APP_REPOSITORY_STAGE_LIMITS.sandbox.maxSizeKb);
+            expect(appWorkRunStageSizeLimitKb()).toBe(
+                APP_REPOSITORY_STAGE_LIMITS.sandbox.maxSizeKb,
+            );
         });
 
         it('the refusing stage is the one Inspect names, and the copy carries the size and the limit (S35)', () => {
@@ -73,7 +75,9 @@ describe('APW-08 T53 — repository size limits from the shared table', () => {
             expect(
                 appWorkRepositorySizeRefusal({ sizeKb: 3 * GIB_KB, stage: 'provisioning' }),
             ).toBeNull();
-            expect(appWorkRepositorySizeRefusal({ sizeKb: 99 * GIB_KB, stage: 'build' })).toBeNull();
+            expect(
+                appWorkRepositorySizeRefusal({ sizeKb: 99 * GIB_KB, stage: 'build' }),
+            ).toBeNull();
             expect(appWorkRepositorySizeRefusal({ sizeKb: null, stage: 'build' })).toBeNull();
         });
 

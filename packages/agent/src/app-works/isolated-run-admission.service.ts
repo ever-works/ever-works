@@ -10,6 +10,7 @@ import {
 
 import type { FleetAppWorkLeaseAdmission } from '../fleet/fleet-app-work-lease-admission.port';
 import { resolveTaskRepository, type TaskRepositoryWork } from '../tasks-domain/task-repository';
+import type { AppChangeTelemetryPayloads } from './app-change.telemetry';
 import {
     resolveTaskDispatchAgentIds,
     type TaskAgentAssigneeReader,
@@ -305,9 +306,46 @@ export class IsolatedRunAdmissionService
     }
 
     /**
+     * APW-08 T43 (plan §8.1, XC-06) — the `app.change.run_admitted` payload for a node that just
+     * WON an App Work job: the containment it runs under, and whether it runs only because the
+     * owner allowed a downgrade there. `null` when there is nothing honest to report (no Task id
+     * on the job, the Work gone or no longer an App Work). Never throws.
+     */
+    async runAdmittedPayload(input: {
+        userId: string;
+        nodeId: string;
+        workId: string;
+        taskId: string | null;
+    }): Promise<AppChangeTelemetryPayloads['app.change.run_admitted'] | null> {
+        if (!input.taskId) return null;
+        try {
+            const work = await this.reads.works.findById(input.workId);
+            if (!work || !isAppWorkKind(work.kind)) return null;
+            const raw = this.reads.fleet
+                ? await this.reads.fleet.latestContainment(input.userId, input.nodeId)
+                : null;
+            const containment = toAppWorkRunContainment(raw);
+            return {
+                workId: input.workId,
+                taskId: input.taskId,
+                placement: 'fleet',
+                containmentPath: containment?.executionPath ?? 'unknown',
+                isolatedHome: containment?.isolatedHome === true,
+                // Admissible on its own report, or only because the owner allowed it there.
+                downgraded: !isNodeContainmentAdmissible({ containment, allowed: false }),
+            };
+        } catch (err) {
+            this.logger.warn(
+                `run_admitted for App Work ${input.workId} on node ${input.nodeId} could not be described (${describe(err)}).`,
+            );
+            return null;
+        }
+    }
+
+    /**
      * APW-08 T51 (FR-61, S36, ACC-08-44 second half) — did this node's LAST run of this Task, within
      * {@link APP_WORK_MISSING_TOOL_EXCLUSION_MS}, report a check whose tool is missing on it? Then the
-     * Task is not offered to it again. The record is the node's own completed job (no new table).
+     * Task is not offered to it again. The record is the Task's own run (the reconciler flags it).
      *
      * Bounded, unlike the containment rules: a machine whose owner installs the tool must be able
      * to take the Task again, so only the latest run of it counts and only for a day. And it fails

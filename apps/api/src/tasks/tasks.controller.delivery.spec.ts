@@ -50,7 +50,9 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
         const getOne = jest.fn().mockResolvedValue(TASK);
         const delivery = {
             getView: jest.fn().mockResolvedValue(VIEW),
-            closeWithoutDeploy: jest.fn().mockResolvedValue({ ...VIEW, state: 'closed_without_deploy' }),
+            closeWithoutDeploy: jest
+                .fn()
+                .mockResolvedValue({ ...VIEW, state: 'closed_without_deploy' }),
             requestFollowUp: jest.fn().mockResolvedValue({ taskId: 'follow-1' }),
             createFixTask: jest
                 .fn()
@@ -86,7 +88,9 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
         it("another account's Task is a 404 and the chain is never read", async () => {
             const { controller, getOne, delivery } = make();
             getOne.mockRejectedValue(new NotFoundException('Task task-1 not found.'));
-            await expect(controller.getDelivery(auth, 'task-1')).rejects.toBeInstanceOf(NotFoundException);
+            await expect(controller.getDelivery(auth, 'task-1')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
             expect(delivery.getView).not.toHaveBeenCalled();
         });
 
@@ -129,7 +133,9 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
         it('a cross-account Task is a 404 before anything is written', async () => {
             const { controller, getOne, delivery } = make();
             getOne.mockRejectedValue(new NotFoundException());
-            await expect(controller.closeDelivery(auth, 'task-1', {})).rejects.toBeInstanceOf(NotFoundException);
+            await expect(controller.closeDelivery(auth, 'task-1', {})).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
             expect(delivery.closeWithoutDeploy).not.toHaveBeenCalled();
         });
 
@@ -264,7 +270,9 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
 
         it('mounts GET :id/delivery, POST :id/delivery/close and POST :id/delivery/follow-up', () => {
             expect(Reflect.getMetadata('path', proto.getDelivery as object)).toBe(':id/delivery');
-            expect(Reflect.getMetadata('path', proto.closeDelivery as object)).toBe(':id/delivery/close');
+            expect(Reflect.getMetadata('path', proto.closeDelivery as object)).toBe(
+                ':id/delivery/close',
+            );
             expect(Reflect.getMetadata('path', proto.requestDeliveryFollowUp as object)).toBe(
                 ':id/delivery/follow-up',
             );
@@ -272,7 +280,9 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
             expect(Reflect.getMetadata('method', proto.getDelivery as object)).toBe(0);
             expect(Reflect.getMetadata('method', proto.closeDelivery as object)).toBe(1);
             expect(Reflect.getMetadata('method', proto.requestDeliveryFollowUp as object)).toBe(1);
-            expect(Reflect.getMetadata('__httpCode__', proto.requestDeliveryFollowUp as object)).toBe(202);
+            expect(
+                Reflect.getMetadata('__httpCode__', proto.requestDeliveryFollowUp as object),
+            ).toBe(202);
         });
     });
 });

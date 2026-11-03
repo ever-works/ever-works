@@ -63,6 +63,15 @@ export const QUEUED_REASON_AGENT_PAUSED = 'agent-paused' as const;
  */
 export const QUEUED_REASON_WORK_BUDGET = 'work-budget' as const;
 
+/**
+ * APW-08 T49 (XC-10, FR-74, R-30) — stamped on an App Work Task's run dispatched while the
+ * operator has `EVER_WORKS_APP_CHANGES_ENABLED` off. R-30's "jobs pause, and turning the switch
+ * back on resumes": the run row exists and nothing starts. Exempt from the stuck-run sweeper, and
+ * released by its tick (`promoteParked`) once the switch is on again. Stamped by
+ * `TaskTransitionService.dispatchAgentRun` itself (the gate's chain does not know the switch).
+ */
+export const QUEUED_REASON_APP_CHANGES_PAUSED = 'app-changes-paused' as const;
+
 export interface RunAdmissionInput {
     userId: string;
     workId?: string | null;

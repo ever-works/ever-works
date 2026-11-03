@@ -32,7 +32,9 @@ import { TASK_DELIVERY_STATES, type TaskDeliveryState } from '@ever-works/contra
  *   - `delivery.state` — one of `TASK_DELIVERY_STATES`;
  *   - `delivery.deployment.state` — the four `work_deployments.state` spellings the chain reads;
  *   - `guard` — the INPUTS of the real `AppChangeGuard` (rules and a diff), never its output: the
- *     refusal text the Task page shows is the guard's own sentence, computed by the route.
+ *     refusal text the Task page shows is the guard's own sentence, computed by the route;
+ *   - `run.containment` — what a Fleet node REPORTED (path, isolated home, downgrades), passed
+ *     through the same `toAppWorkRunContainment` normalizer the reconciler uses (APW-08 T52).
  */
 
 /** A commit id as the chain stores it (`varchar(64)`, lower-case hex). */
@@ -50,9 +52,13 @@ export type E2eTaskSeedDeploymentState = (typeof E2E_TASK_SEED_DEPLOYMENT_STATES
 /** `GitDiffFile.status` values a fixture may name. */
 export const E2E_TASK_SEED_FILE_STATUSES = ['added', 'modified', 'removed', 'renamed'] as const;
 
+/** `FleetAgentTaskContainment.executionPath` values a node reports. */
+export const E2E_TASK_SEED_EXECUTION_PATHS = ['hardened', 'ordinary'] as const;
+
 /** Bounds — a fixture, not a load test. */
 export const E2E_TASK_SEED_MAX_FILES = 50;
 export const E2E_TASK_SEED_MAX_PATHS = 50;
+export const E2E_TASK_SEED_MAX_DOWNGRADES = 10;
 
 /** The deciding Deployment of a `live` / `deploy_failed` / `deploying` change. */
 export class E2eTaskSeedDeploymentDto {
@@ -179,6 +185,44 @@ export class E2eTaskSeedGuardDto {
     totalFiles?: number;
 }
 
+/** One control a node ran without, and why (`FleetAgentTaskContainmentDowngrade`). */
+export class E2eTaskSeedDowngradeDto {
+    @IsString()
+    @MaxLength(64)
+    control: string;
+
+    @IsString()
+    @MaxLength(300)
+    reason: string;
+}
+
+/** The containment a Fleet node reported for the run (the reconciler's raw input). */
+export class E2eTaskSeedContainmentDto {
+    @IsIn(E2E_TASK_SEED_EXECUTION_PATHS)
+    executionPath: (typeof E2E_TASK_SEED_EXECUTION_PATHS)[number];
+
+    @IsBoolean()
+    isolatedHome: boolean;
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(E2E_TASK_SEED_MAX_DOWNGRADES)
+    @ValidateNested({ each: true })
+    @Type(() => E2eTaskSeedDowngradeDto)
+    downgrades?: E2eTaskSeedDowngradeDto[];
+}
+
+/**
+ * APW-08 T52 — one finished Fleet run of the Task carrying a containment record, so the Cost
+ * section's containment notice (`TaskRunContainmentNotice`) renders. No node is named: a node id
+ * would point at a machine the lane does not have.
+ */
+export class E2eTaskSeedRunDto {
+    @ValidateNested()
+    @Type(() => E2eTaskSeedContainmentDto)
+    containment: E2eTaskSeedContainmentDto;
+}
+
 /** `POST /api/e2e/app-works/task-seed`. */
 export class E2eTaskSeedDto {
     /** A Task the signed-in person can see, on an App Work. */
@@ -194,4 +238,9 @@ export class E2eTaskSeedDto {
     @ValidateNested()
     @Type(() => E2eTaskSeedGuardDto)
     guard?: E2eTaskSeedGuardDto;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => E2eTaskSeedRunDto)
+    run?: E2eTaskSeedRunDto;
 }

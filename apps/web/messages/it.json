@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Gratuito",
                         "pro": "Pro",
-                        "standard": "Standard",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Senza limiti"
                     },
                     "usageRequired": "Passa a pay-per-use per usare questa cadenza.",
@@ -7187,6 +7187,7 @@
                     "other": "Si è verificato un problema durante la configurazione del repository."
                 },
                 "overview": {
+                    "changesPaused": "Le modifiche alle app sono sospese dall’operatore.",
                     "title": "App",
                     "repository": "Repository del Work",
                     "upstream": "Upstream",

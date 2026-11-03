@@ -247,7 +247,10 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             escalated: 0,
             durationMs: 0,
         };
-        const limit = Math.max(1, Math.min(opts.limit ?? APP_DELIVERY_RECONCILE_BATCH, APP_DELIVERY_RECONCILE_BATCH));
+        const limit = Math.max(
+            1,
+            Math.min(opts.limit ?? APP_DELIVERY_RECONCILE_BATCH, APP_DELIVERY_RECONCILE_BATCH),
+        );
         const due = await this.tasks.find({
             where: [
                 { deliveryState: In([...TASK_DELIVERY_OPEN_STATES]) },
@@ -272,7 +275,9 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                 if (outcome.followUp === 'escalated') summary.escalated += 1;
             } catch (error) {
                 summary.failed += 1;
-                this.logger.warn(`Delivery reconcile failed for task ${task.id}: ${errorText(error)}`);
+                this.logger.warn(
+                    `Delivery reconcile failed for task ${task.id}: ${errorText(error)}`,
+                );
             }
         }
         summary.durationMs = Date.now() - started;
@@ -347,7 +352,11 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                 website: row.website ?? null,
             })),
         };
-        const ancestry = await this.ancestry(work, mergeCommitSha, ancestryQuestions(decisionInput));
+        const ancestry = await this.ancestry(
+            work,
+            mergeCommitSha,
+            ancestryQuestions(decisionInput),
+        );
         const switches = readAppWorkSwitches();
         const defaults = readAppDeliveryDefaults();
         const decision = decideDelivery({
@@ -391,7 +400,10 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                 deliveryUpdatedAt: now,
             });
             if (decision.state !== from) {
-                await this.recordStateChange(task, decision, mergeCommitSha, { builds, deployments });
+                await this.recordStateChange(task, decision, mergeCommitSha, {
+                    builds,
+                    deployments,
+                });
             }
         }
 
@@ -468,9 +480,7 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             this.history(task),
             // S20 — only a `built` change asks whether a person has to deploy it.
             state === 'built' && task.workId
-                ? this.runtimeStates
-                      .findOne({ where: { workId: task.workId } })
-                      .catch(() => null)
+                ? this.runtimeStates.findOne({ where: { workId: task.workId } }).catch(() => null)
                 : Promise.resolve(null),
         ]);
         const merge = (task.mergeCommitSha ?? '').trim();
@@ -530,7 +540,10 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
      * must never fail because of a chip.
      */
     async listEmbeds(
-        rows: readonly Pick<Task, 'id' | 'deliveryState' | 'deliveryDeploymentId' | 'mergeCommitSha'>[],
+        rows: readonly Pick<
+            Task,
+            'id' | 'deliveryState' | 'deliveryDeploymentId' | 'mergeCommitSha'
+        >[],
     ): Promise<Map<string, TaskDeliveryEmbed>> {
         const tracked = rows.filter((row) => isDeliveryState(row.deliveryState));
         const embeds = new Map<string, TaskDeliveryEmbed>();
@@ -538,7 +551,10 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         const deploymentIds = [
             ...new Set(
                 tracked
-                    .filter((row) => row.deliveryState === 'live' || row.deliveryState === 'deploy_failed')
+                    .filter(
+                        (row) =>
+                            row.deliveryState === 'live' || row.deliveryState === 'deploy_failed',
+                    )
                     .map((row) => row.deliveryDeploymentId)
                     .filter((id): id is string => typeof id === 'string' && id.length > 0),
             ),
@@ -593,7 +609,8 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             throw new UnprocessableEntityException({
                 code: 'notClosable',
                 state: from,
-                message: 'Only a merged change that is not live and not deploying can be closed this way.',
+                message:
+                    'Only a merged change that is not live and not deploying can be closed this way.',
             });
         }
         // Review of #3030 — a Task that cannot reach Done (blocked, back in the backlog) is refused,
@@ -750,7 +767,11 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                     {
                         summary: `Follow-up Task opened (try once more) for the failed ${failure.phase}`,
                         state: state as TaskDeliveryState,
-                        extra: { followUpTaskId: result.taskId, failureId: failure.failureId, manual: true },
+                        extra: {
+                            followUpTaskId: result.taskId,
+                            failureId: failure.failureId,
+                            manual: true,
+                        },
                     },
                 );
                 await this.postFollowUpOpened(task, result.taskId);
@@ -817,16 +838,21 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         }
         const created = result.kind === 'opened';
         if (created) {
-            await this.recordActivity(task, APP_CHANGE_ACTIONS.followUpOpened, ActivityStatus.COMPLETED, {
-                summary: `Fix Task opened by hand for the failed ${failure.phase}`,
-                state: state as TaskDeliveryState,
-                extra: {
-                    followUpTaskId: result.taskId,
-                    failureId: failure.failureId,
-                    manual: true,
-                    requestedById: userId,
+            await this.recordActivity(
+                task,
+                APP_CHANGE_ACTIONS.followUpOpened,
+                ActivityStatus.COMPLETED,
+                {
+                    summary: `Fix Task opened by hand for the failed ${failure.phase}`,
+                    state: state as TaskDeliveryState,
+                    extra: {
+                        followUpTaskId: result.taskId,
+                        failureId: failure.failureId,
+                        manual: true,
+                        requestedById: userId,
+                    },
                 },
-            });
+            );
         }
         const slug = created
             ? await this.postFollowUpOpened(task, result.taskId)
@@ -887,11 +913,17 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             }
             let answer: boolean | null = null;
             try {
-                answer = await this.git.isAncestorCommit(target.owner, target.repo, mergeCommitSha, sha, {
-                    userId: work.userId,
-                    providerId: work.gitProvider,
-                    workId: work.id,
-                });
+                answer = await this.git.isAncestorCommit(
+                    target.owner,
+                    target.repo,
+                    mergeCommitSha,
+                    sha,
+                    {
+                        userId: work.userId,
+                        providerId: work.gitProvider,
+                        workId: work.id,
+                    },
+                );
             } catch (error) {
                 // A broken read is "cannot say" for this tick and is NOT cached.
                 this.logger.warn(
@@ -915,7 +947,9 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         deployments: readonly WorkDeployment[],
     ): DeliveryFailure | null {
         if (decision.kind !== 'state' || !decision.failurePhase) return null;
-        const build = decision.buildId ? (builds.find((row) => row.id === decision.buildId) ?? null) : null;
+        const build = decision.buildId
+            ? (builds.find((row) => row.id === decision.buildId) ?? null)
+            : null;
         const deployment = decision.deploymentId
             ? (deployments.find((row) => row.id === decision.deploymentId) ?? null)
             : null;
@@ -1028,7 +1062,9 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                     workId: task.workId as string,
                     taskId: task.id,
                     minutesMergeToLive:
-                        mergedAt === null ? 0 : Math.max(0, Math.round((Date.now() - mergedAt) / 60_000)),
+                        mergedAt === null
+                            ? 0
+                            : Math.max(0, Math.round((Date.now() - mergedAt) / 60_000)),
                     carried: decision.carried,
                 },
                 task.userId,
@@ -1263,7 +1299,10 @@ function buildFailureReason(build: WorkBuild | null): string | null {
         (value): value is string => typeof value === 'string' && value.trim().length > 0,
     );
     if (!raw) return null;
-    const line = raw.replace(/\s+/g, ' ').trim().replace(/[.\s]+$/, '');
+    const line = raw
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/[.\s]+$/, '');
     return line.length > POST_REASON_MAX ? `${line.slice(0, POST_REASON_MAX - 1)}…` : line;
 }
 

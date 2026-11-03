@@ -4,6 +4,7 @@ import { DomainEventPublisher } from '../domain-events/domain-event-publisher.se
 import type { Task } from '../entities/task.entity';
 import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
 import { runStartedPost } from './task-lifecycle-posts';
+import { APP_WORK_RUN_STOP_HANDLER, type AppWorkRunStopHandler } from './task-run-stop.port';
 
 /**
  * Statuses `TaskRunDenormService` mirrors onto the Task row. Matches the
@@ -63,6 +64,12 @@ export class TaskRunDenormService {
         @Optional()
         @Inject(TASK_LIFECYCLE_POSTER)
         private readonly lifecycle?: TaskLifecyclePoster,
+        // APW-08 T46 (R-17, FR-67) — told when a run ends, so an App Work run a safety rail
+        // refused ends as `needs_input`. Appended LAST + @Optional() and injected by TOKEN (see
+        // the port). Absent = a terminal write is exactly what it was.
+        @Optional()
+        @Inject(APP_WORK_RUN_STOP_HANDLER)
+        private readonly runStops?: AppWorkRunStopHandler,
     ) {}
 
     /** New run dispatched for the Task — unconditional pointer install. */
@@ -124,7 +131,15 @@ export class TaskRunDenormService {
         runId: string,
         status: TaskRunTerminalStatus,
     ): Promise<boolean> {
-        return this.write(taskId, runId, status, runId);
+        const applied = await this.write(taskId, runId, status, runId);
+        // APW-08 T46 — the one write BOTH run paths make when a run ends (the cloud worker over
+        // its RPC proxy, the Fleet reconciler in process). Only for the Task's CURRENT run: a stale
+        // run that lost the pointer must not block a Task that has moved on. Fire-and-forget:
+        // the handler never throws and the run's terminal write never waits on it.
+        if (applied && this.runStops) {
+            void this.runStops.onRunTerminal({ taskId, runId, status }).catch(() => undefined);
+        }
+        return applied;
     }
 
     /** Best-effort `task.runtime_updated` — telemetry, never allowed to fail the run. */

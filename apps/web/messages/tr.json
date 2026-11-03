@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Ücretsiz",
                         "pro": "Pro",
-                        "standard": "Standart",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Sınırsız"
                     },
                     "usageRequired": "Bu sıklığı kullanmak için kullanım başına ödemeye geçin.",
@@ -7187,6 +7187,7 @@
                     "other": "Depo kurulurken bir sorun oluştu."
                 },
                 "overview": {
+                    "changesPaused": "Uygulamalardaki değişiklikler operatör tarafından duraklatıldı.",
                     "title": "App",
                     "repository": "Work Deposu",
                     "upstream": "Kaynak depo",

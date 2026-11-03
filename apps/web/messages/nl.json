@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "Gratis",
                         "pro": "Pro",
-                        "standard": "Standaard",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Onbeperkt"
                     },
                     "usageRequired": "Schakel over naar betaling per gebruik om deze frequentie te gebruiken.",
@@ -7187,6 +7187,7 @@
                     "other": "Er ging iets mis bij het instellen van de repository."
                 },
                 "overview": {
+                    "changesPaused": "Wijzigingen aan apps zijn gepauzeerd door de beheerder.",
                     "title": "App",
                     "repository": "Work-repository",
                     "upstream": "Upstream",

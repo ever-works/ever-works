@@ -4783,8 +4783,8 @@
                     "plans": {
                         "free": "免费",
                         "pro": "专业版",
-                        "standard": "标准",
-                        "premium": "高级",
+                        "standard": "专业版",
+                        "premium": "Unlimited",
                         "unmetered": "无限"
                     },
                     "usageRequired": "切换到按使用付费以使用此节奏。",
@@ -7187,6 +7187,7 @@
                     "other": "设置仓库时出现问题。"
                 },
                 "overview": {
+                    "changesPaused": "运营方已暂停对应用的更改。",
                     "title": "App",
                     "repository": "Work 仓库",
                     "upstream": "上游仓库",

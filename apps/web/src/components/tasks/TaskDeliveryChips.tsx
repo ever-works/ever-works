@@ -91,6 +91,34 @@ export function deliveryChipKey(input: TaskDeliveryChipInput): DeliveryChipKey {
 }
 
 /**
+ * APW-08 T52 (FR-71) — a delivery state's chip text, and its spoken form where that differs (a
+ * failed Deployment's chip names its outcome in words for a screen reader). Shared by the chip and
+ * the Delivery section's polite live region, so what is announced is exactly what the chip shows.
+ */
+export function useDeliveryChipText(): (delivery: TaskDeliveryChipInput) => {
+    label: string;
+    spoken: string;
+} {
+    const t = useTranslations('dashboard.tasksPage.delivery');
+    return (delivery) => {
+        const key = deliveryChipKey(delivery);
+        const outcomeKey =
+            delivery.outcome && delivery.outcome in OUTCOME_KEYS
+                ? OUTCOME_KEYS[delivery.outcome as TaskDeliveryDeployOutcome]
+                : null;
+        const outcome = outcomeKey ? t(`outcome.${outcomeKey}`) : '';
+        if (key === 'chipDeployFailed') {
+            return {
+                label: t('chipDeployFailed', { outcome }),
+                spoken: t('ariaDeployFailed', { outcome }),
+            };
+        }
+        const label = t(key);
+        return { label, spoken: label };
+    };
+}
+
+/**
  * APW-08 T27 (`TaskDeliveryChips`, spec §6.1) — where a merged App Work change stands, as a
  * board / list chip: `Merged ✓ · Waiting for a build` → `Build ⟳` → `Built ✓ · Waiting for a
  * deployment` → `Deploying ⟳` → `Live ✓`, or a failure / `Closed without deploying`. Rendered
@@ -111,16 +139,11 @@ export function TaskDeliveryChips({
     className?: string;
 }) {
     const t = useTranslations('dashboard.tasksPage.delivery');
+    const chipText = useDeliveryChipText();
     if (!delivery || !(delivery.state in STATE_TONES)) return null;
 
-    const key = deliveryChipKey(delivery);
-    const outcomeKey =
-        delivery.outcome && delivery.outcome in OUTCOME_KEYS
-            ? OUTCOME_KEYS[delivery.outcome as TaskDeliveryDeployOutcome]
-            : null;
-    const outcome = outcomeKey ? t(`outcome.${outcomeKey}`) : '';
-    const label = key === 'chipDeployFailed' ? t('chipDeployFailed', { outcome }) : t(key);
-    const ariaLabel = key === 'chipDeployFailed' ? t('ariaDeployFailed', { outcome }) : undefined;
+    const { label, spoken } = chipText(delivery);
+    const ariaLabel = spoken !== label ? spoken : undefined;
     const tone = TONES[STATE_TONES[delivery.state]];
     // A deployment target may serve plain http; anything else (`javascript:` …) renders inert.
     const liveUrl = delivery.state === 'live' && linkLive ? safeWebUrl(delivery.liveUrl) : null;

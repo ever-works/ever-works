@@ -759,6 +759,43 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
             expect(result).toMatchObject({ status: 'completed', workspaceOutcome: 'pr-opened' });
         });
 
+        // Review of #3050 (APW-08 T46) — the runtime's own success (`dispatched`) mirrored its end
+        // nowhere: the Task kept `latestRunStatus: running` and T46's stop handler was never asked.
+        it('a dispatched run mirrors its end AFTER its pull request is opened', async () => {
+            useWorkTask();
+            runner.execute.mockResolvedValue({ status: 'dispatched' });
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            taskWorkspace.finalizeRun.mockResolvedValue({ outcome: 'pr-opened', prNumber: 7 });
+            resolveChecksPolicyMock.mockReturnValue('off');
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(result).toMatchObject({ status: 'completed', workspaceOutcome: 'pr-opened' });
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(
+                OWNED_TASK_ID,
+                'run-1',
+                'completed',
+            );
+            expect(taskWorkspace.finalizeRun.mock.invocationCallOrder[0]).toBeLessThan(
+                runDenorm.recordTerminal.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('a dispatched run with no workspace mirrors its end too', async () => {
+            useWorkTask();
+            runner.execute.mockResolvedValue({ status: 'dispatched' });
+            resolveChecksPolicyMock.mockReturnValue('off');
+
+            await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(
+                OWNED_TASK_ID,
+                'run-1',
+                'completed',
+            );
+        });
+
         it("red gate + policy 'required' → NO finalize/PR, run completes naming the failing check, task chat notified", async () => {
             useWorkTask();
             taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
