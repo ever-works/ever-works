@@ -47,11 +47,12 @@ With no runs at all the tab says so: _"No runs yet — terminals attach to agent
 
 If **Start session** fails, the API's own message is shown verbatim, because those messages are the useful ones:
 
-| What you see                                                                        | Why                                                                              |
-| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| _already has a live terminal session — attach to it instead_                        | A session is already resident for this run. Attach to it; do not start a second. |
-| _has finished — a terminal session can only be started for a queued or running run_ | The run reached a terminal status while you were looking at it.                  |
-| _Terminal sessions are unavailable on this install_                                 | No background job runtime is wired — see [Workers](./workers.md).                |
+| What you see                                                                        | Why                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _already has a live terminal session — attach to it instead_                        | A session is already resident for this run. Attach to it; do not start a second.                                                                                                  |
+| _has finished — a terminal session can only be started for a queued or running run_ | The run reached a terminal status while you were looking at it.                                                                                                                   |
+| _Terminal sessions are unavailable on this install_                                 | No background job runtime is wired — see [Workers](./workers.md).                                                                                                                 |
+| _Terminal sessions are disabled on this install_                                    | Sessions are opt-in. An operator sets `TERMINAL_SESSIONS_ENABLED=true` on the API **and** the Trigger worker (the shell runs inside the worker process, next to its environment). |
 
 ## The pane, state by state
 
