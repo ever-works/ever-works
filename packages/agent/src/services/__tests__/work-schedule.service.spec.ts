@@ -67,6 +67,10 @@ describe('WorkScheduleService', () => {
                 .mockResolvedValue([{ cadence: WorkScheduleCadence.DAILY, allowed: true }]),
             getDefaultCadence: jest.fn().mockReturnValue(WorkScheduleCadence.DAILY),
             requiresUsageBilling: jest.fn().mockReturnValue(false),
+            // EW-761 - every BillingProvider in the tree inherits the no-op
+            // `recordUsageCharge`, so "we can bill this run" is FALSE in
+            // production. That is the default here too.
+            canBillUsage: jest.fn().mockReturnValue(false),
         };
         usageLedgerService = {
             recordUsage: jest.fn().mockResolvedValue(null),
@@ -717,5 +721,198 @@ describe('WorkScheduleService', () => {
         expect(workRepository.update).not.toHaveBeenCalled();
         expect(dataGeneratorService.getConfig).not.toHaveBeenCalled();
         expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    /**
+     * EW-761 - validateRunEntitlement is the LAST gate before a scheduled
+     * run is allowed to spend money on the platform's inference budget.
+     *
+     * It used to open with an unconditional
+     *   `if (schedule.billingMode === USAGE) return true;`
+     * justified by the comment "assuming they can pay". Nothing in the tree
+     * can charge a pay-per-use run - `BillingProvider.recordUsageCharge` is
+     * a bare `return` on the abstract and neither concrete provider
+     * overrides it - so the assumption was false and an unmetered run was
+     * silently allowed past the plan's active-schedule cap.
+     *
+     * The gate now stands down for USAGE only when the bound provider says
+     * it really settles usage charges. Both paths are covered here so the
+     * fix cannot regress in either direction: a legitimately billable
+     * pay-per-use run must still sail through.
+     */
+    describe('validateRunEntitlement - pay-per-use may not bypass plan limits unless it is billable', () => {
+        const overLimitPlan = { code: 'standard', displayName: 'Standard', maxWorks: 1 };
+
+        const usageSchedule = {
+            id: 'schedule-ppu',
+            workId: work.id,
+            userId: user.id,
+            cadence: WorkScheduleCadence.HOURLY,
+            billingMode: WorkScheduleBillingMode.USAGE,
+            status: WorkScheduleStatus.ACTIVE,
+        } as any;
+
+        const subscriptionSchedule = {
+            ...usageSchedule,
+            id: 'schedule-sub',
+            billingMode: WorkScheduleBillingMode.SUBSCRIPTION,
+        } as any;
+
+        beforeEach(() => {
+            subscriptionService.isEnabled.mockReturnValue(true);
+            subscriptionService.resolvePlanForUser.mockResolvedValue(overLimitPlan);
+            subscriptionService.getCadenceAllowances.mockResolvedValue([
+                { cadence: WorkScheduleCadence.HOURLY, allowed: true },
+            ]);
+            workRepository.findById.mockResolvedValue({ id: work.id, name: 'My Work' });
+        });
+
+        it('REFUSES an over-limit pay-per-use run and pauses the schedule when the provider cannot bill usage', async () => {
+            scheduleRepository.countActiveByUser.mockResolvedValue(5);
+
+            await expect(service.validateRunEntitlement(usageSchedule, user)).resolves.toBe(false);
+
+            expect(subscriptionService.canBillUsage).toHaveBeenCalled();
+            expect(scheduleRepository.countActiveByUser).toHaveBeenCalledWith(user.id);
+            expect(scheduleRepository.updateById).toHaveBeenCalledWith(
+                usageSchedule.id,
+                expect.objectContaining({
+                    status: WorkScheduleStatus.PAUSED,
+                    nextRunAt: null,
+                }),
+            );
+            expect(notificationService.notifySchedulePaused).toHaveBeenCalled();
+        });
+
+        it('tells the pay-per-use owner WHY in the pause notification (not the plain plan-limit copy)', async () => {
+            scheduleRepository.countActiveByUser.mockResolvedValue(5);
+
+            await service.validateRunEntitlement(usageSchedule, user);
+
+            const reason = notificationService.notifySchedulePaused.mock.calls[0][3] as string;
+            expect(reason.toLowerCase()).toContain('pay-per-use');
+            expect(reason).toContain('Standard');
+        });
+
+        it('ALLOWS an over-limit pay-per-use run when the provider really settles usage charges', async () => {
+            subscriptionService.canBillUsage.mockReturnValue(true);
+            scheduleRepository.countActiveByUser.mockResolvedValue(5);
+
+            await expect(service.validateRunEntitlement(usageSchedule, user)).resolves.toBe(true);
+
+            expect(scheduleRepository.updateById).not.toHaveBeenCalled();
+            expect(notificationService.notifySchedulePaused).not.toHaveBeenCalled();
+        });
+
+        it('REFUSES a pay-per-use run on a cadence the plan no longer allows (unbillable) and pauses it', async () => {
+            scheduleRepository.countActiveByUser.mockResolvedValue(1);
+            subscriptionService.getCadenceAllowances.mockResolvedValue([
+                { cadence: WorkScheduleCadence.HOURLY, allowed: false },
+            ]);
+
+            await expect(service.validateRunEntitlement(usageSchedule, user)).resolves.toBe(false);
+
+            expect(scheduleRepository.updateById).toHaveBeenCalledWith(
+                usageSchedule.id,
+                expect.objectContaining({ status: WorkScheduleStatus.PAUSED }),
+            );
+        });
+
+        it('still ALLOWS an in-limit pay-per-use run (the fix does not blanket-ban pay-per-use)', async () => {
+            scheduleRepository.countActiveByUser.mockResolvedValue(1);
+
+            await expect(service.validateRunEntitlement(usageSchedule, user)).resolves.toBe(true);
+            expect(scheduleRepository.updateById).not.toHaveBeenCalled();
+        });
+
+        it('still ALLOWS a subscription-covered run inside the plan limit (no regression on the paid path)', async () => {
+            scheduleRepository.countActiveByUser.mockResolvedValue(1);
+
+            await expect(service.validateRunEntitlement(subscriptionSchedule, user)).resolves.toBe(
+                true,
+            );
+            expect(scheduleRepository.updateById).not.toHaveBeenCalled();
+            expect(notificationService.notifySchedulePaused).not.toHaveBeenCalled();
+        });
+
+        it('still REFUSES an over-limit subscription run with the original plan-limit copy', async () => {
+            scheduleRepository.countActiveByUser.mockResolvedValue(5);
+
+            await expect(service.validateRunEntitlement(subscriptionSchedule, user)).resolves.toBe(
+                false,
+            );
+            const reason = notificationService.notifySchedulePaused.mock.calls[0][3] as string;
+            expect(reason).toContain('Plan limit exceeded');
+        });
+
+        it('short-circuits to true for BOTH billing modes when subscriptions are disabled', async () => {
+            subscriptionService.isEnabled.mockReturnValue(false);
+
+            await expect(service.validateRunEntitlement(usageSchedule, user)).resolves.toBe(true);
+            await expect(service.validateRunEntitlement(subscriptionSchedule, user)).resolves.toBe(
+                true,
+            );
+            expect(subscriptionService.resolvePlanForUser).not.toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * EW-761 (related cleanup) - the ledger write is the LAST thing
+     * `markRunCompleted` does, and it was un-guarded: a BillingProvider that
+     * ever threw from `recordUsageCharge` would propagate out of here and
+     * fail a run that had already succeeded, after the schedule columns were
+     * already advanced. The row is persisted before the charge, so
+     * swallowing-and-logging loses nothing that settlement cannot pick up.
+     */
+    describe('markRunCompleted - a billing failure cannot fail a successful run', () => {
+        const completedSchedule = {
+            id: 'schedule-done',
+            workId: work.id,
+            userId: user.id,
+            cadence: WorkScheduleCadence.DAILY,
+            billingMode: WorkScheduleBillingMode.USAGE,
+            status: WorkScheduleStatus.ACTIVE,
+            nextRunAt: null,
+            scheduledFor: new Date('2026-04-11T00:00:00.000Z'),
+            failureCount: 0,
+        } as any;
+
+        it('does not throw when usage recording rejects, and still advances the schedule', async () => {
+            scheduleRepository.findById.mockResolvedValue(completedSchedule);
+            usageLedgerService.recordUsage.mockRejectedValue(new Error('stripe down'));
+
+            await expect(
+                service.markRunCompleted({
+                    scheduleId: completedSchedule.id,
+                    historyId: 'hist-1',
+                    status: GenerateStatusType.GENERATED,
+                }),
+            ).resolves.toBeUndefined();
+
+            expect(scheduleRepository.updateById).toHaveBeenCalledWith(
+                completedSchedule.id,
+                expect.objectContaining({ lastRunStatus: GenerateStatusType.GENERATED }),
+            );
+            expect(usageLedgerService.recordUsage).toHaveBeenCalled();
+        });
+
+        it('still records usage on the happy path', async () => {
+            scheduleRepository.findById.mockResolvedValue(completedSchedule);
+
+            await service.markRunCompleted({
+                scheduleId: completedSchedule.id,
+                historyId: 'hist-2',
+                status: GenerateStatusType.GENERATED,
+            });
+
+            expect(usageLedgerService.recordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: user.id,
+                    workId: work.id,
+                    billingMode: WorkScheduleBillingMode.USAGE,
+                    generationHistoryId: 'hist-2',
+                }),
+            );
+        });
     });
 });

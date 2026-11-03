@@ -33,6 +33,37 @@ describe('BillingProvider abstract', () => {
         await expect(provider.recordUsageCharge({} as any)).resolves.toBeUndefined();
     });
 
+    /**
+     * EW-761 — the capability flag that makes the pay-per-use entitlement
+     * bypass HONEST. `WorkScheduleService` used to let a `billingMode:
+     * USAGE` schedule skip both plan gates on the stated assumption that
+     * the user "can pay"; nothing in the tree could actually charge them,
+     * so the assumption was false and the runs were free.
+     *
+     * The flag defaults to FALSE on the abstract, which is what closes the
+     * hole: a provider only opts in once `recordUsageCharge` really
+     * settles the ledger row. Do not override it as a convenience.
+     */
+    it('default supportsUsageCharges() is FALSE (the no-op recordUsageCharge hook cannot bill anyone)', () => {
+        const provider = new TestProvider();
+        expect(provider.supportsUsageCharges()).toBe(false);
+    });
+
+    it('a provider that really settles usage can opt in by overriding supportsUsageCharges()', () => {
+        class MeteredProvider extends BillingProvider {
+            getDefaultCurrency(): string {
+                return 'usd';
+            }
+            supportsUsageCharges(): boolean {
+                return true;
+            }
+            async recordUsageCharge(): Promise<void> {
+                return;
+            }
+        }
+        expect(new MeteredProvider().supportsUsageCharges()).toBe(true);
+    });
+
     it('subclasses can override recordUsageCharge() and the parent contract still resolves', async () => {
         const onCharge = jest.fn().mockResolvedValue(undefined);
         class WithGateway extends BillingProvider {
@@ -120,6 +151,10 @@ describe('ManualBillingProvider', () => {
 
         process.env.BILLING_DEFAULT_CURRENCY = 'jpy';
         expect(provider.getDefaultCurrency()).toBe('jpy');
+    });
+
+    it('inherits supportsUsageCharges() === false (EW-761: manual billing moves no money)', () => {
+        expect(new ManualBillingProvider().supportsUsageCharges()).toBe(false);
     });
 
     it('inherits the no-op recordUsageCharge() (no external gateway in manual mode)', async () => {

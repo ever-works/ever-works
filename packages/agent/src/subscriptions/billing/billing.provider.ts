@@ -536,6 +536,36 @@ export abstract class BillingProvider {
         return false;
     }
 
+    /**
+     * True only when this provider actually SETTLES `usage_ledger_entry`
+     * rows - i.e. it overrides {@link recordUsageCharge} with something that
+     * forwards the charge to a gateway which takes the money.
+     *
+     * ## Why this exists (EW-761)
+     *
+     * `WorkScheduleService.validateRunEntitlement` and
+     * `SubscriptionService.requiresUsageBilling` both used to wave a
+     * `billingMode: USAGE` schedule straight past the caller's plan limits,
+     * on the stated assumption that pay-per-use meant the user "can pay".
+     * Nothing in this tree can charge them: the hook below is a bare
+     * `return`, and neither {@link ManualBillingProvider} nor
+     * `StripeBillingProvider` overrides it, so every row written for a
+     * pay-per-use run sits in `usage_ledger_entries` as PENDING forever.
+     * Selecting pay-per-use therefore bought uncapped schedules, free.
+     *
+     * Both gates now ask this question instead of assuming the answer, so
+     * the assumption is something the code CHECKS. It defaults to `false`,
+     * which is what closes the hole; the gates re-open by themselves the
+     * day a provider implements real settlement and flips this to `true`.
+     *
+     * 🛑 Do not override this as a convenience. Returning `true` without a
+     * working {@link recordUsageCharge} re-opens the revenue hole in full:
+     * unmetered runs are allowed past every plan cap and nobody is billed.
+     */
+    supportsUsageCharges(): boolean {
+        return false;
+    }
+
     // Optional hook for forwarding charges to an external gateway.
     async recordUsageCharge(_entry: UsageLedgerEntry): Promise<void> {
         return;

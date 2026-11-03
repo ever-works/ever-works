@@ -67,21 +67,40 @@ function makePlanEntitlementRepository(overrides: Record<string, jest.Mock> = {}
     };
 }
 
+/**
+ * EW-761 — the billing seam SubscriptionService consults before it lets a
+ * pay-per-use schedule skip a plan gate. `supportsUsageCharges: false` is
+ * the real posture of EVERY provider in the tree today (the abstract's
+ * `recordUsageCharge` is a no-op and neither Stripe nor Manual overrides
+ * it), so it is the DEFAULT here too.
+ */
+function makeBillingProvider(overrides: Record<string, jest.Mock> = {}) {
+    return {
+        getDefaultCurrency: jest.fn().mockReturnValue('usd'),
+        supportsUsageCharges: jest.fn().mockReturnValue(false),
+        recordUsageCharge: jest.fn().mockResolvedValue(undefined),
+        ...overrides,
+    };
+}
+
 function makeService(
     plan: Record<string, jest.Mock> = {},
     userSub: Record<string, jest.Mock> = {},
     user: Record<string, jest.Mock> = {},
     planEntitlement: Record<string, jest.Mock> = {},
+    billing: Record<string, jest.Mock> = {},
 ) {
     const planRepository = makePlanRepository(plan);
     const userSubscriptionRepository = makeUserSubscriptionRepository(userSub);
     const userRepository = makeUserRepository(user);
     const planEntitlementRepository = makePlanEntitlementRepository(planEntitlement);
+    const billingProvider = makeBillingProvider(billing);
     const service = new SubscriptionService(
         planRepository as unknown as SubscriptionServiceDependencies[0],
         userSubscriptionRepository as unknown as SubscriptionServiceDependencies[1],
         userRepository as unknown as SubscriptionServiceDependencies[2],
         planEntitlementRepository as unknown as SubscriptionServiceDependencies[3],
+        billingProvider as unknown as SubscriptionServiceDependencies[4],
     );
     return {
         service,
@@ -89,6 +108,7 @@ function makeService(
         userSubscriptionRepository,
         userRepository,
         planEntitlementRepository,
+        billingProvider,
     };
 }
 
@@ -858,7 +878,56 @@ describe('SubscriptionService', () => {
             ).toBe(true);
         });
 
-        it('returns false when the cadence is OUT-OF-PLAN but billingMode === USAGE (already opted in)', () => {
+        /**
+         * EW-761 — the revenue hole. This branch used to return `false`
+         * unconditionally for USAGE, so ticking "Pay-per-use" bought an
+         * out-of-plan cadence for free: no provider in the tree implements
+         * `recordUsageCharge`, so the ledger row is written PENDING and
+         * never settled. The gate must now FAIL CLOSED and only stand down
+         * when the bound provider can genuinely bill the run.
+         */
+        it('returns TRUE for an OUT-OF-PLAN cadence + billingMode === USAGE when the provider CANNOT bill usage (fail closed)', () => {
+            const { service, billingProvider } = makeService();
+            expect(
+                service.requiresUsageBilling(
+                    WorkScheduleCadence.HOURLY,
+                    STANDARD_PLAN as any,
+                    WorkScheduleBillingMode.USAGE,
+                ),
+            ).toBe(true);
+            expect(billingProvider.supportsUsageCharges).toHaveBeenCalled();
+        });
+
+        it('returns false when the cadence is OUT-OF-PLAN, billingMode === USAGE AND the provider CAN bill usage (already opted in)', () => {
+            const { service } = makeService(
+                {},
+                {},
+                {},
+                {},
+                { supportsUsageCharges: jest.fn().mockReturnValue(true) },
+            );
+            expect(
+                service.requiresUsageBilling(
+                    WorkScheduleCadence.HOURLY,
+                    STANDARD_PLAN as any,
+                    WorkScheduleBillingMode.USAGE,
+                ),
+            ).toBe(false);
+        });
+
+        it('still returns false for an IN-PLAN cadence under USAGE even when the provider cannot bill (nothing to gate)', () => {
+            const { service } = makeService();
+            expect(
+                service.requiresUsageBilling(
+                    WorkScheduleCadence.MONTHLY,
+                    STANDARD_PLAN as any,
+                    WorkScheduleBillingMode.USAGE,
+                ),
+            ).toBe(false);
+        });
+
+        it('still returns false for USAGE when subscriptions are disabled (kill-switch wins over the capability check)', () => {
+            process.env.SUBSCRIPTIONS_ENABLED = 'false';
             const { service } = makeService();
             expect(
                 service.requiresUsageBilling(
@@ -879,6 +948,24 @@ describe('SubscriptionService', () => {
                     WorkScheduleBillingMode.SUBSCRIPTION,
                 ),
             ).toBe(true);
+        });
+    });
+
+    describe('canBillUsage', () => {
+        it('is false when the bound provider cannot settle usage charges (every provider today)', () => {
+            const { service } = makeService();
+            expect(service.canBillUsage()).toBe(false);
+        });
+
+        it('is true only when the bound provider says it settles usage charges', () => {
+            const { service } = makeService(
+                {},
+                {},
+                {},
+                {},
+                { supportsUsageCharges: jest.fn().mockReturnValue(true) },
+            );
+            expect(service.canBillUsage()).toBe(true);
         });
     });
 

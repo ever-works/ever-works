@@ -18,6 +18,7 @@ import { PlanEntitlementRepository } from '@src/database/repositories/plan-entit
 import { WorkScheduleBillingMode, WorkScheduleCadence, SubscriptionPlanCode } from '@src/entities';
 import type { SubscriptionPlanHosting } from '@src/entities/types';
 import { CATALOG_CURRENCY } from './billing/stripe-catalog';
+import { BillingProvider } from './billing/billing.provider';
 
 const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.MONTHLY,
@@ -271,6 +272,10 @@ export class SubscriptionService implements OnModuleInit {
         private readonly userSubscriptionRepository: UserSubscriptionRepository,
         private readonly userRepository: UserRepository,
         private readonly planEntitlementRepository: PlanEntitlementRepository,
+        // EW-761 - the seam the cadence gate consults before it lets a
+        // pay-per-use schedule skip a plan limit. Bound in
+        // `SubscriptionsModule` alongside this service, so no module change.
+        private readonly billingProvider: BillingProvider,
     ) {}
 
     async onModuleInit() {
@@ -457,7 +462,27 @@ export class SubscriptionService implements OnModuleInit {
             return false;
         }
 
+        // EW-761 - pay-per-use is only an escape hatch when somebody is
+        // actually charged for using it. `canBillUsage()` is false on every
+        // provider shipped today, so an out-of-plan cadence stays gated no
+        // matter which billing mode the caller asks for; the alternative was
+        // handing out any cadence, uncapped, for free.
         return billingMode !== WorkScheduleBillingMode.USAGE;
+    }
+
+    /**
+     * Whether a pay-per-use run can genuinely be charged on this deployment.
+     *
+     * Delegates to {@link BillingProvider.supportsUsageCharges}, which is
+     * `false` for every provider in the tree because none of them implements
+     * `recordUsageCharge`. Both entitlement gates (this service's cadence
+     * check and `WorkScheduleService.validateRunEntitlement`'s active-schedule
+     * cap) route their pay-per-use exemption through here, so the exemption
+     * is fail-closed and turns itself back on when settlement lands. See
+     * EW-761.
+     */
+    canBillUsage(): boolean {
+        return this.billingProvider.supportsUsageCharges();
     }
 
     /**

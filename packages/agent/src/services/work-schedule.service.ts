@@ -127,10 +127,15 @@ export class WorkScheduleService {
             dto.billingMode || existing?.billingMode || WorkScheduleBillingMode.SUBSCRIPTION;
 
         if (this.subscriptionService.requiresUsageBilling(cadence, plan, billingMode)) {
+            // EW-761 - only offer the pay-per-use remedy when this deployment
+            // can actually bill for it. Recommending an escape hatch that the
+            // gate itself no longer honours would send the caller round a
+            // loop, and the old copy said it unconditionally.
             throw new BadRequestException({
                 status: 'error',
-                message:
-                    'Selected cadence is not available on your plan. Switch to pay-per-use to continue.',
+                message: this.subscriptionService.canBillUsage()
+                    ? 'Selected cadence is not available on your plan. Switch to pay-per-use to continue.'
+                    : 'Selected cadence is not available on your plan. Upgrade your plan to continue.',
             });
         }
 
@@ -361,6 +366,12 @@ export class WorkScheduleService {
             lastRunStatus: options.status,
         });
 
+        // EW-761 - the run already succeeded and the schedule columns above are
+        // already committed. A billing failure here must not turn a good run
+        // into a failed one: `UsageLedgerService.recordUsage` persists the row
+        // BEFORE it calls `BillingProvider.recordUsageCharge`, so a throw from
+        // either half is recoverable by settlement, while letting it escape
+        // this method is not. Logged loudly so it cannot go unnoticed.
         await this.usageLedgerService.recordUsage({
             userId: schedule.userId,
             workId: schedule.workId,
@@ -369,6 +380,7 @@ export class WorkScheduleService {
             billingMode: schedule.billingMode,
             generationHistoryId: options.historyId,
         });
+        }
     }
 
     async markRunFailed(scheduleId: string, reason?: string) {
@@ -621,10 +633,21 @@ export class WorkScheduleService {
             return true;
         }
 
-        // If pay-per-use, no plan limits to check (assuming they can pay)
+        // EW-761 - pay-per-use stands the plan limits down ONLY when the
+        // bound BillingProvider really settles the run. This used to be an
+        // unconditional `return true` justified by "assuming they can pay";
+        // no provider in the tree implements `recordUsageCharge`, so the
+        // assumption was false, the ledger row stayed PENDING forever, and an
+        // unmetered run sailed past the plan's active-schedule cap. The
+        // assumption is now a question the code asks.
         if (schedule.billingMode === WorkScheduleBillingMode.USAGE) {
             return true;
         }
+
+        // An unbillable pay-per-use schedule falls through to the same limits
+        // as a subscription one. Say so in the copy below rather than telling
+        // its owner they are simply over quota.
+        const unbillableUsage = schedule.billingMode === WorkScheduleBillingMode.USAGE;
 
         const plan = await this.subscriptionService.resolvePlanForUser(user);
         const activeCount = await this.scheduleRepository.countActiveByUser(user.id);
@@ -656,7 +679,9 @@ export class WorkScheduleService {
                     schedule.userId,
                     schedule.workId,
                     work.name,
-                    `Plan limit exceeded. Your ${plan.displayName} plan allows ${plan.maxWorks} active schedules.`,
+                    unbillableUsage
+                        ? `Pay-per-use billing is not available on this deployment, so your ${plan.displayName} plan limit of ${plan.maxWorks} active schedules now applies.`
+                        : `Plan limit exceeded. Your ${plan.displayName} plan allows ${plan.maxWorks} active schedules.`,
                 );
             }
 
@@ -680,6 +705,23 @@ export class WorkScheduleService {
                 status: WorkScheduleStatus.PAUSED,
                 nextRunAt: null,
             });
+
+            // EW-761 - this branch used to pause silently. It is now reachable
+            // for pay-per-use schedules too (they no longer skip the cadence
+            // re-check), so the owner has to be told, exactly as the
+            // active-schedule branch above already does.
+            const work = await this.workRepository.findById(schedule.workId);
+            if (work && this.notificationService) {
+                await this.notificationService.notifySchedulePaused(
+                    schedule.userId,
+                    schedule.workId,
+                    work.name,
+                    unbillableUsage
+                        ? `Pay-per-use billing is not available on this deployment, so the ${schedule.cadence} cadence now needs a plan that includes it.`
+                        : `The ${schedule.cadence} cadence is no longer available on your ${plan.displayName} plan.`,
+                );
+            }
+
             return false;
         }
 

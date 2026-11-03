@@ -105,6 +105,24 @@ describe('StripeBillingProvider — configuration posture', () => {
         expect(provider.isWebhookConfigured()).toBe(true);
     });
 
+    /**
+     * EW-761 — Stripe is fully configured for CHECKOUT and still cannot bill
+     * a pay-per-use schedule run: it does not override `recordUsageCharge`,
+     * so `usage_ledger_entry` rows it "charges" stay PENDING forever.
+     *
+     * `supportsUsageCharges()` must therefore stay FALSE here even with both
+     * keys present. When somebody implements real usage settlement on this
+     * provider, flipping the flag is the deliberate second step — and this
+     * assertion is the thing that makes them take it.
+     */
+    it('does NOT claim usage-charge support even when fully configured (recordUsageCharge is still the inherited no-op)', () => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        process.env.STRIPE_WEBHOOK_SECRET = 'whsec_x';
+        const { provider } = build();
+        expect(provider.isConfigured()).toBe(true);
+        expect(provider.supportsUsageCharges()).toBe(false);
+    });
+
     it('treats a whitespace-only key as unconfigured', () => {
         process.env.STRIPE_SECRET_KEY = '   ';
         const { provider } = build();
