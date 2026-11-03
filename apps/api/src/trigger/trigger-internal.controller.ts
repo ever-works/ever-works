@@ -46,7 +46,6 @@ import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService } from '@ever-works/agent/goals';
 import {
-    AgentEscalationService,
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
@@ -56,10 +55,9 @@ import {
 import {
     TaskChatService,
     TaskGateRunnerService,
-    TaskPrStatusService,
-    TaskReviewRejectionService,
     TaskRunDenormService,
     TaskWorkspaceService,
+    TaskPrStatusService,
     TaskRecurrenceDispatcherService,
     TasksService,
 } from '@ever-works/agent/tasks-domain';
@@ -77,7 +75,6 @@ import {
 } from '@ever-works/agent/plugins';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
-import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
 import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 
 /**
@@ -330,30 +327,9 @@ export class TriggerInternalController implements OnModuleInit {
         // lapsed claims to the pool. Appended LAST + @Optional() per the
         // arity rule above.
         private readonly fleetJobService?: FleetJobService,
-
-        // Kanban run cockpit (plan 04 M5/M7) — backs the
-        // `task-pr-status-sync` cron: the worker proxy calls
-        // `syncDuePrStatuses()` over the internal RPC channel, landing
-        // here where the git-provider plugins + credentials are wired.
-        // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly taskPrStatusService?: TaskPrStatusService,
-        // Memory consolidation cadence (memory upgrades M9) — backs the
-        // `memory-consolidation-tick` cron: the worker proxy calls
-        // `dispatchDue()` over the internal RPC channel, landing here
-        // where the org/tenant repositories, the AI facade and the
-        // notification producer are wired. Appended LAST + @Optional()
-        // per the arity rule above.
-        private readonly memoryConsolidationScheduleService?: MemoryConsolidationScheduleService,
-        // Judgment layer G3 — backs the escalation write from
-        // `agent-task-execute` when the quality gate is exhausted or the
-        // budget stopped the iterate loop. Appended LAST + @Optional()
-        private readonly agentEscalationService?: AgentEscalationService,
-        // Orchestration M9 — backs the durable gate-rejection write from
-        // `agent-task-execute`, so a LATER resume replays the machine
-        // feedback the terminal run already consumed. Appended LAST +
-        // @Optional() per the arity rule above.
-        private readonly taskReviewRejectionService?: TaskReviewRejectionService,
+
     ) {}
 
     onModuleInit() {
@@ -388,12 +364,6 @@ export class TriggerInternalController implements OnModuleInit {
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
             AgentRunSweeperService: this.agentRunSweeperService,
-            // Judgment layer G3 — agent-task-execute files escalations here
-            // when the gate is exhausted / the budget stopped the loop.
-            AgentEscalationService: this.agentEscalationService,
-            // Orchestration M9 — agent-task-execute persists the machine
-            // gate feedback here so a later resume replays it.
-            TaskReviewRejectionService: this.taskReviewRejectionService,
             // Run orchestration (Wave 4 M2) — agent-task-execute calls
             // drainForWork here after every terminal transition.
             RunDispatchGateService: this.runDispatchGateService,
@@ -405,6 +375,7 @@ export class TriggerInternalController implements OnModuleInit {
             TasksService: this.tasksService,
             TaskChatService: this.taskChatService,
             TaskWorkspaceService: this.taskWorkspaceService,
+            TaskPrStatusService: this.taskPrStatusService,
             // Wave 3 M2 — agent-task-execute calls `runChecks` here after the
             // agent loop (quality gates; allow-list auto-derived).
             TaskGateRunnerService: this.taskGateRunnerService,
@@ -449,13 +420,6 @@ export class TriggerInternalController implements OnModuleInit {
             // calls `reclaimExpired()` here (allow-list auto-derived).
             FleetJobService: this.fleetJobService,
 
-            // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
-            // calls `syncDuePrStatuses()` here (allow-list auto-derived).
-            TaskPrStatusService: this.taskPrStatusService,
-            // Memory consolidation cadence (memory upgrades M9) —
-            // `memory-consolidation-tick` calls `dispatchDue()` here
-            // (allow-list auto-derived).
-            MemoryConsolidationScheduleService: this.memoryConsolidationScheduleService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
