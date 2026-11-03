@@ -520,6 +520,15 @@ export class OrganizationService {
              * Organization the key cannot use (and a retry a duplicate).
              */
             initialAdmin?: { userId: string; invitedById: string | null };
+            /**
+             * A caller's transaction to join, opened by the caller on the queue of
+             * single-connection drivers (the company created from Ever Platform): the
+             * Organization commits or rolls back with the rest of it. A slug another
+             * request took is rethrown (the transaction is lost on Postgres), so the
+             * caller re-runs its whole transaction. The caller makes the Tenant first.
+             * Omitted (every other path): nothing changes.
+             */
+            manager?: EntityManager;
         },
     ): Promise<Organization> {
         const trimmedName = name?.trim();
@@ -555,8 +564,15 @@ export class OrganizationService {
         // so losing the race should yield `acme-2` and a 201 — the same result
         // they would have got a second later. A 409 would be us reporting our
         // own race back to a user who did nothing wrong.
-        return this.withSlugCollisionRetry(slugBase, (slug) =>
-            this.inQueuedTransaction(async (manager) => {
+        const callerManager = extra?.manager;
+        const inTransaction = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> =>
+            callerManager ? work(callerManager) : this.inQueuedTransaction(work);
+        const withSlug = <T>(base: string, create: (slug: string) => Promise<T>): Promise<T> =>
+            callerManager
+                ? this.usernameAllocator.allocateUsername(base).then(create)
+                : this.withSlugCollisionRetry(base, create);
+        return withSlug(slugBase, (slug) =>
+            inTransaction(async (manager) => {
                 // Use the manager's repository so the INSERT lands in the
                 // same transaction as the backfill UPDATEs below.
                 //
@@ -744,6 +760,10 @@ export class OrganizationService {
             legalName?: string | null;
             linkedWorkId?: string | null;
             slugOverride?: string;
+            /** Who registered it; `manual` unless a caller says otherwise. */
+            registrationProvider?: OrganizationRegistrationProvider;
+            /** A caller's transaction to join: see {@link createOrganization}. */
+            manager?: EntityManager;
         },
     ): Promise<Organization> {
         const trimmed = params.name?.trim();
@@ -755,9 +775,10 @@ export class OrganizationService {
         return this.createOrganization(userId, trimmed, params.slugOverride, {
             legalName: trimmedLegal,
             countryCode: params.countryCode?.trim() || null,
-            registrationProvider: 'manual',
+            registrationProvider: params.registrationProvider ?? 'manual',
             registrationStatus: 'registered',
             linkedWorkId: params.linkedWorkId ?? null,
+            ...(params.manager ? { manager: params.manager } : {}),
         });
     }
 

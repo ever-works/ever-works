@@ -12,13 +12,16 @@ import { config } from '../../config/constants';
  * - `signUp` — a pending account creation (S2) or the account-exists hand-off
  *   (S3): the verified identity, until the person confirms (600 s, FR-23).
  * - `connect` — a pending connection from Settings (300 s, FR-26).
+ * - `provision` — a signed company request from Ever Platform that was verified
+ *   here (900 s, the longest such a request lives).
  */
-export type EverIdSealKind = 'txn' | 'signUp' | 'connect';
+export type EverIdSealKind = 'txn' | 'signUp' | 'connect' | 'provision';
 
 export const EVER_ID_SEAL_TTL_SECONDS: Readonly<Record<EverIdSealKind, number>> = {
     txn: EVER_ID_LIMITS.transactionTtlSeconds,
     signUp: EVER_ID_LIMITS.signUpPendingTtlSeconds,
     connect: EVER_ID_LIMITS.connectPendingTtlSeconds,
+    provision: 900,
 };
 
 /** NFR-6: a sealed value never exceeds 3,072 characters, so its cookie fits under 4 KB. */

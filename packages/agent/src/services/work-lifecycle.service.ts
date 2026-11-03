@@ -10,6 +10,7 @@ import {
     ServiceUnavailableException,
     UnprocessableEntityException,
 } from '@nestjs/common';
+import type { EntityManager } from 'typeorm';
 import {
     DomainEventPublisher,
     recordAfterWrite,
@@ -871,6 +872,10 @@ export class WorkLifecycleService {
             companyWebsite?: string | null;
             status?: WorkStatus;
         },
+        // A caller's transaction to join (the company created from Ever Platform):
+        // the row and its `work.created` commit or roll back with it. Without one,
+        // everything below is as before.
+        options?: { manager?: EntityManager },
     ): Promise<Work> {
         const workData: Partial<Work> = {
             slug: params.slug,
@@ -894,7 +899,16 @@ export class WorkLifecycleService {
         };
 
         try {
-            const created = await this.workRepository.create(workData, user);
+            const created = await this.workRepository.create(workData, user, options?.manager);
+            if (options?.manager) {
+                await this.domainEvents?.created(
+                    options.manager,
+                    'work',
+                    created.id,
+                    'work.created',
+                );
+                return created;
+            }
             // This path emits no `work.created` app event, so the domain event is
             // recorded here (the main create path is covered by DomainEventWorkBridge).
             await recordAfterWrite(
@@ -906,6 +920,9 @@ export class WorkLifecycleService {
             );
             return created;
         } catch (error) {
+            // A caller's transaction decides what a unique violation means (it re-runs
+            // its whole core), so it gets the driver's error as it was.
+            if (options?.manager) throw error;
             rethrowAsNormalized(error, this.logger, 'creating company work');
         }
     }
