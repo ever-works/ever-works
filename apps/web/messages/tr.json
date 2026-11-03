@@ -4811,8 +4811,8 @@
                     "plans": {
                         "free": "Ücretsiz",
                         "pro": "Pro",
-                        "standard": "Standart",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Sınırsız"
                     },
                     "usageRequired": "Bu sıklığı kullanmak için kullanım başına ödemeye geçin.",

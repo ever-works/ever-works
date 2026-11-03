@@ -63,6 +63,12 @@ const PAID_CADENCES: WorkScheduleCadence[] = [
  * `standard` is now shown as "Pro" and `premium` as "Enterprise", matching what ever.works has
  * always advertised. The DB seed had drifted from the marketing site; this closes that gap.
  *
+ * Owner pricing rules of 2026-11-01 renamed the top tier's LABEL: `premium` is shown as "Unlimited"
+ * and `selfhosted_enterprise` as "Unlimited Edition" (Free / Pro / Unlimited). Labels only: the
+ * plan codes, the catalog tier `enterprise`, its Stripe lookup keys and the Stripe product names
+ * (`tierName` in stripe-catalog.data.json) do not change. `seedPlans()` upserts on `code`, so
+ * every environment picks the new label up at its next boot.
+ *
  * A "seat" is an employee OR an agent — interchangeable, which is the point of the product.
  * `seatsIncluded: null` means UNBOUNDED and suppresses per-seat billing entirely.
  *
@@ -111,7 +117,7 @@ const PLAN_SEED_DATA: Array<{
         hosting: 'cloud',
         maxWorks: 5,
         allowedCadences: PAID_CADENCES,
-        // Ever Gauzy / Ever Teams cloud Small Business since the 2026-10-05 repricing: $49/mo,
+        // Ever Gauzy / Ever Teams cloud Business since the 2026-10-05 repricing: $49/mo,
         // $408/yr (displays "$34/mo" = floor(49 x 7 / 10)), 25 seats included (was $25 / $204 / 10).
         monthlyPrice: '49',
         annualPrice: '408',
@@ -123,11 +129,11 @@ const PLAN_SEED_DATA: Array<{
     },
     {
         code: SubscriptionPlanCode.PREMIUM,
-        displayName: 'Enterprise',
+        displayName: 'Unlimited',
         hosting: 'cloud',
         maxWorks: 15,
         allowedCadences: ALL_CADENCES,
-        // Ever Gauzy / Ever Teams Enterprise since the 2026-10-05 repricing: $499/mo, $4,188/yr
+        // Ever Gauzy / Ever Teams Unlimited since the 2026-10-05 repricing: $499/mo, $4,188/yr
         // (displays "$349/mo" = floor(499 x 7 / 10)); was $199 / $1,668.
         monthlyPrice: '499',
         annualPrice: '4188',
@@ -166,7 +172,7 @@ const PLAN_SEED_DATA: Array<{
         hosting: 'selfhosted',
         maxWorks: 5,
         allowedCadences: PAID_CADENCES,
-        // Ever Gauzy self-hosted Small Business Edition: $49/mo, $408/yr (displays "$34/mo"),
+        // Ever Gauzy self-hosted Business Edition: $49/mo, $408/yr (displays "$34/mo"),
         // or a $99 one-time perpetual commercial licence (UNCHANGED by the 2026-10-05 repricing).
         // Seats included: 25 since that repricing (was 10), the same as cloud Pro.
         monthlyPrice: '49',
@@ -179,11 +185,11 @@ const PLAN_SEED_DATA: Array<{
     },
     {
         code: SubscriptionPlanCode.SELFHOSTED_ENTERPRISE,
-        displayName: 'Enterprise Edition',
+        displayName: 'Unlimited Edition',
         hosting: 'selfhosted',
         maxWorks: 15,
         allowedCadences: ALL_CADENCES,
-        // Same price as cloud Enterprise (cloud == self-hosted since the 2026-10-05 repricing):
+        // Same price as cloud Unlimited (cloud == self-hosted since the 2026-10-05 repricing):
         // $499/mo, $4,188/yr, 50 seats included (was $199 / $1,668 / 10).
         monthlyPrice: '499',
         annualPrice: '4188',
@@ -472,7 +478,8 @@ export class SubscriptionService implements OnModuleInit {
      * The plan a user should be told to upgrade to for a cadence their plan
      * does not allow. Returns the catalog DISPLAY name, resolved from the
      * seed by plan code, so the copy cannot drift from the plan switcher
-     * again: the tiers were renamed Standard/Premium -> Pro/Enterprise in
+     * again: the tiers were renamed Standard/Premium -> Pro/Enterprise (and
+     * Enterprise -> Unlimited on 2026-11-01) in
      * the catalog while this string kept recommending plans that no longer
      * exist under those names (and three e2e specs asserted the stale copy).
      */

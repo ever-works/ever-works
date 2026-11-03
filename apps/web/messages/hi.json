@@ -4811,8 +4811,8 @@
                     "plans": {
                         "free": "मुफ्त",
                         "pro": "Pro",
-                        "standard": "मानक",
-                        "premium": "प्रीमियम",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "असीमित"
                     },
                     "usageRequired": "इस कैडेंस का उपयोग करने के लिए प्रति-उपयोग पर स्विच करें।",

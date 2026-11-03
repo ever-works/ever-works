@@ -4880,8 +4880,8 @@
                     "plans": {
                         "free": "Gratis",
                         "pro": "Pro",
-                        "standard": "Estándar",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Sin medidor"
                     },
                     "usageRequired": "Cambia a pago por uso para usar esta cadencia.",

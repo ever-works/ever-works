@@ -275,10 +275,16 @@ export class FleetJobService {
      */
     private reportAppWorkLeased(candidate: FleetJob, node: { id: string; userId: string }): void {
         if (candidate.kind !== 'agent-task' || !this.appWorkLeaseAdmission?.onLeased) return;
-        const payload = candidate.payload as { appWorkId?: unknown; taskId?: unknown } | null | undefined;
+        const payload = candidate.payload as
+            | { appWorkId?: unknown; taskId?: unknown }
+            | null
+            | undefined;
         const workId = payload?.appWorkId;
         if (typeof workId !== 'string' || workId.length === 0) return;
-        const taskId = typeof payload?.taskId === 'string' && payload.taskId.length > 0 ? payload.taskId : null;
+        const taskId =
+            typeof payload?.taskId === 'string' && payload.taskId.length > 0
+                ? payload.taskId
+                : null;
         void this.appWorkLeaseAdmission
             .onLeased({ userId: node.userId, nodeId: node.id, workId, jobId: candidate.id, taskId })
             .catch(() => undefined);

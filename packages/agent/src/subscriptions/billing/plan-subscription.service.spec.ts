@@ -595,7 +595,7 @@ describe('startPlanCheckout — the 90-day trial is Cloud paid plans only', () =
         ...SELFHOSTED_PRO_PLAN,
         id: 'plan-selfhosted-enterprise',
         code: 'selfhosted_enterprise',
-        displayName: 'Enterprise Edition',
+        displayName: 'Unlimited Edition',
         monthlyPrice: '499',
         annualPrice: '4188',
         lifetimePrice: null,

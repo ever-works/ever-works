@@ -46,9 +46,9 @@ describe('GitFacadeService — isAncestorCommit (APW-08 T8)', () => {
 
     it.each([false, null])('passes a provider %s through unchanged', async (answer) => {
         const facade = makeFacade({ isAncestorCommit: jest.fn().mockResolvedValue(answer) });
-        await expect(
-            facade.isAncestorCommit('acme', 'bookings', 'a', 'b', OPTIONS),
-        ).resolves.toBe(answer);
+        await expect(facade.isAncestorCommit('acme', 'bookings', 'a', 'b', OPTIONS)).resolves.toBe(
+            answer,
+        );
     });
 
     it('answers null — never throws — for a provider without the method', async () => {

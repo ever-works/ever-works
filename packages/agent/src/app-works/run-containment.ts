@@ -108,7 +108,12 @@ export function readAgentRunContainmentRecord(raw: unknown): AgentRunContainment
         typeof input.reportedAt === 'string' && Number.isFinite(Date.parse(input.reportedAt))
             ? new Date(input.reportedAt).toISOString()
             : new Date(0).toISOString();
-    return { ...containment, nodeId, reportedAt, ...(input.missingTool === true ? { missingTool: true } : {}) };
+    return {
+        ...containment,
+        nodeId,
+        reportedAt,
+        ...(input.missingTool === true ? { missingTool: true } : {}),
+    };
 }
 
 // ── The allowance store (EW-807 pattern) ─────────────────────────────────────

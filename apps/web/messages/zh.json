@@ -4811,8 +4811,8 @@
                     "plans": {
                         "free": "免费",
                         "pro": "专业版",
-                        "standard": "标准",
-                        "premium": "高级",
+                        "standard": "专业版",
+                        "premium": "Unlimited",
                         "unmetered": "无限"
                     },
                     "usageRequired": "切换到按使用付费以使用此节奏。",

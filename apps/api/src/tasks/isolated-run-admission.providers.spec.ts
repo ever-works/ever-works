@@ -1,5 +1,8 @@
 import { APP_WORK_RUN_ADMISSION, AppChangeTelemetry } from '@ever-works/agent/app-works';
-import { FLEET_APP_WORK_LEASE_ADMISSION, type FleetAppWorkLeaseAdmission } from '@ever-works/agent/fleet';
+import {
+    FLEET_APP_WORK_LEASE_ADMISSION,
+    type FleetAppWorkLeaseAdmission,
+} from '@ever-works/agent/fleet';
 import { ISOLATED_RUN_ADMISSION_PROVIDERS } from './isolated-run-admission.providers';
 
 /**
@@ -35,7 +38,8 @@ describe('ISOLATED_RUN_ADMISSION_PROVIDERS — the lease binding reports run_adm
     function moduleRefWith(services: { admission?: unknown; telemetry?: unknown }) {
         return {
             get: jest.fn((token: unknown) => {
-                if (token === APP_WORK_RUN_ADMISSION && services.admission) return services.admission;
+                if (token === APP_WORK_RUN_ADMISSION && services.admission)
+                    return services.admission;
                 if (token === AppChangeTelemetry && services.telemetry) return services.telemetry;
                 throw new Error('not in this graph');
             }),
@@ -53,12 +57,17 @@ describe('ISOLATED_RUN_ADMISSION_PROVIDERS — the lease binding reports run_adm
     it('emits nothing without a payload, and nothing (without throwing) when the graph has no telemetry', async () => {
         const telemetry = { track: jest.fn() };
         await leaseFactory(
-            moduleRefWith({ admission: { runAdmittedPayload: jest.fn(async () => null) }, telemetry }),
+            moduleRefWith({
+                admission: { runAdmittedPayload: jest.fn(async () => null) },
+                telemetry,
+            }),
         ).onLeased!(input);
         expect(telemetry.track).not.toHaveBeenCalled();
 
         const admission = { runAdmittedPayload: jest.fn(async () => payload) };
-        await expect(leaseFactory(moduleRefWith({ admission })).onLeased!(input)).resolves.toBeUndefined();
+        await expect(
+            leaseFactory(moduleRefWith({ admission })).onLeased!(input),
+        ).resolves.toBeUndefined();
         // Without a sink the payload is not even built.
         expect(admission.runAdmittedPayload).not.toHaveBeenCalled();
     });

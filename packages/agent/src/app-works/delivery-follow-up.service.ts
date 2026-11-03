@@ -169,7 +169,9 @@ export class DeliveryFollowUpService {
             // decides (Close anyway / Try once more), and the tick does not ask again.
             const escalationKey = deliveryEscalationKeyOf(task.id, failure.failureId);
             if (this.escalationRows) {
-                const raised = await this.escalationRows.findOne({ where: { dedupKey: escalationKey } });
+                const raised = await this.escalationRows.findOne({
+                    where: { dedupKey: escalationKey },
+                });
                 if (raised) return { kind: 'skipped', reason: 'escalated' };
             }
 
@@ -213,7 +215,9 @@ export class DeliveryFollowUpService {
                 },
             );
         } catch (error) {
-            const winner = await this.tasks.findOne({ where: { followUpKey: key } }).catch(() => null);
+            const winner = await this.tasks
+                .findOne({ where: { followUpKey: key } })
+                .catch(() => null);
             if (winner) return { kind: 'exists', taskId: winner.id };
             this.logger.warn(
                 `Delivery follow-up for task ${task.id} could not be created (${errorText(error)}); escalating.`,
@@ -328,7 +332,9 @@ export class DeliveryFollowUpService {
     async countChain(task: Task): Promise<number> {
         let root: Task = task;
         for (let step = 0; step < CHAIN_WALK_MAX && root.followUpKey; step += 1) {
-            const up = await this.relations.findOne({ where: { taskId: root.id, kind: 'follow-up' } });
+            const up = await this.relations.findOne({
+                where: { taskId: root.id, kind: 'follow-up' },
+            });
             if (!up) break;
             const parent = await this.tasks.findOne({ where: { id: up.relatedTaskId } });
             if (!parent) break;
@@ -390,7 +396,9 @@ export class DeliveryFollowUpService {
         const attempted = [
             {
                 label: failure.phase,
-                outcome: failure.outcome ? OUTCOME_LABEL[failure.outcome] : `${failure.phase} failed`,
+                outcome: failure.outcome
+                    ? OUTCOME_LABEL[failure.outcome]
+                    : `${failure.phase} failed`,
             },
         ];
         const row = await this.escalations.record({
@@ -425,7 +433,8 @@ export function describeFailure(failure: DeliveryFailure): string {
             `- Phase: build`,
             `- Outcome: ${build?.status ?? 'failed'}${build?.failureClass ? ` (${build.failureClass})` : ''}`,
         );
-        if (build?.notDeployableReason) lines.push(`- Not deployable: ${build.notDeployableReason}`);
+        if (build?.notDeployableReason)
+            lines.push(`- Not deployable: ${build.notDeployableReason}`);
         if (build?.blockedReason) lines.push(`- Blocked: ${build.blockedReason}`);
         if (build) lines.push(`- Build: #${build.number ?? '?'} (${build.id})`);
         if (build?.logsUrl) lines.push(`- Logs: ${build.logsUrl}`);
@@ -461,14 +470,18 @@ export function failureLogTail(failure: DeliveryFailure): string[] {
     } else {
         const render = failure.deployment?.appRender;
         const recorded =
-            render && typeof render === 'object' && render.failure && typeof render.failure === 'object'
+            render &&
+            typeof render === 'object' &&
+            render.failure &&
+            typeof render.failure === 'object'
                 ? (render.failure as Record<string, unknown>)
                 : null;
         if (typeof recorded?.message === 'string' && recorded.message.trim()) {
             raw.push(...recorded.message.split(/\r?\n/));
         }
         const lastError = failure.deployment?.lastError;
-        if (typeof lastError === 'string' && lastError.trim()) raw.push(...lastError.split(/\r?\n/));
+        if (typeof lastError === 'string' && lastError.trim())
+            raw.push(...lastError.split(/\r?\n/));
     }
     // Redact the WHOLE recorded text first, then split and take the tail (review of #3030): a PEM
     // private key spans lines, so a per-line pass leaves its body lines untouched, and a tail cut

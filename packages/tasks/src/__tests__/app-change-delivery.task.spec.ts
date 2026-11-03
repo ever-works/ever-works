@@ -99,9 +99,11 @@ describe('appChangeDeliveryTask (APW-08 T23)', () => {
         reconcileMock = vi.fn().mockResolvedValue(EMPTY);
         appContext = {
             useLogger: vi.fn(),
-            get: vi.fn().mockImplementation((token: unknown) =>
-                token === TaskDeliveryServiceToken ? { reconcile: reconcileMock } : undefined,
-            ),
+            get: vi
+                .fn()
+                .mockImplementation((token: unknown) =>
+                    token === TaskDeliveryServiceToken ? { reconcile: reconcileMock } : undefined,
+                ),
             close: vi.fn().mockResolvedValue(undefined),
         };
         createApplicationContextMock.mockResolvedValue(appContext);

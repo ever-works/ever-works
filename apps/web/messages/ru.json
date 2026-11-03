@@ -4811,8 +4811,8 @@
                     "plans": {
                         "free": "Бесплатный",
                         "pro": "Pro",
-                        "standard": "Стандартный",
-                        "premium": "Премиум",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Неограниченный"
                     },
                     "usageRequired": "Переключитесь на оплату по факту, чтобы использовать эту периодичность.",

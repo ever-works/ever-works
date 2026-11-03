@@ -21,7 +21,12 @@ import { TaskChecksSection } from './TaskChecksSection';
  * a plain "Error": the gate row says "a tool this check needs is missing on this machine".
  */
 describe('TaskChecksSection — the missing-tool row (APW-08 T51)', () => {
-    const check = { id: 'repo/check-1', name: 'type-check', kind: 'command', command: 'cargo test' };
+    const check = {
+        id: 'repo/check-1',
+        name: 'type-check',
+        kind: 'command',
+        command: 'cargo test',
+    };
 
     function renderWith(result: Record<string, unknown>) {
         return render(

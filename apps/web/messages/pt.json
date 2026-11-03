@@ -4811,8 +4811,8 @@
                     "plans": {
                         "free": "Grátis",
                         "pro": "Pro",
-                        "standard": "Padrão",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Sem limite"
                     },
                     "usageRequired": "Mude para uso por execução para usar este ritmo.",

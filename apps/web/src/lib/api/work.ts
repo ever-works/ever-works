@@ -1017,7 +1017,10 @@ export const workAPI = {
      * APW-08 T49 (FR-74, R-30) — the operator's App Works switches, for the read-only banner. The
      * dispatchers enforce them on their own; this only lets the page say so first.
      */
-    getAppWorkSwitches: async (): Promise<{ changesEnabled: boolean; autoDeployEnabled: boolean }> => {
+    getAppWorkSwitches: async (): Promise<{
+        changesEnabled: boolean;
+        autoDeployEnabled: boolean;
+    }> => {
         return serverFetch<{ changesEnabled: boolean; autoDeployEnabled: boolean }>(
             `/app-works/switches`,
             // Bounded (CodeRabbit on #3046): a stalled read must not hold the Overview; the page's

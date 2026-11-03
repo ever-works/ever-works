@@ -6964,8 +6964,8 @@
                     "plans": {
                         "free": "Free",
                         "pro": "Pro",
-                        "standard": "Standard",
-                        "premium": "Premium",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "Unmetered"
                     },
                     "usageRequired": "Switch to pay-per-use to use this cadence.",

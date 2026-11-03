@@ -54,7 +54,7 @@ export class CreatePlanCheckoutDto {
      * The service clamps this against the plan row and bills only the excess, so this number can
      * only ever cost the buyer MORE, never less: under-reporting just buys fewer seats. The upper
      * bound is a sanity limit on a public, throttled endpoint, not a product limit; a genuinely
-     * larger deployment buys Enterprise Option 1, which is unbounded and meters nothing.
+     * larger deployment buys Unlimited Option 1, which is unbounded and meters nothing.
      */
     @IsOptional()
     @IsInt()

@@ -4811,8 +4811,8 @@
                     "plans": {
                         "free": "ฟรี",
                         "pro": "Pro",
-                        "standard": "มาตรฐาน",
-                        "premium": "พรีเมียม",
+                        "standard": "Pro",
+                        "premium": "Unlimited",
                         "unmetered": "ไม่จำกัด"
                     },
                     "usageRequired": "เปลี่ยนเป็นโหมดคิดค่าบริการตามการใช้งานเพื่อใช้รอบการทำงานนี้",

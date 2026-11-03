@@ -47,7 +47,9 @@ function repo(rows: Row[]) {
         find: jest.fn(async (o: { where: Row; take?: number }) =>
             rows.filter((r) => matches(r, o.where)).slice(0, o.take ?? rows.length),
         ),
-        findOne: jest.fn(async (o: { where: Row }) => rows.find((r) => matches(r, o.where)) ?? null),
+        findOne: jest.fn(
+            async (o: { where: Row }) => rows.find((r) => matches(r, o.where)) ?? null,
+        ),
         count: jest.fn(async (o: { where: Row }) => rows.filter((r) => matches(r, o.where)).length),
         update: jest.fn(async (where: Row, patch: Row) => {
             const target = rows.find((r) => matches(r, where));
@@ -81,12 +83,23 @@ const DEPLOYMENT_ID = '22222222-2222-4222-8222-222222222222';
 function failure(overrides: Partial<DeliveryFailure> = {}): DeliveryFailure {
     return {
         task: ORIGINAL as unknown as Task,
-        work: { id: 'work-1', userId: 'user-1', name: 'Bookings', tenantId: null, organizationId: null },
+        work: {
+            id: 'work-1',
+            userId: 'user-1',
+            name: 'Bookings',
+            tenantId: null,
+            organizationId: null,
+        },
         phase: 'deploy',
         failureId: DEPLOYMENT_ID,
         failedSha: '3f9c2ab0000000000000000000000000000000aa',
         outcome: 'rolled_back',
-        deployment: { id: DEPLOYMENT_ID, state: 'ROLLED_BACK', lastError: 'pod crashloop', appRender: null },
+        deployment: {
+            id: DEPLOYMENT_ID,
+            state: 'ROLLED_BACK',
+            lastError: 'pod crashloop',
+            appRender: null,
+        },
         ...overrides,
     };
 }
@@ -97,31 +110,45 @@ function harness(seed: { tasks?: Row[]; relations?: Row[]; escalations?: Row[] }
     const escalationRows = repo(seed.escalations ?? []);
     let created = 0;
     const tasksService = {
-        create: jest.fn(async (_userId: string, input: Row, _scope: unknown, options: { withinCreate?: (row: Row, m?: unknown) => Promise<void> }) => {
-            created += 1;
-            const row: Row = {
-                id: `follow-${created}`,
-                userId: 'user-1',
-                slug: `T-${created + 1}`,
-                followUpKey: null,
-                deliveryState: null,
-                prState: null,
-                createdAt: new Date(),
-                ...input,
-            };
-            tasks.rows.push(row);
-            try {
-                if (options?.withinCreate) await options.withinCreate(row, undefined);
-            } catch (error) {
-                tasks.rows.splice(tasks.rows.indexOf(row), 1); // the create transaction rolls back
-                throw error;
-            }
-            return row;
-        }),
-        addRelation: jest.fn(async (_u: string, taskId: string, relatedTaskId: string, kind: string) => {
-            relations.rows.push({ id: `rel-${relations.rows.length}`, taskId, relatedTaskId, kind });
-            return {};
-        }),
+        create: jest.fn(
+            async (
+                _userId: string,
+                input: Row,
+                _scope: unknown,
+                options: { withinCreate?: (row: Row, m?: unknown) => Promise<void> },
+            ) => {
+                created += 1;
+                const row: Row = {
+                    id: `follow-${created}`,
+                    userId: 'user-1',
+                    slug: `T-${created + 1}`,
+                    followUpKey: null,
+                    deliveryState: null,
+                    prState: null,
+                    createdAt: new Date(),
+                    ...input,
+                };
+                tasks.rows.push(row);
+                try {
+                    if (options?.withinCreate) await options.withinCreate(row, undefined);
+                } catch (error) {
+                    tasks.rows.splice(tasks.rows.indexOf(row), 1); // the create transaction rolls back
+                    throw error;
+                }
+                return row;
+            },
+        ),
+        addRelation: jest.fn(
+            async (_u: string, taskId: string, relatedTaskId: string, kind: string) => {
+                relations.rows.push({
+                    id: `rel-${relations.rows.length}`,
+                    taskId,
+                    relatedTaskId,
+                    kind,
+                });
+                return {};
+            },
+        ),
         runTask: jest.fn(async () => ({ dispatched: true })),
     };
     const escalations = { record: jest.fn(async (input: Row) => ({ id: 'esc-1', ...input })) };
@@ -138,7 +165,16 @@ function harness(seed: { tasks?: Row[]; relations?: Row[]; escalations?: Row[] }
         transitions as never,
         activityLog as never,
     );
-    return { service, tasks, relations, escalationRows, tasksService, escalations, transitions, activityLog };
+    return {
+        service,
+        tasks,
+        relations,
+        escalationRows,
+        tasksService,
+        escalations,
+        transitions,
+        activityLog,
+    };
 }
 
 afterEach(() => {
@@ -177,7 +213,12 @@ describe('followUpKey — server-side, not a label (APW08-G23)', () => {
         const key = followUpKeyOf(ORIGINAL.id, DEPLOYMENT_ID);
         // Another reconciler's create lands between the pre-check and this one's key write.
         h.tasks.findOne.mockImplementationOnce(async () => null);
-        h.tasks.rows.push({ id: 'winner', followUpKey: key, status: TaskStatus.TODO, workId: 'work-1' });
+        h.tasks.rows.push({
+            id: 'winner',
+            followUpKey: key,
+            status: TaskStatus.TODO,
+            workId: 'work-1',
+        });
         const result = await h.service.open(failure());
         expect(result).toEqual({ kind: 'exists', taskId: 'winner' });
         expect(h.tasks.rows.filter((r) => r.followUpKey === key)).toHaveLength(1);
@@ -187,7 +228,16 @@ describe('followUpKey — server-side, not a label (APW08-G23)', () => {
     it('a user label that looks like the key changes nothing — the column decides', async () => {
         const key = followUpKeyOf(ORIGINAL.id, DEPLOYMENT_ID);
         const h = harness({
-            tasks: [{ ...ORIGINAL }, { id: 'manual', labels: [key], followUpKey: null, status: TaskStatus.TODO, workId: 'work-1' }],
+            tasks: [
+                { ...ORIGINAL },
+                {
+                    id: 'manual',
+                    labels: [key],
+                    followUpKey: null,
+                    status: TaskStatus.TODO,
+                    workId: 'work-1',
+                },
+            ],
         });
         const result = await h.service.open(failure());
         expect(result.kind).toBe('opened');
@@ -243,7 +293,13 @@ describe('the follow-up Task (FR-36, S7)', () => {
         ];
         const f = failure({
             phase: 'build',
-            build: { id: 'b1', number: 4, status: 'failed', failureExcerpt: excerpt, logsUrl: 'https://ci.invalid/4' },
+            build: {
+                id: 'b1',
+                number: 4,
+                status: 'failed',
+                failureExcerpt: excerpt,
+                logsUrl: 'https://ci.invalid/4',
+            },
         });
         const tail = failureLogTail(f);
         expect(tail).toHaveLength(200);
@@ -258,9 +314,24 @@ describe('the follow-up Task (FR-36, S7)', () => {
     });
 
     it('redacts a multi-line PEM private key whole, body lines included (review of #3030)', () => {
-        const body = ['MIIEowIBAAKCAQEAsecretbodyline1', 'Zm9vYmFyc2VjcmV0Ym9keWxpbmUy', 'c2VjcmV0Ym9keWxpbmUz'];
-        const excerpt = ['step 3 failed', '-----BEGIN RSA PRIVATE KEY-----', ...body, '-----END RSA PRIVATE KEY-----', 'exit 1'];
-        const tail = failureLogTail(failure({ phase: 'build', build: { id: 'b1', status: 'failed', failureExcerpt: excerpt } }));
+        const body = [
+            'MIIEowIBAAKCAQEAsecretbodyline1',
+            'Zm9vYmFyc2VjcmV0Ym9keWxpbmUy',
+            'c2VjcmV0Ym9keWxpbmUz',
+        ];
+        const excerpt = [
+            'step 3 failed',
+            '-----BEGIN RSA PRIVATE KEY-----',
+            ...body,
+            '-----END RSA PRIVATE KEY-----',
+            'exit 1',
+        ];
+        const tail = failureLogTail(
+            failure({
+                phase: 'build',
+                build: { id: 'b1', status: 'failed', failureExcerpt: excerpt },
+            }),
+        );
         const text = tail.join('\n');
         for (const line of body) expect(text).not.toContain(line);
         expect(text).toContain('step 3 failed');
@@ -270,7 +341,12 @@ describe('the follow-up Task (FR-36, S7)', () => {
     it('drops the body of a key whose footer was cut off, even when the tail slice would drop its header', () => {
         const body = Array.from({ length: 205 }, (_, i) => `c2VjcmV0a2V5Ym9keQ${i}`);
         const excerpt = ['build output', '-----BEGIN PRIVATE KEY-----', ...body];
-        const tail = failureLogTail(failure({ phase: 'build', build: { id: 'b1', status: 'failed', failureExcerpt: excerpt } }));
+        const tail = failureLogTail(
+            failure({
+                phase: 'build',
+                build: { id: 'b1', status: 'failed', failureExcerpt: excerpt },
+            }),
+        );
         const text = tail.join('\n');
         for (const line of body) expect(text).not.toContain(line);
         expect(text).toContain('build output');
@@ -278,7 +354,9 @@ describe('the follow-up Task (FR-36, S7)', () => {
 
     it('names the APW-06 outcome of a deployment failure', () => {
         expect(describeFailure(failure())).toContain('- Outcome: rolled back');
-        expect(describeFailure(failure({ outcome: 'rollback_failed' }))).toContain('- Outcome: rollback failed');
+        expect(describeFailure(failure({ outcome: 'rollback_failed' }))).toContain(
+            '- Outcome: rollback failed',
+        );
     });
 });
 
@@ -288,8 +366,25 @@ describe('the follow-up budget (FR-37, FR-38; APW08-G25 CL-08-5)', () => {
         return harness({
             tasks: [
                 { ...ORIGINAL },
-                { id: 'follow-1', userId: 'user-1', status: TaskStatus.DONE, workId: 'work-1', agentId: 'agent-1', followUpKey: 'followup:a:1' },
-                { id: 'follow-2', userId: 'user-1', status: TaskStatus.IN_REVIEW, workId: 'work-1', agentId: 'agent-1', followUpKey: 'followup:b:2', slug: 'T-3', tenantId: null, organizationId: null },
+                {
+                    id: 'follow-1',
+                    userId: 'user-1',
+                    status: TaskStatus.DONE,
+                    workId: 'work-1',
+                    agentId: 'agent-1',
+                    followUpKey: 'followup:a:1',
+                },
+                {
+                    id: 'follow-2',
+                    userId: 'user-1',
+                    status: TaskStatus.IN_REVIEW,
+                    workId: 'work-1',
+                    agentId: 'agent-1',
+                    followUpKey: 'followup:b:2',
+                    slug: 'T-3',
+                    tenantId: null,
+                    organizationId: null,
+                },
             ],
             relations: [
                 { id: 'r1', taskId: 'follow-1', relatedTaskId: ORIGINAL.id, kind: 'follow-up' },
@@ -331,19 +426,44 @@ describe('the follow-up budget (FR-37, FR-38; APW08-G25 CL-08-5)', () => {
         process.env.EVER_WORKS_APP_FOLLOW_UPS_PER_CHANGE = '3';
         const h = chain();
         const failing = h.tasks.rows.find((r) => r.id === 'follow-2') as unknown as Task;
-        await expect(h.service.open(failure({ task: failing }))).resolves.toMatchObject({ kind: 'opened' });
+        await expect(h.service.open(failure({ task: failing }))).resolves.toMatchObject({
+            kind: 'opened',
+        });
     });
 
     it('at 3 open automatic follow-ups on the App Work, the next failure escalates', async () => {
-        const open = (id: string) => ({ id, workId: 'work-1', followUpKey: `followup:${id}:x`, status: TaskStatus.TODO });
-        const h = harness({ tasks: [{ ...ORIGINAL }, open('o1'), open('o2'), open('o3'), { id: 'closed', workId: 'work-1', followUpKey: 'k', status: TaskStatus.DONE }] });
+        const open = (id: string) => ({
+            id,
+            workId: 'work-1',
+            followUpKey: `followup:${id}:x`,
+            status: TaskStatus.TODO,
+        });
+        const h = harness({
+            tasks: [
+                { ...ORIGINAL },
+                open('o1'),
+                open('o2'),
+                open('o3'),
+                { id: 'closed', workId: 'work-1', followUpKey: 'k', status: TaskStatus.DONE },
+            ],
+        });
         await expect(h.service.countOpenForWork('work-1')).resolves.toBe(3);
-        await expect(h.service.open(failure())).resolves.toMatchObject({ kind: 'escalated', reason: 'work-limit' });
+        await expect(h.service.open(failure())).resolves.toMatchObject({
+            kind: 'escalated',
+            reason: 'work-limit',
+        });
     });
 
     it('an escalation already raised for this failure record is not raised again, and opens nothing', async () => {
-        const h = harness({ escalations: [{ id: 'esc-0', dedupKey: deliveryEscalationKeyOf(ORIGINAL.id, DEPLOYMENT_ID) }] });
-        await expect(h.service.open(failure())).resolves.toEqual({ kind: 'skipped', reason: 'escalated' });
+        const h = harness({
+            escalations: [
+                { id: 'esc-0', dedupKey: deliveryEscalationKeyOf(ORIGINAL.id, DEPLOYMENT_ID) },
+            ],
+        });
+        await expect(h.service.open(failure())).resolves.toEqual({
+            kind: 'skipped',
+            reason: 'escalated',
+        });
         expect(h.escalations.record).not.toHaveBeenCalled();
         expect(h.tasksService.create).not.toHaveBeenCalled();
     });
@@ -351,7 +471,9 @@ describe('the follow-up budget (FR-37, FR-38; APW08-G25 CL-08-5)', () => {
     it('Try once more (manual) opens one more follow-up past both limits', async () => {
         const h = chain();
         const failing = h.tasks.rows.find((r) => r.id === 'follow-2') as unknown as Task;
-        await expect(h.service.open(failure({ task: failing }), { manual: true })).resolves.toMatchObject({
+        await expect(
+            h.service.open(failure({ task: failing }), { manual: true }),
+        ).resolves.toMatchObject({
             kind: 'opened',
         });
     });
@@ -359,7 +481,10 @@ describe('the follow-up budget (FR-37, FR-38; APW08-G25 CL-08-5)', () => {
     it('a follow-up that cannot be created raises the escalation — a failure always reaches a person', async () => {
         const h = harness();
         h.tasksService.create.mockRejectedValueOnce(new Error('credits exhausted'));
-        await expect(h.service.open(failure())).resolves.toMatchObject({ kind: 'escalated', reason: 'create-failed' });
+        await expect(h.service.open(failure())).resolves.toMatchObject({
+            kind: 'escalated',
+            reason: 'create-failed',
+        });
     });
 });
 
@@ -368,10 +493,38 @@ describe('cancelObsolete (FR-39, S24, S8)', () => {
         const h = harness({
             tasks: [
                 { ...ORIGINAL },
-                { id: 'open-fix', userId: 'user-1', workId: 'work-1', status: TaskStatus.IN_PROGRESS, followUpKey: 'k1', deliveryState: null, prState: 'open' },
-                { id: 'merged-fix', userId: 'user-1', workId: 'work-1', status: TaskStatus.IN_REVIEW, followUpKey: 'k2', deliveryState: 'deploying', prState: 'merged' },
-                { id: 'done-fix', userId: 'user-1', workId: 'work-1', status: TaskStatus.DONE, followUpKey: 'k3' },
-                { id: 'manual-fix', userId: 'user-1', workId: 'work-1', status: TaskStatus.TODO, followUpKey: null },
+                {
+                    id: 'open-fix',
+                    userId: 'user-1',
+                    workId: 'work-1',
+                    status: TaskStatus.IN_PROGRESS,
+                    followUpKey: 'k1',
+                    deliveryState: null,
+                    prState: 'open',
+                },
+                {
+                    id: 'merged-fix',
+                    userId: 'user-1',
+                    workId: 'work-1',
+                    status: TaskStatus.IN_REVIEW,
+                    followUpKey: 'k2',
+                    deliveryState: 'deploying',
+                    prState: 'merged',
+                },
+                {
+                    id: 'done-fix',
+                    userId: 'user-1',
+                    workId: 'work-1',
+                    status: TaskStatus.DONE,
+                    followUpKey: 'k3',
+                },
+                {
+                    id: 'manual-fix',
+                    userId: 'user-1',
+                    workId: 'work-1',
+                    status: TaskStatus.TODO,
+                    followUpKey: null,
+                },
             ],
             relations: ['open-fix', 'merged-fix', 'done-fix', 'manual-fix'].map((id) => ({
                 id: `r-${id}`,
@@ -391,7 +544,10 @@ describe('cancelObsolete (FR-39, S24, S8)', () => {
             expect.objectContaining({
                 action: 'app.change.closed',
                 summary: FOLLOW_UP_NO_LONGER_NEEDED_NOTE,
-                details: expect.objectContaining({ resourceId: 'open-fix', originalTaskId: ORIGINAL.id }),
+                details: expect.objectContaining({
+                    resourceId: 'open-fix',
+                    originalTaskId: ORIGINAL.id,
+                }),
             }),
         );
     });

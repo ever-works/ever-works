@@ -135,7 +135,11 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
     // APW-08 T43 — `app.change.run_admitted` is reported for the node that WON the claim.
     it('reports a WON App Work lease once, with the node, the Work and the Task', async () => {
         const onLeased = jest.fn(async () => undefined);
-        const leased = await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 });
+        const leased = await build({ ...admission, onLeased }).lease({
+            nodeId: NODE,
+            secret,
+            max: 1,
+        });
         expect(leased).toHaveLength(1);
         expect(onLeased).toHaveBeenCalledTimes(1);
         expect(onLeased).toHaveBeenCalledWith({
@@ -150,9 +154,13 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
     it('reports nothing for a claim lost to another node, or for a job without the marker', async () => {
         const onLeased = jest.fn(async () => undefined);
         jobs.claim.mockResolvedValueOnce(false);
-        expect(await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 })).toEqual([]);
+        expect(
+            await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 }),
+        ).toEqual([]);
         job = makeJob({ payload: { taskId: 'task-1', runId: 'run-1', agentId: 'agent-1' } });
-        expect(await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 })).toHaveLength(1);
+        expect(
+            await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 }),
+        ).toHaveLength(1);
         expect(onLeased).not.toHaveBeenCalled();
     });
 
@@ -160,7 +168,9 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
         const onLeased = jest.fn(async () => {
             throw new Error('sink down');
         });
-        expect(await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 })).toHaveLength(1);
+        expect(
+            await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 }),
+        ).toHaveLength(1);
     });
 
     it('a report still pending never delays the lease (CodeRabbit on #3047)', async () => {
@@ -170,7 +180,11 @@ describe('FleetJobService — App Work lease admission (APW-08 T12 / T48)', () =
         });
         const onLeased = jest.fn(() => pending);
         // `lease()` resolves while the report is still pending: it is never awaited.
-        const leased = await build({ ...admission, onLeased }).lease({ nodeId: NODE, secret, max: 1 });
+        const leased = await build({ ...admission, onLeased }).lease({
+            nodeId: NODE,
+            secret,
+            max: 1,
+        });
         expect(leased).toHaveLength(1);
         expect(onLeased).toHaveBeenCalledTimes(1);
         release();

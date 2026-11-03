@@ -313,15 +313,15 @@ describe('github-review-bots', () => {
         });
 
         it('drops a <details> block a removal spliced together', () => {
-            expect(
-                stripReviewBotMarkup('P <det<details>x</details>ails>hidden</details> Q'),
-            ).toBe('P  Q');
+            expect(stripReviewBotMarkup('P <det<details>x</details>ails>hidden</details> Q')).toBe(
+                'P  Q',
+            );
         });
 
         it('keeps an unclosed outer <details> and drops the complete inner one', () => {
-            expect(
-                stripReviewBotMarkup('A <details>B <details>C</details> D'),
-            ).toBe('A <details>B  D');
+            expect(stripReviewBotMarkup('A <details>B <details>C</details> D')).toBe(
+                'A <details>B  D',
+            );
             expect(stripReviewBotMarkup('A</details> <details>x</details>B')).toBe('A</details> B');
         });
 
