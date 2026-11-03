@@ -46,9 +46,10 @@ export interface PluginSettingsSchema {
 export type PluginSettings = Record<string, unknown>;
 
 /**
- * Setting source indicating where a value came from
+ * Setting source indicating where a value came from. `platform` is a value Ever
+ * Platform handed a connected installation (below `env`, above `default`).
  */
-export type SettingSource = 'default' | 'env' | 'admin' | 'work' | 'user';
+export type SettingSource = 'default' | 'env' | 'admin' | 'work' | 'user' | 'platform';
 
 export interface ResolvedSetting<T = unknown> {
 	readonly key: string;

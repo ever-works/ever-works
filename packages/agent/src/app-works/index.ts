@@ -124,6 +124,11 @@ export {
     MAX_INSTRUCTION_FILES,
     MAX_SIZE_GUIDANCE,
     MIN_SIZE_GUIDANCE,
+    // APW08-G22 — `agents.maxPullRequestChangedFiles`, the file guidance.
+    DEFAULT_FILE_GUIDANCE,
+    MAX_FILE_GUIDANCE,
+    MIN_FILE_GUIDANCE,
+    clampFileGuidance,
     type AppWorkRules,
     type AppWorkRulesWork,
 } from './app-work-rules.service';
@@ -174,6 +179,13 @@ export * from './agent-app-change-tools';
 // APW-04 — the provisioning feedback loop (build / deploy / smoke → the provisioning Task).
 export * from './app-provisioning-feedback.service';
 
+// Gauzy Ever Works #37 — the provisioner's (APW-04 §10.1) and the evolve loop's (APW-08
+// §8.1) telemetry, over `APP_WORKS_TELEMETRY_SINK`.
+export * from './app-provisioning.telemetry';
+export * from './app-change.telemetry';
+// APW-02 T39 - the fork lifecycle telemetry (plan 9.1).
+export * from './app-upstream.telemetry';
+
 // APW-03 T27–T31 (lane aw-blueprints) — Blueprint apply-after-create and upgrades: the
 // three-way merge, the `app-blueprint-apply` job contract, the service behind the App spec
 // routes and the worker's RPC runner. Declared under `apps-catalog/`, which has no
@@ -190,9 +202,22 @@ export * from './app-work-run-classifier';
 
 // APW-08 T49 (XC-10, FR-74, R-30, lane B2) — the evolve loop's operator kill switches.
 export * from './app-work-switches';
+// APW-08 T46 — safety-rail holds on App Work runs (R-17).
+export * from './app-work-run-holds';
+
+// APW-08 T56 (XC-19, FR-73) — one budget per App Work: the booking door every App Work charge
+// goes through, the run-admission port it implements, and the installer that puts it in the gate.
+export * from './app-work-budget';
 
 // APW-08 T18 (lane B2) — the App Work run brief from the App rules at the base commit, and the
 // source both run paths (AgentRunService, the fleet planner) ask for it.
 export * from './app-run-brief';
 export * from './app-run-brief.port';
 export * from './app-run-brief.service';
+
+// APW-08 T12 + T48 (FR-12, FR-70, FR-75) — isolated-run admission (the predicate, its two sites'
+// ports and the cloud worker's pre-flight), the Fleet containment record and the per-node
+// allowance store, and the service the API binds over them.
+export * from './run-containment';
+export * from './isolated-run-admission';
+export * from './isolated-run-admission.service';

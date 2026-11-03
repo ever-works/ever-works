@@ -59,8 +59,12 @@ function windowsCandidates(env: Record<string, string | undefined>): string[] {
 
 	const out: string[] = [];
 	for (const root of roots) {
+		// Trailing backslashes by index, not `/\\+$/` (polynomial on a long run that
+		// does not end the string — CodeQL js/polynomial-redos).
+		let end = root.length;
+		while (end > 0 && root[end - 1] === '\\') end--;
 		for (const suffix of suffixes) {
-			out.push(`${root.replace(/\\+$/, '')}${suffix}`);
+			out.push(`${root.slice(0, end)}${suffix}`);
 		}
 	}
 	return out;

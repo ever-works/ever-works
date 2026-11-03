@@ -57,6 +57,7 @@ import {
     workflowChanges,
     type UpstreamWorkflowChanges,
 } from './upstream-workflow-diff';
+import { APP_UPSTREAM_TELEMETRY_EVENTS, AppUpstreamTelemetry } from './app-upstream.telemetry';
 
 /**
  * APW-02 T26 — one upstream sync run (plan §6.3, `plan.md:715-754`).
@@ -548,6 +549,9 @@ export class AppUpstreamSyncService {
         @Optional()
         @Inject(APP_UPSTREAM_PRIVATE_COPY_PORT)
         private readonly privateCopies?: AppUpstreamPrivateCopyPort,
+        // APW-02 T39 (Gauzy Ever Works #37) - `app_upstream.sync_finished`. Appended LAST and
+        // `@Optional()`: absent (the worker today), nothing is emitted; it never throws.
+        @Optional() private readonly telemetry?: AppUpstreamTelemetry,
     ) {}
 
     /**
@@ -556,6 +560,25 @@ export class AppUpstreamSyncService {
      * that throws is a job whose outcome nobody recorded.
      */
     async run(
+        payload: AppUpstreamSyncJobPayload,
+        deps: AppUpstreamSyncDeps = {},
+    ): Promise<AppUpstreamSyncRunResult> {
+        const result = await this.runSync(payload, deps);
+        // APW-02 T39 - one sync run, by its result and reason codes and its counters
+        // (plan 9.1); never a sha, a branch, a pull request url or a repository.
+        this.telemetry?.track(APP_UPSTREAM_TELEMETRY_EVENTS.syncFinished, {
+            trigger: result.trigger,
+            result: result.result,
+            ...(result.reason ? { reason: result.reason } : {}),
+            commits: result.commits,
+            providerCalls: result.providerCalls,
+            durationMs: result.durationMs,
+            outcome: result.outcome,
+        });
+        return result;
+    }
+
+    private async runSync(
         payload: AppUpstreamSyncJobPayload,
         deps: AppUpstreamSyncDeps = {},
     ): Promise<AppUpstreamSyncRunResult> {

@@ -1,3 +1,15 @@
+import { isAppWorkKind } from '@ever-works/contracts';
+import {
+    DEFAULT_MISSION_OUTPUT_MODE,
+    isMissionOutputMode,
+    missionFilesTasks,
+    MISSION_NO_APP_WORK_RELATION,
+    MISSION_OUTPUT_MODES,
+    MISSION_TASK_OUTPUT_RELATIONS,
+    normalizeMissionTaskOutput,
+    type MissionOutputMode,
+    type MissionTaskOutput,
+} from './mission-task-output';
 import {
     BadRequestException,
     Injectable,
@@ -39,6 +51,7 @@ import {
 } from '../database/repositories/mission-work.repository';
 import { MISSION_WORK_RELATIONS, type MissionWorkRelation } from '../entities/mission-work.entity';
 import { Work } from '../entities/work.entity';
+import { Agent } from '../entities/agent.entity';
 import { TitlerService } from '../titler/titler.service';
 import { MissionTickService } from './mission-tick.service';
 import { toMissionDto, type MissionDto } from './types';
@@ -112,6 +125,10 @@ export interface CreateMissionInput {
     visibility?: 'team' | 'organization';
     /** EW-P2-5 — Teams (`team_resources` type `mission`) of the Mission's Organization. */
     teamIds?: string[];
+    /** APW-08 T34 (FR-51) — omitted = `ideas`. */
+    outputMode?: string;
+    /** APW-08 T34 — stored normalized; omitted / `null` = the defaults. */
+    taskOutput?: Record<string, unknown> | null;
 }
 
 /**
@@ -128,6 +145,10 @@ export interface UpdateMissionInput {
     outstandingIdeasCap?: number | null;
     guardrailsOverride?: MissionGuardrailsOverride | null;
     missionTemplateRepo?: string | null;
+    /** APW-08 T34 (FR-51). */
+    outputMode?: string;
+    /** APW-08 T34 — `null` resets to the defaults. */
+    taskOutput?: Record<string, unknown> | null;
 }
 
 export interface ListMissionsFilter {
@@ -247,6 +268,13 @@ export class MissionsService {
         @Optional() private readonly domainEvents?: DomainEventPublisher,
         // EW-P2-5 — integration-created Missions' Teams + D11 (`createExternal`).
         @Optional() private readonly recordVisibility?: RecordVisibilityService,
+        // APW-08 T34 (review of #3061) — a Task output's `agentId` must be an Agent the caller may
+        // use. `Agent` is in MissionsModule's `forFeature`. TRAILING + @Optional(): absent (a
+        // hand-rolled test), the Agent is not checked here; TasksService still refuses a foreign
+        // one when the tick files.
+        @Optional()
+        @InjectRepository(Agent)
+        private readonly agentsRepo?: Repository<Agent>,
     ) {}
 
     /**
@@ -370,6 +398,8 @@ export class MissionsService {
             throw new Error('Mission withinCreate needs DomainEventsModule (one transaction)');
         }
         this.assertScheduleConsistency(input.type, input.schedule);
+        // APW-08 T34 — validated (and its Agent checked) before anything is generated or written.
+        const taskOutput = await this.resolveTaskOutput(userId, null, input.taskOutput, scope);
         const description = input.description.trim();
         // Phase 3 PR I — when the caller doesn't pass a title (or
         // passes an empty/whitespace one), generate one from the
@@ -402,6 +432,9 @@ export class MissionsService {
                 missionTemplateRepo: this.normalizeTemplateRepo(input.missionTemplateRepo),
                 missionRepo: null, // Phase 8 PR X scaffolder sets this.
                 sourceMissionId: null, // Mission Clone (PR HH) sets this.
+                // APW-08 T34 (FR-51) — validated, never stored raw.
+                outputMode: this.assertOutputMode(input.outputMode),
+                taskOutput,
                 ...(input.createdBy
                     ? { createdByType: input.createdBy.type, createdById: input.createdBy.id }
                     : {}),
@@ -439,7 +472,7 @@ export class MissionsService {
             missionId: saved.id,
             title: saved.title,
         });
-        return toMissionDto(saved);
+        return this.withTaskOutputWarnings(toMissionDto(saved), userId, scope);
     }
 
     /**
@@ -578,6 +611,18 @@ export class MissionsService {
         if (input.missionTemplateRepo !== undefined)
             // Security: validate/normalize before persisting (SSRF defense-in-depth).
             existing.missionTemplateRepo = this.normalizeTemplateRepo(input.missionTemplateRepo);
+        // APW-08 T34 (FR-51) — validated, never stored raw.
+        if (input.outputMode !== undefined) {
+            existing.outputMode = this.assertOutputMode(input.outputMode);
+        }
+        if (input.taskOutput !== undefined) {
+            existing.taskOutput = await this.resolveTaskOutput(
+                userId,
+                existing.taskOutput ?? null,
+                input.taskOutput,
+                scope,
+            );
+        }
 
         const changedFields = Object.keys(input).filter(
             (key) => (input as Record<string, unknown>)[key] !== undefined,
@@ -585,7 +630,96 @@ export class MissionsService {
         const saved = await this.persist(existing, (publisher, manager, row) =>
             publisher.changed(manager, 'mission', row.id, 'mission.updated', { changedFields }),
         );
-        return toMissionDto(saved);
+        return this.withTaskOutputWarnings(toMissionDto(saved), userId, scope);
+    }
+
+    /**
+     * APW-08 T34 — the Task output a write stores. Review of #3061: the incoming fields are
+     * MERGED over the stored ones (the Output card sends only `tasksPerTick` and `openTasksCap`,
+     * and replacing the whole object silently dropped an `agentId` an API client had set); an
+     * omitted field keeps its stored value, `agentId: null` clears the Agent, and `null` resets
+     * the whole output to the defaults. A NEW `agentId` must be an Agent the caller may use in
+     * this scope (`400` otherwise), so a tick never files work for an Agent its owner cannot reach.
+     */
+    private async resolveTaskOutput(
+        userId: string,
+        stored: Record<string, unknown> | null,
+        incoming: Record<string, unknown> | null | undefined,
+        scope?: OwnershipScope,
+    ): Promise<MissionTaskOutput | null> {
+        if (incoming === undefined) return stored ? normalizeMissionTaskOutput(stored) : null;
+        if (incoming === null) return null;
+        const previous = stored ? normalizeMissionTaskOutput(stored) : null;
+        const merged: Record<string, unknown> = { ...(previous ?? {}) };
+        for (const [key, value] of Object.entries(incoming)) {
+            if (value === undefined) continue;
+            if (key === 'agentId' && value === null) {
+                delete merged.agentId;
+                continue;
+            }
+            merged[key] = value;
+        }
+        const next = normalizeMissionTaskOutput(merged);
+        if (next.agentId && next.agentId !== previous?.agentId) {
+            await this.assertTaskOutputAgent(userId, next.agentId, scope);
+        }
+        return next;
+    }
+
+    /** The Task output's Agent is one the caller owns in this scope, or `400`. */
+    private async assertTaskOutputAgent(
+        userId: string,
+        agentId: string,
+        scope?: OwnershipScope,
+    ): Promise<void> {
+        if (!this.agentsRepo) return;
+        const agent = await this.agentsRepo.findOne({
+            where: scope
+                ? ownershipWhere<Agent>(userId, scope).map((branch) => ({ ...branch, id: agentId }))
+                : { id: agentId, userId },
+            select: ['id'],
+        });
+        if (!agent) {
+            throw new BadRequestException(
+                'taskOutput.agentId must be an Agent you can use in this workspace.',
+            );
+        }
+    }
+
+    /** APW-08 T34 (FR-51) — a known mode, or `400`; omitted = `ideas`. */
+    private assertOutputMode(raw: string | undefined): MissionOutputMode {
+        if (raw === undefined) return DEFAULT_MISSION_OUTPUT_MODE;
+        if (!isMissionOutputMode(raw)) {
+            throw new BadRequestException(
+                `outputMode must be one of ${MISSION_OUTPUT_MODES.join(', ')}.`,
+            );
+        }
+        return raw;
+    }
+
+    /**
+     * APW-08 T34 (plan §5, S27) — a Mission that files Tasks but has no App Work attached as
+     * Improves or Operates is accepted, and the answer says `noAppWorkRelation` so the form can
+     * point at the fix. Unbound relation reads (a trimmed graph) warn nothing.
+     */
+    private async withTaskOutputWarnings(
+        dto: MissionDto,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<MissionDto> {
+        if (!missionFilesTasks(dto.outputMode) || !this.missionWorks) return dto;
+        let relations: Awaited<ReturnType<MissionWorkRepository['listForMissionWithWork']>>;
+        try {
+            relations = await this.missionWorks.listForMissionWithWork(dto.id, userId, scope);
+        } catch {
+            return dto;
+        }
+        const hasAppWork = relations.some(
+            (relation) =>
+                (MISSION_TASK_OUTPUT_RELATIONS as readonly string[]).includes(relation.relation) &&
+                isAppWorkKind(relation.workKind ?? null),
+        );
+        return hasAppWork ? dto : { ...dto, warnings: [MISSION_NO_APP_WORK_RELATION] };
     }
 
     /**
@@ -786,11 +920,15 @@ export class MissionsService {
             | 'spawned'
             | 'cap-hit'
             | 'no-ideas'
+            | 'tasks-filed'
+            | 'no-tasks'
             | 'failed'
             | 'cron-no-match';
         missionId: string;
         ideasCreated?: number;
         ideasQueued?: number;
+        /** APW-08 T35 — Tasks filed on the Mission's App Works. */
+        tasksFiled?: number;
         message?: string;
     }> {
         const mission = await this.findOrThrow(userId, missionId, scope);
@@ -811,6 +949,7 @@ export class MissionsService {
             missionId,
             ideasCreated: result.ideasCreated,
             ideasQueued: result.ideasQueued,
+            tasksFiled: result.tasksFiled,
             message: result.message,
         };
     }

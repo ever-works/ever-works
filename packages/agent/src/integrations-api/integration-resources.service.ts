@@ -37,6 +37,9 @@ import {
     readKeysetPage,
 } from './keyset-cursor';
 
+/** APW-08 T54 — the author type of a platform thread post, which this API does not serve. */
+const SYSTEM_AUTHOR = 'system';
+
 /** A cursor before every row: the roster page after a first page the synthesized owner filled. */
 // The id must be a uuid: `decodeKeysetCursor` refuses anything else (F41, 911cf1f14), and
 // an id of '0' turned the second page of a `limit=1` members walk into a 400. The nil
@@ -314,6 +317,10 @@ export class IntegrationResourcesService {
      * `GET /tasks/:id/comments` — the task's comments, ordered by
      * `(updatedAt, id)` (an edit moves a comment behind the cursor, so an
      * `updatedSince` sync picks it up). The task must be one the caller sees.
+     *
+     * APW-08 T54 — a `system` thread post (a delivery-chain progress line, no author) is not a
+     * comment of this API: the comment DTO carries a real author, so those rows are left out
+     * here, by id below, and as link targets.
      */
     async comments(
         organizationId: string,
@@ -325,7 +332,8 @@ export class IntegrationResourcesService {
         const qb = this.dataSource
             .getRepository(TaskChatMessage)
             .createQueryBuilder('row')
-            .where('row.taskId = :taskId', { taskId });
+            .where('row.taskId = :taskId', { taskId })
+            .andWhere('row.authorType <> :systemAuthor', { systemAuthor: SYSTEM_AUTHOR });
         const page = await readKeysetPage(qb, 'row', query);
         const dtos = page.data.map(
             (row) => toTaskCommentDto(row, organizationId) as unknown as Record<string, unknown>,
@@ -348,7 +356,7 @@ export class IntegrationResourcesService {
         const row = await this.dataSource
             .getRepository(TaskChatMessage)
             .findOne({ where: { id: commentId, taskId } });
-        if (!row) throw notFound('task_comment', commentId);
+        if (!row || row.authorType === SYSTEM_AUTHOR) throw notFound('task_comment', commentId);
         const [dto] = await this.withLinks(
             'task_comment',
             organizationId,
@@ -396,8 +404,10 @@ export class IntegrationResourcesService {
             case 'task_comment': {
                 const comment = await this.dataSource
                     .getRepository(TaskChatMessage)
-                    .findOne({ where: { id: entityId }, select: ['id', 'taskId'] });
-                if (!comment) throw notFound('task_comment', entityId);
+                    .findOne({ where: { id: entityId }, select: ['id', 'taskId', 'authorType'] });
+                if (!comment || comment.authorType === SYSTEM_AUTHOR) {
+                    throw notFound('task_comment', entityId);
+                }
                 await this.get('task', organizationId, comment.taskId, source).catch(() => {
                     throw notFound('task_comment', entityId);
                 });

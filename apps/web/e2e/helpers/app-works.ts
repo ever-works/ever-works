@@ -630,7 +630,7 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/tasks/:taskId/delivery',
         wrapper: 'getTaskDelivery',
-        shipped: false,
+        shipped: true,
     },
     {
         id: '08-3',
@@ -638,7 +638,7 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'POST',
         path: '/api/tasks/:taskId/delivery/close',
         wrapper: 'closeTaskDelivery',
-        shipped: false,
+        shipped: true,
     },
     {
         id: '08-4',
@@ -646,7 +646,7 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'POST',
         path: '/api/tasks/:taskId/delivery/follow-up',
         wrapper: 'followUpTaskDelivery',
-        shipped: false,
+        shipped: true,
     },
     {
         id: '08-5',
@@ -1492,7 +1492,7 @@ export function evolveAppWork(
     return rawApi(request, 'POST', `/api/works/${seg(input.workId)}/evolve`, input);
 }
 
-/** **Unshipped / contract-only** (APW-08): `GET /api/tasks/:id/delivery`. */
+/** **Shipped** (APW-08 T24, lane L3): `GET /api/tasks/:id/delivery` (`TaskDeliveryView`). */
 export function getTaskDelivery(
     request: APIRequestContext,
     input: WrapperOptions & { taskId: string },
@@ -1500,7 +1500,10 @@ export function getTaskDelivery(
     return rawApi(request, 'GET', `/api/tasks/${seg(input.taskId)}/delivery`, input);
 }
 
-/** **Unshipped / contract-only** (APW-08): `POST /api/tasks/:id/delivery/close`. */
+/**
+ * **Shipped** (APW-08 T24, lane L3): `POST /api/tasks/:id/delivery/close` (`{ note? }`;
+ * `422 notClosable` unless the change is merged, built or failed).
+ */
 export function closeTaskDelivery(
     request: APIRequestContext,
     input: WrapperOptions & { taskId: string } & BodyInput<Record<string, unknown>>,
@@ -1509,7 +1512,7 @@ export function closeTaskDelivery(
 }
 
 /**
- * **Unshipped / contract-only** (APW-08): `POST /api/tasks/:id/delivery/follow-up`
+ * **Shipped** (APW-08 T24, lane L3): `POST /api/tasks/:id/delivery/follow-up`
  * (`202`, body `{ escalationId }`; every refusal answers `422 followUpLimit`).
  */
 export function followUpTaskDelivery(

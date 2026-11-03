@@ -132,7 +132,11 @@ export class PluginInstallerService {
         @Inject(PLUGINS_MODULE_OPTIONS)
         options: PluginsModuleOptions,
         private readonly pluginRepository: PluginRepository,
+        // An explicit token (C-9): `X | null` is emitted as `Object`, so without it Nest injected
+        // `undefined` although PluginsModule provides the repository — and every non-first-party
+        // install was refused as "no allowlist repository is configured", allowlisted or not.
         @Optional()
+        @Inject(PluginAllowlistRepository)
         private readonly allowlistRepository: PluginAllowlistRepository | null,
         /**
          * Indirection seam for tests. Production code leaves this null;

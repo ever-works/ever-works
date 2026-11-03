@@ -4,11 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Archive,
     ArchiveRestore,
+    AtSign,
     Bot,
     CircleAlert,
+    ClipboardCheck,
     Inbox as InboxIcon,
     ListChecks,
+    Mail,
     MailOpen,
+    MessageSquareMore,
     MoreVertical,
     ShieldQuestion,
     Trash2,
@@ -41,6 +45,7 @@ import {
 } from '@/app/actions/dashboard/inbox';
 import { InboxAnswerSummary } from './InboxAnswerSummary';
 import { InboxFleetSource } from './InboxFleetSource';
+import { InboxEmailHeader, InboxIntegrationSource } from './InboxIntegrationSource';
 import { InboxSessionSource } from './InboxSessionSource';
 import { InboxReplyComposer } from './InboxReplyComposer';
 import { InboxSourceFilter, InboxTabs, type InboxView } from './InboxTabs';
@@ -63,7 +68,15 @@ const KIND_ICON: Record<InboxItemKind, typeof Bot> = {
     approval: ShieldQuestion,
     escalation: CircleAlert,
     notice: InboxIcon,
+    // Integration inbox push — kinds another product's Inbox has.
+    mention: AtSign,
+    assignment: ClipboardCheck,
+    email: Mail,
+    other: MessageSquareMore,
 };
+
+const NEUTRAL_BADGE =
+    'bg-surface-secondary text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark border-border/50 dark:border-white/10';
 
 const KIND_BADGE: Record<InboxItemKind, string> = {
     question:
@@ -72,7 +85,13 @@ const KIND_BADGE: Record<InboxItemKind, string> = {
         'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 border-amber-200 dark:border-amber-500/25',
     escalation:
         'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300 border-red-200 dark:border-red-500/25',
-    notice: 'bg-surface-secondary text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark border-border/50 dark:border-white/10',
+    notice: NEUTRAL_BADGE,
+    mention:
+        'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/25',
+    assignment:
+        'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/25',
+    email: NEUTRAL_BADGE,
+    other: NEUTRAL_BADGE,
 };
 
 /** First ~140 characters of the body, on one line — the list preview. */
@@ -331,6 +350,9 @@ export function InboxClient({
                                             a run on the owner's own machine asked. */}
                                         <InboxFleetSource item={item} compact />
                                         <InboxSessionSource item={item} compact />
+                                        {/* Integration inbox push — "Ever Gauzy" on an
+                                            item another product filed. */}
+                                        <InboxIntegrationSource item={item} compact />
                                         <ShowDateTime value={item.createdAt} />
                                     </div>
                                 </button>
@@ -407,7 +429,13 @@ export function InboxClient({
                                     that branch. */}
                                 <InboxFleetSource item={active} />
                                 <InboxSessionSource item={active} />
+                                {/* Integration inbox push — the badge and a safe link
+                                    back to the item in the product that filed it. The
+                                    reply box below answers it like any other item. */}
+                                <InboxIntegrationSource item={active} />
                             </div>
+
+                            <InboxEmailHeader item={active} />
 
                             {isAwaitingReply(active) && (
                                 <div

@@ -59,10 +59,19 @@ function truncateText(text: string): string {
  */
 export function stripStatusHtml(html: string | undefined): string | undefined {
 	if (typeof html !== 'string' || html.length === 0) return undefined;
-	const text = html
-		.replace(/<br\s*\/?>/gi, '\n')
-		.replace(/<\/p>/gi, '\n\n')
-		.replace(/<[^>]+>/g, '')
+	let stripped = html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n');
+	// Tags until none is left (bounded), so a split tag cannot survive one pass.
+	let previous: string;
+	let passes = 0;
+	do {
+		previous = stripped;
+		stripped = stripped.replace(/<[^<>]+>/g, '');
+	} while (stripped !== previous && ++passes < 32);
+	const text = stripped
+		// Any `<` a capped run left that could still open a tag. Both steps run before the
+		// entities are decoded: the result is plain text, and an escaped `&lt;` in the
+		// status is meant to read as `<` (CodeQL js/incomplete-multi-character-sanitization).
+		.replace(/(?<!<)<+(?=[a-z/!?])/gi, '')
 		.replace(/&nbsp;/g, ' ')
 		.replace(/&lt;/g, '<')
 		.replace(/&gt;/g, '>')

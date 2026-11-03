@@ -4,10 +4,13 @@ import { PromptAssemblerService } from '@ever-works/agent/agents';
 import {
     APP_RUN_BRIEF_SOURCE,
     APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+    APP_WORKS_TELEMETRY_SINK,
+    AppChangeTelemetry,
     appWorkTaskToolPolicyApplies,
     describeAppChangesPaused,
     readAppWorkSwitches,
     type AppRunBriefSource,
+    type AppWorksTelemetrySink,
 } from '@ever-works/agent/app-works';
 import { config } from '@ever-works/agent/config';
 import {
@@ -57,6 +60,7 @@ import {
     type FleetAgentModelExecution,
     type FleetAgentModelResume,
     type FleetAgentTaskMcpBridge,
+    type FleetNotAdmittedCheck,
     type FleetTaskWorkspaceSpec,
     type TaskAcceptanceCheck,
 } from '@ever-works/contracts';
@@ -465,6 +469,20 @@ export { FleetAgentTaskPlanError, FleetDelegationScopeRefusedError };
  *     written. Jobs already in `fleet_jobs` before this rule shipped are
  *     not re-checked at lease time.
  */
+/**
+ * APW-08 T35 (APW08-G15) — a run's own cap in USD for the node: whole cents only, rounded DOWN
+ * (`floor(cents) / 100`), so a conversion can never raise the cap; no cap = `null`. Clamped to
+ * {@link FLEET_AGENT_EXECUTION_MAX_BUDGET_USD} (review of #3061): a Mission may allow up to
+ * 1,000,000 cents per run, but the node refuses any `maxBudgetUsd` above that maximum, so an
+ * unclamped cap above it would make every capped run fail on the node.
+ */
+export function runBudgetCapUsd(cents: unknown): number | null {
+    if (typeof cents !== 'number' || !Number.isFinite(cents) || cents <= 0) return null;
+    const usd = Math.floor(cents) / 100;
+    if (usd <= 0) return null;
+    return Math.min(usd, FLEET_AGENT_EXECUTION_MAX_BUDGET_USD);
+}
+
 @Injectable()
 export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
     private readonly logger = new Logger(FleetAgentTaskPlannerService.name);
@@ -500,7 +518,19 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         @Optional()
         @Inject(APP_RUN_BRIEF_SOURCE)
         private readonly appRunBriefs?: AppRunBriefSource,
+        // APW-08 T43 — `app.change.tool_denied` when an App Work run's MCP bridge is withheld.
+        // The API's @Global() PostHog alias; absent (unit tests), nothing is sent. Appended LAST
+        // + @Optional() per the positional-spec arity rule.
+        @Optional()
+        @Inject(APP_WORKS_TELEMETRY_SINK)
+        private readonly appWorksSink?: AppWorksTelemetrySink,
     ) {}
+
+    /** APW-08 T43 — the evolve-loop events over the App Works sanitizer (built on first use). */
+    private appChangeTelemetryInstance?: AppChangeTelemetry;
+    private get appChangeTelemetry(): AppChangeTelemetry {
+        return (this.appChangeTelemetryInstance ??= new AppChangeTelemetry(this.appWorksSink));
+    }
 
     /**
      * Instance defaults overlaid with the tenant's plugin settings. Every
@@ -835,13 +865,32 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // declares commands this Work does not admit, or a config that
         // cannot be read, fails the plan; the alternative is a run that
         // reports green having verified less than the repository asked for.
-        const repoDeclared = checksOff
+        const repoDeclared: Awaited<
+            ReturnType<TaskWorkspaceService['readFleetRepoDeclaredCommands']>
+        > = checksOff
             ? { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] }
             : await this.taskWorkspace.readFleetRepoDeclaredCommands({
                   task,
                   userId: payload.userId,
                   workspace,
               });
+        // APW-08 T13 (FR-14, ACC-08-10) — an App Work's checks the owner has
+        // not admitted. They are NOT in `acceptanceChecks`, so the node never
+        // runs them; they ride the job as ids, labels and `required` only (no
+        // command), and the reconciler folds them into the verdict the node
+        // reports (`foldNotAdmittedChecks`) — otherwise a run whose admitted
+        // checks passed would grade green while a required check never ran.
+        // Empty, and absent from the plan, for every other Work kind.
+        const notAdmittedChecks: FleetNotAdmittedCheck[] = (repoDeclared.notAdmitted ?? []).map(
+            (check) => ({ id: check.id, name: check.name, required: check.required }),
+        );
+        if (notAdmittedChecks.length > 0) {
+            this.logger.log(
+                `Task ${task.slug ?? task.id}: ${notAdmittedChecks.length} App check(s) not admitted for this Work's machines (${notAdmittedChecks
+                    .map((check) => check.id)
+                    .join(', ')}) — reported not-admitted, never executed.`,
+            );
+        }
 
         // Owner-authored entries come FIRST in both phases, and repository
         // ids carry a `repo/` prefix that owner ids cannot spell, so a
@@ -873,6 +922,22 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             this.logger.log(
                 `Task ${task.slug ?? task.id}: App Work run — the platform-MCP bridge is withheld (${APP_WORK_TOOL_POLICY_REFUSAL_CODE}).`,
             );
+            // APW-08 T43 (plan §8.1, XC-05) — the group only, never a tool name or argument. The
+            // App Work is the Task's when that is one, else the Agent's own once it is READ as one:
+            // a bridge withheld because the Agent's Work was unreadable (fail closed) names no
+            // Work (review of #3055).
+            let workId: string | null = work && isAppWorkKind(work.kind) ? work.id : null;
+            if (!workId && agent.workId) {
+                const agentWork = await this.works.findById(agent.workId).catch(() => null);
+                if (agentWork && isAppWorkKind(agentWork.kind)) workId = agent.workId;
+            }
+            if (workId) {
+                this.appChangeTelemetry.track(
+                    'app.change.tool_denied',
+                    { workId, taskId: task.id, group: 'mcp' },
+                    task.userId,
+                );
+            }
         }
         // APW-08 T18 — an App Work run's brief: the App rules at the workspace's base, and the
         // repository's instruction files fenced as untrusted content. Best-effort (`null` when
@@ -922,6 +987,15 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         if (settings.model) execution.model = settings.model;
         if (settings.effort) execution.effort = settings.effort;
         if (settings.maxBudgetUsd !== undefined) execution.maxBudgetUsd = settings.maxBudgetUsd;
+        // APW-08 T35 (FR-53, APW08-G15) — the run's own cap (a Mission-filed Task's per-run
+        // budget): cents to USD rounded DOWN, and never above the Agent's own cap.
+        const runCapUsd = runBudgetCapUsd(plannedRun?.budgetCapCents);
+        if (runCapUsd !== null) {
+            execution.maxBudgetUsd =
+                execution.maxBudgetUsd === undefined
+                    ? runCapUsd
+                    : Math.min(execution.maxBudgetUsd, runCapUsd);
+        }
         if (settings.skipPermissions) execution.skipPermissions = true;
         // Self-build slice AU — offer the session the source run left on its
         // node. Conditional key: a job with nothing to resume is the exact
@@ -950,6 +1024,9 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             workspace,
             acceptanceChecks,
             ...(setup.length > 0 ? { setup } : {}),
+            // APW-08 T13 — conditional key, like `setup`: a plan with nothing
+            // not-admitted is the exact payload it always was.
+            ...(notAdmittedChecks.length > 0 ? { notAdmittedChecks } : {}),
             git: {
                 commit: canCommit,
                 push: canCommit,

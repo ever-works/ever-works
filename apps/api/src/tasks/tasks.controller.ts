@@ -1,4 +1,14 @@
-import { normalizeRecordListView, type TaskCostView } from '@ever-works/contracts';
+import {
+    normalizeRecordListView,
+    TASK_DELIVERY_STATE_FILTERS,
+    TASK_DELIVERY_STATES,
+    type TaskCostView,
+    type TaskDeliveryEmbed,
+    type TaskDeliveryFixTaskResponse,
+    type TaskDeliveryFollowUpResponse,
+    type TaskDeliveryStateFilter,
+    type TaskDeliveryView,
+} from '@ever-works/contracts';
 import {
     BadRequestException,
     Body,
@@ -10,6 +20,7 @@ import {
     Header,
     HttpCode,
     HttpStatus,
+    Inject,
     NotFoundException,
     Optional,
     Param,
@@ -31,6 +42,7 @@ import {
     RUN_BATCH_MAX_TASKS,
     TaskPrStatusService,
     TaskBoardService,
+    TaskDeliveryService,
     type TaskActorType,
     type TaskAuthorType,
     type ListTasksFilter,
@@ -60,10 +72,11 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 import {
     AgentRepository,
     AgentRunRepository,
-    ownershipScopeOf,
+    ownershipRelationScopeOf,
     type OwnershipScope,
 } from '@ever-works/agent/database';
-import { buildTaskCostView } from './task-cost';
+import { buildTaskCostView, withTaskContainment, type TaskCostContainmentReads } from './task-cost';
+import { APP_WORK_TASK_CONTAINMENT_READER } from '@ever-works/agent/app-works';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 // Re-litigation guard (memory upgrades M6) — provided + exported by
 // `KnowledgeBaseModule`, which the api-side TasksModule imports.
@@ -100,8 +113,10 @@ import {
     AddBlockerDto,
     AddRelationDto,
     AddReviewerDto,
+    CloseTaskDeliveryDto,
     CreateTaskDto,
     RejectTaskDto,
+    RequestTaskDeliveryFollowUpDto,
     ResolveEscalationDto,
     PostTaskChatDto,
     RunTaskDto,
@@ -312,6 +327,16 @@ export class TasksController {
         // positional construction keeps compiling; absent, the view lists no runs and still
         // answers the Task's total from the usage ledger.
         @Optional() private readonly agentRuns?: AgentRunRepository,
+        // APW-08 T24 — the App Works delivery chain behind `:id/delivery*`. Appended LAST +
+        // @Optional() so every positional construction keeps compiling; absent, the read answers
+        // an untracked chain and the two writes answer 503.
+        @Optional() private readonly delivery?: TaskDeliveryService,
+        // APW-08 T48 — the containment half of `GET :id/cost`. Appended LAST + @Optional() so
+        // every positional construction keeps compiling; absent, the view carries no
+        // containment keys (as before T48). Bound by this module's isolated-run providers.
+        @Optional()
+        @Inject(APP_WORK_TASK_CONTAINMENT_READER)
+        private readonly containment?: TaskCostContainmentReads,
     ) {}
 
     /**
@@ -464,6 +489,25 @@ export class TasksController {
         required: false,
         description: "'true' also returns Tasks a trigger keeps off the board",
     })
+    @ApiQuery({
+        name: 'deliveryState',
+        required: false,
+        description:
+            "APW-08 — comma-separated App Work delivery states (merged, building, build_failed, built, deploying, deploy_failed, live, closed_without_deploy) or 'waiting' (not merged yet: an open pull request and no delivery state). OR-ed; narrows the caller's own list only.",
+    })
+    @ApiQuery({
+        name: 'includeDelivery',
+        required: false,
+        description:
+            "APW-08 — 'true' attaches each row's `delivery: { state, liveUrl, outcome, liveWithWarnings, carriedByLaterChange }`, null for a Task the delivery chain does not track",
+    })
+    @ApiQuery({
+        name: 'orderBy',
+        required: false,
+        enum: ['updatedAt', 'createdAt'],
+        description:
+            "Row order: 'updatedAt' (default) = most recently updated first; 'createdAt' = newest first. Unknown = default.",
+    })
     @HttpCode(HttpStatus.OK)
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -489,7 +533,15 @@ export class TasksController {
         @Query('includeHidden') includeHidden?: string,
         // Record visibility (EW-P1-3) — the list tab. Unknown or missing = `mine`.
         @Query('view') view?: string,
+        // APW-08 T24 — the App Work Tasks tab's Delivery filter and the board chips' embed.
+        // Appended LAST so every positional caller (specs) keeps its meaning.
+        @Query('deliveryState') deliveryState?: string,
+        @Query('includeDelivery') includeDelivery?: string,
+        // APW-08 T36 (FR-55, review of #3061) — `createdAt` = newest first, for a list whose
+        // rows agents keep updating. Appended LAST (positional specs); anything else = default.
+        @Query('orderBy') orderBy?: string,
     ) {
+        const deliveryStates = this.parseDeliveryStateList(deliveryState);
         const filter: ListTasksFilter = {
             view: normalizeRecordListView(view),
             status: this.parseStatusList(status),
@@ -504,6 +556,8 @@ export class TasksController {
             label,
             search,
             includeHidden: includeHidden === 'true',
+            ...(deliveryStates ? { deliveryState: deliveryStates } : {}),
+            ...(orderBy === 'createdAt' ? { orderBy: 'createdAt' as const } : {}),
             limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
             offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
         };
@@ -515,7 +569,69 @@ export class TasksController {
             },
             this.scopeContext.getScope(),
         );
-        return { data: rows, meta: { total, limit: filter.limit, offset: filter.offset } };
+        const data = includeDelivery === 'true' ? await this.withDeliveryEmbeds(rows) : rows;
+        return { data, meta: { total, limit: filter.limit, offset: filter.offset } };
+    }
+
+    /**
+     * APW-08 T24 — `?deliveryState=` as the filter's token list; an unknown token is a 400, like
+     * the status and priority filters. Empty (or only commas) = no filter.
+     */
+    private parseDeliveryStateList(value?: string): TaskDeliveryStateFilter[] | undefined {
+        if (!value) return undefined;
+        const parts = value
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+        const out: TaskDeliveryStateFilter[] = [];
+        for (const p of parts) {
+            if (!(TASK_DELIVERY_STATE_FILTERS as readonly string[]).includes(p)) {
+                throw new BadRequestException(`Invalid deliveryState filter: ${p}`);
+            }
+            if (!out.includes(p as TaskDeliveryStateFilter)) out.push(p as TaskDeliveryStateFilter);
+        }
+        return out.length > 0 ? out : undefined;
+    }
+
+    /**
+     * APW-08 T24 — `?includeDelivery=true`: each row gains `delivery` (null when untracked). The
+     * embed is computed from the rows `list` already owner-scoped, never from client ids. A
+     * runtime without the delivery chain — or a chain whose read failed — still answers each
+     * row's state from its own column, with no Deployment details.
+     */
+    private async withDeliveryEmbeds<
+        T extends {
+            id: string;
+            deliveryState?: string | null;
+            deliveryDeploymentId?: string | null;
+            mergeCommitSha?: string | null;
+        },
+    >(rows: T[]): Promise<Array<T & { delivery: TaskDeliveryEmbed | null }>> {
+        let embeds = new Map<string, TaskDeliveryEmbed>();
+        if (this.delivery) {
+            try {
+                embeds = await this.delivery.listEmbeds(rows);
+            } catch {
+                embeds = new Map();
+            }
+        }
+        return rows.map((row) => {
+            const state = (TASK_DELIVERY_STATES as readonly string[]).includes(
+                row.deliveryState ?? '',
+            )
+                ? (row.deliveryState as TaskDeliveryEmbed['state'])
+                : null;
+            const delivery: TaskDeliveryEmbed | null = state
+                ? (embeds.get(row.id) ?? {
+                      state,
+                      liveUrl: null,
+                      outcome: null,
+                      liveWithWarnings: false,
+                      carriedByLaterChange: false,
+                  })
+                : null;
+            return { ...row, delivery };
+        });
     }
 
     @Post()
@@ -1307,7 +1423,10 @@ export class TasksController {
             escalationId,
             auth.userId,
             id,
-            ownershipScopeOf(task),
+            // A legacy (null/null) Task can carry an escalation stamped from its Organization
+            // Agent's run; the raw stamp would match legacy rows only and 404 the resolve
+            // (#2213 `escalation-cas-legacy`). `taskId` + `userId` still bind the row.
+            ownershipRelationScopeOf(task),
             body.note ?? null,
         );
         if (!resolved) {
@@ -1575,8 +1694,98 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<TaskCostView> {
         // The same cross-account check as `:id/spend` — another account's Task is a 404.
-        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
-        return buildTaskCostView(id, { usage: this.pluginUsage, runs: this.agentRuns ?? null });
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        const view = await buildTaskCostView(id, {
+            usage: this.pluginUsage,
+            runs: this.agentRuns ?? null,
+        });
+        // APW-08 T48 / T12 — the containment the Task's latest Fleet run got and the nodes that
+        // hold its next run (App Work Tasks only; every other view is returned unchanged).
+        return withTaskContainment(
+            view,
+            { ...task, viewerUserId: auth.userId },
+            this.containment ?? null,
+        );
+    }
+
+    @Get(':id/delivery')
+    @ApiOperation({
+        summary:
+            "APW-08 — where a merged App Work change stands: merged → building → built → deploying → live (or failed / closed without deploying), with the Build, Deployment, follow-ups and the chain's timeline.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async getDelivery(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<TaskDeliveryView> {
+        // Owner-scoped like `:id/cost` — another account's Task is a 404.
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        if (!this.delivery) return untrackedDeliveryView(task.id);
+        return this.delivery.getView(task);
+    }
+
+    @Post(':id/delivery/close')
+    @ApiOperation({
+        summary:
+            "APW-08 S9/S20 — Close anyway: move the Task to Done although its change is not live. Passes the approver and blocker gates; 422 { code: 'notClosable' } unless the change is merged, built or failed.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async closeDelivery(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: CloseTaskDeliveryDto,
+    ): Promise<TaskDeliveryView> {
+        // Review of #3030 — accepting a change as not live is a person's decision, like resolving
+        // an escalation: no API key, automation or fleet run may make it.
+        requireHumanSession(auth, 'close a change without deploying it');
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        if (!this.delivery) {
+            throw new ServiceUnavailableException('The delivery chain is not available.');
+        }
+        return this.delivery.closeWithoutDeploy(auth.userId, task, body?.note ?? null);
+    }
+
+    @Post(':id/delivery/follow-up')
+    @ApiOperation({
+        summary:
+            "APW-08 S22 — Try once more: consume the Task's open delivery-failed Inbox item and open one more follow-up Task. Every refusal is 422 { code: 'followUpLimit' }.",
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async requestDeliveryFollowUp(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: RequestTaskDeliveryFollowUpDto,
+    ): Promise<TaskDeliveryFollowUpResponse> {
+        // Review of #3030 — "Try once more" answers an Inbox item (an escalation): a human gate.
+        requireHumanSession(auth, 'try a failed change once more');
+        const scope = this.scopeContext.getScope();
+        const task = await this.service.getOne(auth.userId, id, scope);
+        if (!this.delivery) {
+            throw new ServiceUnavailableException('The delivery chain is not available.');
+        }
+        return this.delivery.requestFollowUp(auth.userId, task, body.escalationId, scope);
+    }
+
+    @Post(':id/delivery/fix-task')
+    @ApiOperation({
+        summary:
+            "APW-08 T27 — Create a fix Task: file the follow-up Task for this change's current failed Build or Deployment (the same Task the automatic follow-up files, one per failure; `created: false` answers the one already filed). Starts its Agent like the automatic follow-up. Every refusal is 422 { code: 'fixTaskUnavailable' }.",
+    })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async createDeliveryFixTask(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<TaskDeliveryFixTaskResponse> {
+        // Filing a fix Task can start a paid agent run: a person's decision, like Try once more.
+        requireHumanSession(auth, 'create a fix Task for a failed change');
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        if (!this.delivery) {
+            throw new ServiceUnavailableException('The delivery chain is not available.');
+        }
+        return this.delivery.createFixTask(auth.userId, task);
     }
 
     @Post(':id/chat')
@@ -1629,4 +1838,21 @@ export class TasksController {
             scope,
         );
     }
+}
+
+/** APW-08 — the chain of a Task the delivery chain does not track (or a runtime without it). */
+function untrackedDeliveryView(taskId: string): TaskDeliveryView {
+    return {
+        taskId,
+        state: null,
+        mergeCommitSha: null,
+        pullRequest: null,
+        build: null,
+        deployment: null,
+        liveUrl: null,
+        liveWithWarnings: false,
+        carriedByLaterChange: false,
+        followUps: [],
+        history: [],
+    };
 }

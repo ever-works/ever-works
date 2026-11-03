@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { NotFoundException } from '@nestjs/common';
 
 /**
  * Reviewer agent stage (slice AD, EW-811) — the chat-reply worker executes a
@@ -87,6 +88,8 @@ describe('agentChatReplyTask — a claimed row runs under its OWN admission scop
     let registeredConfig: TaskConfig;
     let runs: any;
     let runner: any;
+    let agents: any;
+    let tasks: any;
 
     beforeAll(async () => {
         vi.resetModules();
@@ -96,7 +99,7 @@ describe('agentChatReplyTask — a claimed row runs under its OWN admission scop
 
     beforeEach(() => {
         vi.clearAllMocks();
-        const agents = {
+        agents = {
             findByIdAndUser: vi.fn().mockResolvedValue({ id: AGENT_ID, userId: OWNER }),
         };
         runs = {
@@ -108,7 +111,7 @@ describe('agentChatReplyTask — a claimed row runs under its OWN admission scop
             markFailed: vi.fn().mockResolvedValue(undefined),
         };
         runner = { execute: vi.fn().mockResolvedValue({ status: 'dispatched' }) };
-        const tasks = { getOne: vi.fn().mockResolvedValue(null) };
+        tasks = { getOne: vi.fn().mockResolvedValue(null) };
         const chat = {
             list: vi
                 .fn()
@@ -163,5 +166,54 @@ describe('agentChatReplyTask — a claimed row runs under its OWN admission scop
         expect(runner.execute).toHaveBeenCalledTimes(1);
         expect(runner.execute.mock.calls[0][0].runId).toBe('run-chat-1');
         expect(runner.execute.mock.calls[0][0]).not.toHaveProperty('delegationScope');
+    });
+
+    // #2213 `trigger-agentrun-stamp`: a Trigger worker has no request ALS, so the fallback row
+    // must carry its ownership explicitly — the Task stamp first, the Agent stamp for a legacy Task.
+    const ORG_SCOPE = {
+        tenantId: '55555555-5555-4555-8555-555555555555',
+        organizationId: '66666666-6666-4666-8666-666666666666',
+    };
+
+    it('stamps a fallback run from its Organization Task', async () => {
+        tasks.getOne.mockResolvedValue({ id: TASK_ID, userId: OWNER, ...ORG_SCOPE });
+
+        await registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } });
+
+        expect(runs.createQueued).toHaveBeenCalledWith(expect.objectContaining(ORG_SCOPE));
+    });
+
+    it('stamps a fallback run on a legacy Task from the Agent', async () => {
+        tasks.getOne.mockResolvedValue({
+            id: TASK_ID,
+            userId: OWNER,
+            tenantId: null,
+            organizationId: null,
+        });
+        agents.findByIdAndUser.mockResolvedValue({ id: AGENT_ID, userId: OWNER, ...ORG_SCOPE });
+
+        await registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } });
+
+        expect(runs.createQueued).toHaveBeenCalledWith(expect.objectContaining(ORG_SCOPE));
+    });
+
+    it('creates no run when the Task is confirmed missing', async () => {
+        tasks.getOne.mockRejectedValue(new NotFoundException('Task not found'));
+
+        const result = await registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } });
+
+        expect(result).toMatchObject({ status: 'skipped', reason: 'task-not-found' });
+        expect(runs.createQueued).not.toHaveBeenCalled();
+        expect(runner.execute).not.toHaveBeenCalled();
+    });
+
+    it('does not fall back to the Agent stamp when the Task lookup fails for another reason', async () => {
+        tasks.getOne.mockRejectedValue(new Error('database unavailable'));
+        agents.findByIdAndUser.mockResolvedValue({ id: AGENT_ID, userId: OWNER, ...ORG_SCOPE });
+
+        await expect(
+            registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } }),
+        ).rejects.toThrow('database unavailable');
+        expect(runs.createQueued).not.toHaveBeenCalled();
     });
 });

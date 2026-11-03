@@ -1,7 +1,13 @@
 import { ConflictException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { ResourceNotFoundError, VersionMismatchError } from '@ever-works/agent/integrations-api';
 import { IntegrationHttpException } from '../../../auth/integration/integration-http.exception';
-import { IntegrationInboxController } from '../inbox.controller';
+import {
+    IntegrationCreateInboxItemDto,
+    IntegrationInboxController,
+    IntegrationUpdateInboxItemDto,
+} from '../inbox.controller';
 
 /**
  * The Inbox of `/api/integrations/v1` (EW-P3-1) over doubles of the services:
@@ -59,6 +65,20 @@ describe('IntegrationInboxController', () => {
             // `decisions:individual` (or `merges:decide`).
             decisionScopeOf: jest.fn().mockResolvedValue(null),
             recordRelayedDecision: jest.fn().mockResolvedValue(true),
+            // Integration inbox push.
+            createExternal: jest.fn(async () => ({
+                item: {
+                    dto: dto(1, { origin: 'integration' }),
+                    etag: '"1"',
+                    recipientUserId: RECIPIENT,
+                },
+                created: true,
+            })),
+            updateExternal: jest.fn(async () => ({
+                dto: dto(3, { origin: 'integration' }),
+                etag: '"3"',
+                recipientUserId: RECIPIENT,
+            })),
         };
         const items = {
             reply: jest.fn(async () => {
@@ -115,7 +135,7 @@ describe('IntegrationInboxController', () => {
 
     it('refuses an unknown status / kind and a non-UUID recipient (400 validation_failed)', async () => {
         const { controller } = setup();
-        for (const query of [{ status: 'closed' }, { kind: 'email' }, { recipientUserId: 'ada' }]) {
+        for (const query of [{ status: 'closed' }, { kind: 'memo' }, { recipientUserId: 'ada' }]) {
             await expect(controller.list(query)).rejects.toMatchObject({
                 code: 'validation_failed',
             });
@@ -421,5 +441,254 @@ describe('IntegrationInboxController', () => {
             controller.state(as(RECIPIENT), 'item-1', { unread: false }, '"7"', res()),
         ).rejects.toBeInstanceOf(VersionMismatchError);
         expect(items.setUnread).not.toHaveBeenCalled();
+    });
+
+    // ── integration inbox push (CR-15) ────────────────────────────────
+
+    const createBody = {
+        externalId: 'gauzy-1',
+        recipientUserId: RECIPIENT,
+        kind: 'notice',
+        title: 'Timesheet approved',
+        sourceUrl: 'https://app.gauzy.co/#/pages/inbox/1',
+    };
+    const createReq = (key?: string) => ({
+        method: 'POST',
+        originalUrl: '/api/integrations/v1/inbox/items',
+        body: createBody,
+        headers: key ? { 'idempotency-key': key } : {},
+    });
+
+    it('files the key’s own item in the pinned organization: 201 + ETag, the key as the writer', async () => {
+        const { controller, inbox, idempotency } = setup();
+        const response = res();
+        const body = await controller.create(as(null), createBody, createReq(), response);
+        expect(inbox.createExternal).toHaveBeenCalledWith(
+            {
+                organizationId: ORG,
+                tenantId: 'tenant-1',
+                integrationKeyId: 'key-1',
+                defaultSourceLabel: 'Ever Gauzy',
+            },
+            expect.objectContaining({
+                externalId: 'gauzy-1',
+                recipientUserId: RECIPIENT,
+                kind: 'notice',
+            }),
+        );
+        expect(response.status).toHaveBeenCalledWith(201);
+        expect(response.setHeader).toHaveBeenCalledWith('ETag', '"1"');
+        expect(body).toMatchObject({ id: 'item-1', origin: 'integration' });
+        expect(idempotency.run).not.toHaveBeenCalled();
+    });
+
+    it('a replayed externalId answers 200 with the existing item; an Idempotency-Key goes through the replay store', async () => {
+        const { controller, inbox, idempotency } = setup();
+        inbox.createExternal.mockResolvedValueOnce({
+            item: { dto: dto(4), etag: '"4"', recipientUserId: RECIPIENT },
+            created: false,
+        });
+        const replay = res();
+        await expect(
+            controller.create(as(null), createBody, createReq(), replay),
+        ).resolves.toMatchObject({
+            version: 4,
+        });
+        expect(replay.status).toHaveBeenCalledWith(200);
+
+        const keyed = res();
+        await controller.create(as(null), createBody, createReq('idem-7'), keyed);
+        expect(idempotency.run).toHaveBeenCalledWith(
+            expect.objectContaining({ integrationKeyId: 'key-1', idempotencyKey: 'idem-7' }),
+            expect.any(Function),
+        );
+        expect(keyed.status).toHaveBeenCalledWith(201);
+    });
+
+    it('linking a related record needs the scope that reads it (403 scope_missing, nothing filed)', async () => {
+        const { controller, inbox } = setup();
+        const TASK = '3c7e5f90-1b4d-4e6f-8a82-9c0d1e2f3a41';
+        const body = { ...createBody, related: { taskId: TASK, goalId: TASK } };
+        const refused = await controller.create(as(null), body, createReq(), res()).then(
+            () => null,
+            (error: unknown) => error,
+        );
+        expect(refused).toBeInstanceOf(IntegrationHttpException);
+        expect((refused as IntegrationHttpException).getStatus()).toBe(403);
+        expect((refused as IntegrationHttpException).getResponse()).toMatchObject({
+            error: {
+                code: 'scope_missing',
+                details: { missing: ['tasks:read', 'goals:read'] },
+            },
+        });
+        expect(inbox.createExternal).not.toHaveBeenCalled();
+        // With the read scopes the link is the service's to check (422 if foreign).
+        await controller.create(as(null, ['tasks:read', 'goals:read']), body, createReq(), res());
+        expect(inbox.createExternal).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ related: { taskId: TASK, goalId: TASK } }),
+        );
+    });
+
+    it('a generic key’s items default to the key name as their badge', async () => {
+        const { controller, inbox } = setup();
+        const generic = {
+            userId: 'owner-1',
+            authMethod: 'integration',
+            integration: { ...principal(null), integrationKind: 'generic', keyName: 'Acme Sync' },
+        } as never;
+        await controller.create(generic, createBody, createReq(), res());
+        expect(inbox.createExternal).toHaveBeenCalledWith(
+            expect.objectContaining({ defaultSourceLabel: 'Acme Sync' }),
+            expect.anything(),
+        );
+    });
+
+    it('PATCH needs If-Match (400 without it) and passes the version and only the sent fields', async () => {
+        const { controller, inbox } = setup();
+        for (const ifMatch of [undefined, '*', '']) {
+            await expect(
+                controller.update(as(null), 'item-1', { title: 'x' }, ifMatch, res()),
+            ).rejects.toMatchObject({ code: 'validation_failed' });
+        }
+        await expect(
+            controller.update(as(null), 'item-1', { title: 'x' }, 'not-a-version', res()),
+        ).rejects.toMatchObject({ code: 'validation_failed' });
+        expect(inbox.updateExternal).not.toHaveBeenCalled();
+
+        const response = res();
+        const body = await controller.update(
+            as(null),
+            'item-1',
+            { state: 'resolved', resolution: { choiceId: 'yes' } },
+            '"2"',
+            response,
+        );
+        expect(inbox.updateExternal).toHaveBeenCalledWith(
+            expect.objectContaining({ organizationId: ORG, integrationKeyId: 'key-1' }),
+            'item-1',
+            2,
+            { state: 'resolved', resolution: { choiceId: 'yes' } },
+        );
+        expect(body).toMatchObject({ version: 3 });
+        expect(response.setHeader).toHaveBeenCalledWith('ETag', '"3"');
+    });
+
+    it('a stale If-Match (412) and someone else’s item (404) pass through from the service', async () => {
+        const { controller, inbox } = setup();
+        inbox.updateExternal.mockRejectedValueOnce(new VersionMismatchError(2, 5));
+        await expect(
+            controller.update(as(null), 'item-1', { title: 'x' }, '"2"', res()),
+        ).rejects.toBeInstanceOf(VersionMismatchError);
+        inbox.updateExternal.mockRejectedValueOnce(
+            new ResourceNotFoundError('inbox_item', 'item-1'),
+        );
+        await expect(
+            controller.update(as(null), 'item-1', { title: 'x' }, '"2"', res()),
+        ).rejects.toBeInstanceOf(ResourceNotFoundError);
+    });
+});
+
+/**
+ * The create / update bodies under the global ValidationPipe's rules
+ * (`whitelist` + `forbidNonWhitelisted` + `transform`): each refusal is a
+ * gate that answers `400 validation_failed` before the route runs.
+ */
+describe('integration inbox push request bodies', () => {
+    const RECIPIENT = '2b6d4e8f-0a3c-4d5e-9f71-8b9c0d1e2f30';
+    const valid = {
+        externalId: 'gauzy-1',
+        recipientUserId: RECIPIENT,
+        kind: 'question',
+        title: 'Approve the leave request?',
+        body: '**Ada** asked for 3 days off.',
+        sourceUrl: 'https://app.gauzy.co/#/pages/inbox/1',
+        sourceLabel: 'Ever Gauzy',
+        related: { taskId: '3c7e5f90-1b4d-4e6f-8a82-9c0d1e2f3a41' },
+        choices: [
+            { id: 'yes', label: 'Approve' },
+            { id: 'no', label: 'Decline' },
+        ],
+        occurredAt: '2026-10-28T09:00:00.000Z',
+    };
+    const errorsOf = async (cls: new () => object, body: Record<string, unknown>) =>
+        validate(plainToInstance(cls, body), { whitelist: true, forbidNonWhitelisted: true });
+    const properties = async (cls: new () => object, body: Record<string, unknown>) =>
+        (await errorsOf(cls, body)).map((error) => error.property);
+
+    it('accepts a full create body and a full email body', async () => {
+        expect(await errorsOf(IntegrationCreateInboxItemDto, valid)).toEqual([]);
+        expect(
+            await errorsOf(IntegrationCreateInboxItemDto, {
+                ...valid,
+                kind: 'email',
+                choices: undefined,
+                email: {
+                    from: 'Billing <billing@example.com>',
+                    to: 'ada@example.com',
+                    subject: 'Invoice #42',
+                    receivedAt: '2026-10-28T09:00:00Z',
+                },
+            }),
+        ).toEqual([]);
+    });
+
+    it('GATE http sourceUrl: refuses http, javascript:, data:, relative and credentialed URLs', async () => {
+        for (const sourceUrl of [
+            'http://app.gauzy.co/inbox/1',
+            'javascript:alert(1)',
+            'data:text/html,<b>x</b>',
+            '/pages/inbox/1',
+            'https://user:pass@app.gauzy.co/',
+            `https://app.gauzy.co/${'a'.repeat(2000)}`,
+        ]) {
+            expect([
+                sourceUrl,
+                await properties(IntegrationCreateInboxItemDto, { ...valid, sourceUrl }),
+            ]).toEqual([sourceUrl, ['sourceUrl']]);
+        }
+    });
+
+    it('GATE oversize body: 20 000 characters pass, 20 001 are refused', async () => {
+        expect(
+            await properties(IntegrationCreateInboxItemDto, { ...valid, body: 'x'.repeat(20_000) }),
+        ).toEqual([]);
+        expect(
+            await properties(IntegrationCreateInboxItemDto, { ...valid, body: 'x'.repeat(20_001) }),
+        ).toEqual(['body']);
+        expect(
+            await properties(IntegrationUpdateInboxItemDto, { body: 'x'.repeat(20_001) }),
+        ).toEqual(['body']);
+    });
+
+    it('refuses the other caps, an unknown kind or property, and a bad nested value', async () => {
+        const cases: Array<[Record<string, unknown>, string]> = [
+            [{ externalId: 'x'.repeat(129) }, 'externalId'],
+            [{ externalId: '' }, 'externalId'],
+            [{ recipientUserId: 'ada' }, 'recipientUserId'],
+            [{ kind: 'escalation' }, 'kind'],
+            [{ title: 'x'.repeat(301) }, 'title'],
+            [{ sourceLabel: 'x'.repeat(81) }, 'sourceLabel'],
+            [{ occurredAt: 'yesterday' }, 'occurredAt'],
+            [{ related: { taskId: 'not-a-uuid' } }, 'related'],
+            [{ related: { projectId: '3c7e5f90-1b4d-4e6f-8a82-9c0d1e2f3a41' } }, 'related'],
+            [
+                { choices: Array.from({ length: 11 }, (_, i) => ({ id: `c${i}`, label: 'C' })) },
+                'choices',
+            ],
+            [{ choices: [{ id: 'x'.repeat(65), label: 'A' }] }, 'choices'],
+            [{ email: { from: 'a@b.c', subject: 'S', receivedAt: 'soon' } }, 'email'],
+            [{ html: '<script>alert(1)</script>' }, 'html'],
+        ];
+        for (const [patch, property] of cases) {
+            expect([
+                patch,
+                await properties(IntegrationCreateInboxItemDto, { ...valid, ...patch }),
+            ]).toEqual([patch, [property]]);
+        }
+        expect(await properties(IntegrationUpdateInboxItemDto, { state: 'closed' })).toEqual([
+            'state',
+        ]);
+        expect(await properties(IntegrationUpdateInboxItemDto, { title: null })).toEqual(['title']);
     });
 });

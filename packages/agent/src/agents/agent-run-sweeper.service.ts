@@ -12,6 +12,8 @@ import {
     QUEUED_REASON_KILL_SWITCH,
     RunDispatchGateService,
 } from './run-dispatch-gate.service';
+import { QUEUED_REASON_APP_CHANGES_PAUSED, QUEUED_REASON_WORK_BUDGET } from './run-admission-chain';
+import { readAppWorkSwitches } from '../app-works/app-work-switches';
 import { AgentEscalationService } from './agent-escalation.service';
 import { NotificationService } from '../notifications/notification.service';
 import type { AgentRun } from '../entities/agent-run.entity';
@@ -136,6 +138,24 @@ export class AgentRunSweeperService {
             return { ...empty, enabled: false };
         }
 
+        // APW-08 T56 (FR-66, FR-73) — release App Work runs parked on a spent budget, every tick;
+        // T49 (R-30) — and App Work runs parked while the operator had changes off, once the
+        // switch is on again ("turning it back on resumes"). Best-effort and bounded. AFTER the
+        // stuck scan (review of #3053): a promoted run keeps its original `createdAt` and has no
+        // `startedAt` until its worker starts, so a scan in the same tick would reap it as stuck.
+        try {
+            return await this.reapStuck(cutoffMinutes, empty);
+        } finally {
+            await this.releaseWorkBudgetWaits();
+            await this.releaseAppChangesWaits();
+        }
+    }
+
+    /** The stuck scan and its bookkeeping (split out so the releases above run after it). */
+    private async reapStuck(
+        cutoffMinutes: number,
+        empty: AgentRunSweepSummary,
+    ): Promise<AgentRunSweepSummary> {
         const limit = config.agents.getRunStuckSweepBatch();
         const now = Date.now();
         const cutoff = new Date(now - cutoffMinutes * 60_000);
@@ -152,10 +172,16 @@ export class AgentRunSweeperService {
         // further down.
         // Fleet usage limits — a fleet run parked until its node's model CLI
         // resets (possibly days: a weekly limit) is waiting, not stuck.
+        // APW-08 T56 (FR-66, FR-73) — and so is an App Work run parked because
+        // its Work's budget is spent: it waits for a new period or a person's
+        // raised cap, and reaping it would turn a wait into a failure.
         const scanned = await this.runs.findStuckNonTerminal(cutoff, limit, [
             QUEUED_REASON_KILL_SWITCH,
             QUEUED_REASON_AGENT_PAUSED,
             FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
+            QUEUED_REASON_WORK_BUDGET,
+            // APW-08 T49 — an App Work run parked by the operator's change switch waits for it.
+            QUEUED_REASON_APP_CHANGES_PAUSED,
         ]);
         // Run steering (Wave 4 M5) — THE hard rule of this plan: a run parked
         // on a human question must NEVER be reaped by a TTL sweep. It is not
@@ -178,7 +204,9 @@ export class AgentRunSweeperService {
                     row.status === 'queued' &&
                     (row.queuedReason === QUEUED_REASON_KILL_SWITCH ||
                         row.queuedReason === QUEUED_REASON_AGENT_PAUSED ||
-                        row.queuedReason === FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON)
+                        row.queuedReason === FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON ||
+                        row.queuedReason === QUEUED_REASON_WORK_BUDGET ||
+                        row.queuedReason === QUEUED_REASON_APP_CHANGES_PAUSED)
                 ),
         );
         const skippedHeld = notAwaiting.length - stuck.length;
@@ -283,6 +311,61 @@ export class AgentRunSweeperService {
             oldestAgeMs,
             byKind,
         };
+    }
+
+    /**
+     * APW-08 T56 (XC-19, FR-66, FR-73) — release App Work runs parked
+     * `work-budget` once their Work's budget allows them again.
+     *
+     * Nothing else drains that reason: a budget opens up when a new period
+     * starts, or when a person raises or removes the cap, and neither is an
+     * event a run can wait on. So every sweeper tick re-asks the gate for each
+     * Work that has such a run (`promoteParked`, oldest first, bounded). The
+     * gate RE-ADMITS through the same chain: a Work whose budget is still
+     * spent answers `work-budget` again and its run stays parked (one budget
+     * read per such Work per tick); one that is allowed goes out through the
+     * same claim / dispatch / rollback path every other release uses.
+     *
+     * Best-effort by contract, like every other sweeper step: it never throws
+     * and never fails the tick. A gate without `promoteParked` (a partial
+     * double in a unit spec) is skipped.
+     */
+    /**
+     * APW-08 T49 (XC-10, FR-74, R-30) — release App Work runs parked `app-changes-paused` once
+     * `EVER_WORKS_APP_CHANGES_ENABLED` is on again. While it is off this reads and releases
+     * NOTHING (the switch is checked first): a released run would only start a change the
+     * operator stopped. Once on, the gate re-admits each through its ordinary chain — which does
+     * not know the switch, hence the check here — and the run goes out through the same claim /
+     * dispatch / rollback path every release uses (and, if the switch flips off again in between,
+     * the worker's own `switch_off` check still refuses it before any model call).
+     *
+     * Best-effort like every sweeper step: never throws, never fails the tick.
+     */
+    async releaseAppChangesWaits(): Promise<void> {
+        if (!readAppWorkSwitches().changesEnabled) return;
+        if (!this.dispatchGate || typeof this.dispatchGate.promoteParked !== 'function') return;
+        try {
+            await this.dispatchGate.promoteParked(QUEUED_REASON_APP_CHANGES_PAUSED);
+        } catch (error) {
+            this.logger.warn(
+                `AgentRun sweep: releasing runs parked by the App changes switch failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    async releaseWorkBudgetWaits(): Promise<void> {
+        if (!this.dispatchGate || typeof this.dispatchGate.promoteParked !== 'function') return;
+        try {
+            await this.dispatchGate.promoteParked(QUEUED_REASON_WORK_BUDGET);
+        } catch (error) {
+            this.logger.warn(
+                `AgentRun sweep: releasing runs parked on a Work budget failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**

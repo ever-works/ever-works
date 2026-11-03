@@ -15,7 +15,11 @@ import {
     sanitizeLikePattern,
 } from '../utils';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
-import type { RecordListView } from '@ever-works/contracts';
+import {
+    TASK_DELIVERY_FILTER_WAITING,
+    type RecordListView,
+    type TaskDeliveryStateFilter,
+} from '@ever-works/contracts';
 import type { RecordAccessContext } from '../../record-visibility/record-access.types';
 import { visibleToPredicate } from '../../record-visibility/visible-to';
 
@@ -45,6 +49,14 @@ export interface ListTasksFilter {
     label?: string;
     search?: string;
     /**
+     * APW-08 T24 — the App Work Tasks tab's **Delivery** filter: rows whose `deliveryState` is one
+     * of these, OR-ed. The token `'waiting'` (`TASK_DELIVERY_FILTER_WAITING`) is a change that is
+     * not merged yet: no delivery state and an open or draft pull request. Omitted or empty = no
+     * predicate, today's behaviour. Applied after the owner / visibility predicate like every
+     * other filter, so it only ever narrows.
+     */
+    deliveryState?: TaskDeliveryStateFilter[];
+    /**
      * Include Tasks flagged `hiddenFromBoard` (trigger-spawned work the
      * owning trigger chose to keep off the board). Omitted/false =
      * hidden rows are excluded, which is what the board and every
@@ -72,8 +84,11 @@ export interface ListTasksFilter {
      *   - `'stalledThenPriority'` — stalled `in_progress` Tasks first (see
      *     `stallCutoff`), then priority, then oldest update first. The
      *     Task board's order.
+     *   - `'createdAt'` — newest first (`createdAt DESC`): a list whose rows agents keep
+     *     updating, so `updatedAt` paging would skip or repeat rows (APW-08 FR-55, the
+     *     Mission's "Tasks on attached Works").
      */
-    orderBy?: 'updatedAt' | 'priorityThenUpdated' | 'stalledThenPriority';
+    orderBy?: 'updatedAt' | 'priorityThenUpdated' | 'stalledThenPriority' | 'createdAt';
     /**
      * Only read with `orderBy: 'stalledThenPriority'`: an `in_progress` Task
      * with nothing running whose `updatedAt` is before this instant sorts
@@ -297,6 +312,27 @@ export class TaskRepository {
         if (filter.isRecurring !== undefined) {
             qb.andWhere('task.isRecurring = :isRecurring', { isRecurring: filter.isRecurring });
         }
+        if (filter.deliveryState && filter.deliveryState.length > 0) {
+            const states = filter.deliveryState.filter(
+                (token) => token !== TASK_DELIVERY_FILTER_WAITING,
+            );
+            const waiting = filter.deliveryState.includes(TASK_DELIVERY_FILTER_WAITING);
+            // The tokens are OR-ed inside one parenthesised predicate, which is AND-ed with
+            // every other filter (and with the owner / visibility predicate before them).
+            const branches: string[] = [];
+            const params: Record<string, unknown> = {};
+            if (states.length > 0) {
+                branches.push('task.deliveryState IN (:...deliveryStates)');
+                params.deliveryStates = states;
+            }
+            if (waiting) {
+                branches.push(
+                    '(task.deliveryState IS NULL AND task.prState IN (:...waitingPrStates))',
+                );
+                params.waitingPrStates = ['open', 'draft'];
+            }
+            qb.andWhere(`(${branches.join(' OR ')})`, params);
+        }
         if (filter.terminalUpdatedSince) {
             qb.andWhere(
                 new Brackets((windowQb) => {
@@ -423,6 +459,9 @@ export class TaskRepository {
                 qb.addOrderBy('task.updatedAt', 'ASC');
                 return;
             }
+            case 'createdAt':
+                qb.orderBy('task.createdAt', 'DESC');
+                return;
             case 'updatedAt':
             case undefined:
             default:
@@ -1095,6 +1134,29 @@ export class TaskRepository {
             .set({ ciAutoResumeNoticedAt: at })
             .where('id = :taskId', { taskId })
             .andWhere('ciAutoResumeNoticedAt IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * APW-08 T16 — release the stop marker {@link casMarkCiAutoResumeNoticed}
+     * claimed. Used only for an App Work Task whose owner unblocked it after
+     * raising the Work's gate-attempt budget
+     * (`TaskAppChecksService.reopenAfterUnblock`).
+     *
+     * `IS NOT NULL` rather than an equality on the timestamp the caller read:
+     * timestamp equality does not survive every driver's round trip, and it
+     * buys nothing here — the marker is only ever SET from NULL, so while it
+     * is non-null it is still the stop the caller saw. Two sweeps clearing
+     * the same marker both succeed, harmlessly.
+     */
+    async casClearCiAutoResumeNoticed(taskId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ ciAutoResumeNoticedAt: null })
+            .where('id = :taskId', { taskId })
+            .andWhere('ciAutoResumeNoticedAt IS NOT NULL')
             .execute();
         return (result.affected ?? 0) > 0;
     }

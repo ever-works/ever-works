@@ -90,8 +90,24 @@ import type {
     AppDependencyProvisionPayload,
     // APW-03 T13 — the payload of the job APW-02 T28 wires below.
     AppSpecEvaluatePayload,
+    AppBuildPreparePayload,
+    AppBuildWatchPayload,
     PluginOperationPayload,
 } from '@ever-works/agent/tasks';
+// C-8 — the App jobs' payloads, TYPE-only: the task modules themselves are the
+// worker's graph, which this factory must not pull in (see `TASK_IDS`).
+import type {
+    AppBlueprintApplyJobPayload,
+    AppForkReadinessJobPayload,
+    AppUpstreamSyncJobPayload,
+} from '@ever-works/agent/app-works';
+import type { AppDeployTaskPayload } from '../tasks/trigger/app-deploy.task';
+import type { AppClusterOpTaskPayload } from '../tasks/trigger/app-cluster-op.task';
+import { config } from '@ever-works/agent/config';
+import {
+    appBlueprintApplyIdempotencyKey,
+    appUpstreamSyncIdempotencyKey,
+} from './app-job-idempotency-keys';
 // T26 / EW-742 P3 — read inside `dispatchPluginOperation`, never at module
 // scope: several specs replace `@ever-works/agent/tasks` with a partial mock
 // that does not carry them, and a top-level read would fail the whole file.
@@ -132,10 +148,43 @@ const TASK_IDS = {
     // APW-03 T13 — must match the `app-spec-evaluate` task's own `id`. Wired by
     // APW-02 T28 so the same dispatch works for a BYO Trigger.dev tenant.
     appSpecEvaluate: 'app-spec-evaluate',
+    // C-8 — the rest of `TriggerService`'s App dispatchers. Each must match its
+    // task module's exported `*_TASK_ID` (`app-fork-readiness.task.ts`,
+    // `app-build-prepare.task.ts`, …): a BYO tenant's bound view reads its
+    // dispatchers from THIS map only, so one missing here answered `undefined`
+    // and the App job never left the API for that tenant.
+    appForkReadiness: 'app-fork-readiness',
+    appBuildPrepare: 'app-build-prepare',
+    appBuildWatch: 'app-build-watch',
+    appDeploy: 'app-deploy',
+    appClusterOp: 'app-cluster-op',
+    appUpstreamSync: 'app-upstream-sync',
+    appBlueprintApply: 'app-blueprint-apply',
     // `run-plugin-operation` is not listed: its id is the shared
     // `PLUGIN_OPERATION_TASK_ID` constant (the router, the dispatchers and the
     // task registration all import it), read in `dispatchPluginOperation`.
 } as const;
+
+/**
+ * `APP_CLUSTER_OP_VERIFICATION_MAX_DURATION` (`app-cluster-op.task.ts`): the
+ * `verification-deploy` op's 3 600 s budget, set at trigger time. Re-typed for
+ * the same reason the ids are.
+ */
+const APP_CLUSTER_OP_VERIFICATION_MAX_DURATION_SECONDS = 3600;
+
+/**
+ * `TriggerService.dispatchAppDeploy` / `dispatchAppClusterOp`'s second refusal,
+ * kept for the BYO mirrors: in production, nothing that dials an owner's
+ * cluster is enqueued without `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true`.
+ * Fails CLOSED on a missing accessor, as the singleton does. (The first
+ * refusal, "no job runtime", cannot apply: a tenant client exists.)
+ */
+function appClusterDispatchRefused(): boolean {
+    return (
+        process.env.NODE_ENV === 'production' &&
+        config.everWorks?.apps?.isClusterWorkerIsolated?.() !== true
+    );
+}
 
 /**
  * Build a `TriggerClient` (the structural `{ tasks, runs }` interface
@@ -478,6 +527,119 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                 );
             }
             return handle.id;
+        },
+
+        /*
+         * C-8 — the remaining App dispatchers, for a BYO Trigger.dev tenant:
+         * mirrors of the singleton `TriggerService.dispatchAppXxx` (same task
+         * ids, tags, `concurrencyKey`s, `idempotencyKey`s and delays; no
+         * `machine`, like the other BYO dispatchers). All are SOFT, as the
+         * singleton's are: `null` is each caller's documented deferral (the
+         * readiness sweeper, the in-process Build runners, Deploy's
+         * `dispatched: false`, the in-process Blueprint apply), never a throw.
+         */
+
+        async dispatchAppForkReadiness(
+            payload: AppForkReadinessJobPayload,
+        ): Promise<string | null> {
+            return softDispatch(() =>
+                client.tasks.trigger(TASK_IDS.appForkReadiness, payload, {
+                    tags: [
+                        'app-fork-readiness',
+                        `work:${payload.workId}`,
+                        `trigger:${payload.reason ?? 'initial'}`,
+                    ],
+                    concurrencyKey: `app-fork-readiness:${payload.workId}`,
+                }),
+            );
+        },
+
+        async dispatchAppBuildPrepare(payload: AppBuildPreparePayload): Promise<string | null> {
+            return softDispatch(() =>
+                client.tasks.trigger(TASK_IDS.appBuildPrepare, payload, {
+                    tags: [
+                        'app-build-prepare',
+                        `work:${payload.workId}`,
+                        // Absent on the coalesced dispatch, which carries no Build.
+                        ...(payload.buildId ? [`build:${payload.buildId}`] : []),
+                    ],
+                    concurrencyKey: `app-build-prepare:${payload.workId}`,
+                }),
+            );
+        },
+
+        async dispatchAppBuildWatch(payload: AppBuildWatchPayload): Promise<string | null> {
+            return softDispatch(() =>
+                client.tasks.trigger(TASK_IDS.appBuildWatch, payload, {
+                    tags: ['app-build-watch', `build:${payload.buildId}`],
+                    concurrencyKey: `app-build-watch:${payload.buildId}`,
+                }),
+            );
+        },
+
+        /** Per-WORK `concurrencyKey`, as the singleton's: two Deployments of one App Work never roll out at once. */
+        async dispatchAppDeploy(
+            payload: AppDeployTaskPayload,
+            opts: { delayMs?: number } = {},
+        ): Promise<string | null> {
+            if (appClusterDispatchRefused()) {
+                return null;
+            }
+            const delayMs = typeof opts.delayMs === 'number' && opts.delayMs > 0 ? opts.delayMs : 0;
+            return softDispatch(() =>
+                client.tasks.trigger(TASK_IDS.appDeploy, payload, {
+                    tags: [
+                        'app-deploy',
+                        `work:${payload.workId}`,
+                        `deployment:${payload.deploymentId}`,
+                        ...(payload.trigger ? [`trigger:${payload.trigger}`] : []),
+                    ],
+                    concurrencyKey: `app-deploy:${payload.workId}`,
+                    ...(delayMs > 0 ? { delay: new Date(Date.now() + delayMs) } : {}),
+                } as TriggerTaskOptions),
+            );
+        },
+
+        async dispatchAppClusterOp(
+            payload: AppClusterOpTaskPayload,
+            opts: { delayMs?: number } = {},
+        ): Promise<string | null> {
+            if (appClusterDispatchRefused()) {
+                return null;
+            }
+            const delayMs = typeof opts.delayMs === 'number' && opts.delayMs > 0 ? opts.delayMs : 0;
+            return softDispatch(() =>
+                client.tasks.trigger(TASK_IDS.appClusterOp, payload, {
+                    tags: ['app-cluster-op', `work:${payload.workId}`, `op:${payload.op}`],
+                    ...(payload.op === 'verification-deploy'
+                        ? { maxDuration: APP_CLUSTER_OP_VERIFICATION_MAX_DURATION_SECONDS }
+                        : {}),
+                    ...(delayMs > 0 ? { delay: new Date(Date.now() + delayMs) } : {}),
+                } as TriggerTaskOptions),
+            );
+        },
+
+        async dispatchAppUpstreamSync(payload: AppUpstreamSyncJobPayload): Promise<string | null> {
+            const trigger = payload.trigger ?? 'schedule';
+            return softDispatch(() =>
+                client.tasks.trigger(TASK_IDS.appUpstreamSync, payload, {
+                    tags: ['app-upstream-sync', `work:${payload.workId}`, `trigger:${trigger}`],
+                    idempotencyKey: appUpstreamSyncIdempotencyKey(payload.workId, trigger),
+                    concurrencyKey: `app-upstream-sync:${payload.workId}`,
+                } as TriggerTaskOptions),
+            );
+        },
+
+        async dispatchAppBlueprintApply(
+            payload: AppBlueprintApplyJobPayload,
+        ): Promise<string | null> {
+            return softDispatch(() =>
+                client.tasks.trigger(TASK_IDS.appBlueprintApply, payload, {
+                    tags: ['app-blueprint-apply', `work:${payload.workId}`, `mode:${payload.mode}`],
+                    idempotencyKey: appBlueprintApplyIdempotencyKey(payload),
+                    concurrencyKey: `app-blueprint-apply:${payload.workId}`,
+                } as TriggerTaskOptions),
+            );
         },
 
         /**

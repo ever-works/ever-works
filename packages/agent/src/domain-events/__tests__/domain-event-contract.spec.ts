@@ -133,6 +133,8 @@ describe('integration contract v1 (published schemas)', () => {
             ['member-invite-result.json', 'resources/member-invite-result.schema.json'],
             ['organization.json', 'resources/organization.schema.json'],
             ['inbox-item.json', 'resources/inbox-item.schema.json'],
+            // CR-15 — an item an integration filed (the integration inbox push).
+            ['inbox-item.integration.json', 'resources/inbox-item.schema.json'],
             ['email-message.json', 'resources/email-message.schema.json'],
             ['email-inbound-result.json', 'resources/email-inbound-result.schema.json'],
             ['inbox-reply-result.json', 'resources/inbox-reply-result.schema.json'],

@@ -20,6 +20,9 @@ const TYPE_COLORS: Record<string, string> = {
     app_fork: 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300',
     app_actions: 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300',
     app_upstream: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300',
+    // APW-08 (CONTRACTS §6) — an App Work change's delivery chain (`app.change.*`: merged,
+    // progressed, live, failed, closed, follow-up opened). `blue` with the deployments it ends in.
+    app_change: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
     work_created: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
     work_updated: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300',
     work_deleted: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
@@ -67,6 +70,8 @@ const TYPE_TO_I18N: Record<string, string> = {
     app_fork: 'appFork',
     app_actions: 'appActions',
     app_upstream: 'appUpstream',
+    // APW-08 T27 — without this the row reads the raw wire value "app change" in every locale.
+    app_change: 'appChange',
     work_created: 'workCreated',
     work_updated: 'workUpdated',
     work_deleted: 'workDeleted',

@@ -446,7 +446,11 @@ the table is corrected in the same PR (resolution R-38, and [TRACKER](./TRACKER.
    toolchain**. The containment a run reports covers the **model step only** and is environment construction, not
    a filesystem or egress boundary; the owner's per-check admission (APW-08 FR-14, the EW-807 allow-list) is the
    control there, and an App Work run is admitted to a Fleet node only when its reported containment includes the
-   isolated home and carries no downgrade affecting the workspace it will read.
+   isolated home and carries no downgrade affecting the workspace it will read. **As built (APW-08 T12 / T48,
+   2026-10-30):** a node's latest reported containment decides — a downgrade, or no readable report, holds the
+   run (`needs_input`) until the owner allows that node once on that App Work (withdrawable, never implied for
+   another node or Work); the record each Fleet run got is stored on the run and shown on the Task's Cost view,
+   and the run brief tells the Agent that setup steps and checks run with the machine's real home.
 10. **Public-repository hygiene.** This repository is public: no competitor names
     (`docs/internal/launch-parity-backlog.md`), no infrastructure addresses, hostnames of internal systems
     or unfixed security findings, and no undisclosed third-party vulnerability details. Those live in the

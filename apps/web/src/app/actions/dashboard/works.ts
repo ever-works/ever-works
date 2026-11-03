@@ -23,6 +23,7 @@ import type {
     TaskAcceptanceCheck,
     WorkChecksPolicy,
     WorkExternalRefs,
+    WorkRepoDeclaredCommandPolicy,
     AppDeployTargetChoice,
     AppSourceCreatedView,
     AppSourceInspectResponse,
@@ -35,6 +36,9 @@ import {
     INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS,
     WORK_EXTERNAL_REFS_MAX_PER_KIND,
     WORK_EXTERNAL_REF_KINDS,
+    WORK_REPO_DECLARED_COMMAND_MAX_ALLOW,
+    WORK_REPO_DECLARED_COMMAND_MAX_LENGTH,
+    normalizeWorkRepoDeclaredCommandPolicy,
 } from '@ever-works/contracts';
 // Security: server actions are reachable as POST endpoints via the
 // `Next-Action` header, so every exported action must independently verify
@@ -1859,6 +1863,46 @@ export async function updateQualityGatesSettings(
             error:
                 error instanceof Error ? error.message : 'Failed to update quality gates settings',
         };
+    }
+}
+
+/**
+ * APW-08 T14 (lane L9) — the Work's repository-declared-command allow-list
+ * (EW-807), written by the App checks admission card's **Admit for my
+ * machines**. Same `PATCH /works/:id` UpdateWorkDto path as the sibling
+ * settings cards; the API normalizes the policy again
+ * (`normalizeWorkRepoDeclaredCommandPolicy`), so this is a shape check that
+ * keeps an obviously-invalid payload in the browser, never the authority.
+ */
+export async function updateRepoDeclaredCommands(
+    workId: string,
+    policy: WorkRepoDeclaredCommandPolicy,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const policySchema = z.object({
+        mode: z.enum(['off', 'allowlist']),
+        allow: z
+            .array(z.string().min(1).max(WORK_REPO_DECLARED_COMMAND_MAX_LENGTH))
+            .max(WORK_REPO_DECLARED_COMMAND_MAX_ALLOW),
+    });
+
+    try {
+        const validation = policySchema.safeParse(policy, ZOD3_ERROR_MESSAGES);
+        if (!validation.success) {
+            return { success: false, error: validation.error.issues[0].message };
+        }
+        const response = await workAPI.update(workId, {
+            repoDeclaredCommands: normalizeWorkRepoDeclaredCommandPolicy(validation.data),
+        });
+        revalidatePath(`/works/${workId}/settings`);
+        return { success: response.status === 'success' };
+    } catch (error) {
+        console.error('Failed to update repository-declared commands:', error);
+        return { success: false, error: 'Failed to update the admitted commands' };
     }
 }
 

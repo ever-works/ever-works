@@ -17,6 +17,7 @@ import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import { PluginRegistryService, loadPluginSchema } from './plugin-registry.service';
 import { PluginEvents } from '../plugins.constants';
 import { PluginSecretEncService } from './plugin-secret-enc.service';
+import { PluginPlatformSettingsService } from './plugin-platform-settings.service';
 import {
     SettingsSchemaValidatorService,
     type SettingsScope as ValidatorSettingsScope,
@@ -71,6 +72,9 @@ export class PluginSettingsService {
         // PluginSettingsService directly keep working. Module DI provides it.
         @Optional()
         private readonly secretEnc?: PluginSecretEncService,
+        // Optional for the same reason; without it no plugin has Ever Platform values.
+        @Optional()
+        private readonly platformSettings?: PluginPlatformSettingsService,
     ) {}
 
     /**
@@ -107,7 +111,8 @@ export class PluginSettingsService {
      * 2. User settings
      * 3. Admin settings
      * 4. Environment variables
-     * 5. Plugin defaults
+     * 5. Values Ever Platform handed the installation ({@link PluginPlatformSettingsService})
+     * 6. Plugin defaults
      *
      * EW-742 P1 — the spec adds a `tenant` tier between `user` and
      * `admin (global)` in the cascade (see
@@ -200,14 +205,21 @@ export class PluginSettingsService {
                 : {};
         }
 
+        const operatorSources = {
+            work: { ...workSettings, ...workSecrets },
+            user: { ...userSettings, ...userSecrets },
+            admin: { ...adminSettings, ...adminSecrets },
+        };
+        const platform = this.platformOfferUnlessConfigured(
+            definitions,
+            this.platformSettings ? await this.platformSettings.read(pluginId) : {},
+            operatorSources,
+            effectiveOptions,
+        );
         for (const def of definitions) {
             resolved[def.key] = this.resolveSetting(
                 def,
-                {
-                    work: { ...workSettings, ...workSecrets },
-                    user: { ...userSettings, ...userSecrets },
-                    admin: { ...adminSettings, ...adminSecrets },
-                },
+                { ...operatorSources, platform },
                 effectiveOptions,
             );
         }
@@ -685,12 +697,13 @@ export class PluginSettingsService {
             work: Record<string, unknown>;
             user: Record<string, unknown>;
             admin: Record<string, unknown>;
+            platform?: Readonly<Record<string, unknown>>;
         },
         options?: SettingsResolutionOptions,
     ): ResolvedSetting {
         const { key, envVar, defaultValue, scope: settingScope } = definition;
 
-        // Resolution order based on priority (work > user > admin > env > default)
+        // Resolution order based on priority (work > user > admin > env > platform > default)
         // isFallback indicates when a value comes from a scope that doesn't match the setting's intended scope
 
         // 1. Work settings (if workId provided)
@@ -712,6 +725,7 @@ export class PluginSettingsService {
         sources: {
             user: Record<string, unknown>;
             admin: Record<string, unknown>;
+            platform?: Readonly<Record<string, unknown>>;
         },
         options?: SettingsResolutionOptions,
     ): ResolvedSetting {
@@ -741,15 +755,34 @@ export class PluginSettingsService {
 
         // 4. Environment variable
         if (envVar && process.env[envVar] !== undefined) {
+            const value = this.parseEnvValue(process.env[envVar]!, definition);
+            // C-14 (#34) — an operator env value is held to its property schema like a stored
+            // one (item limits, patterns, enums: `EVER_ID_ALLOWED_ISSUERS` had no item limit and
+            // `issuerUrl`'s pattern never ran). An invalid value is IGNORED, so the setting
+            // falls back to its default — fail-closed — rather than reaching the plugin.
+            if (this.envValueConforms(definition, value)) {
+                return {
+                    key,
+                    value,
+                    source: 'env',
+                    isFallback: true,
+                };
+            }
+        }
+
+        // 5. What Ever Platform handed this installation (see PluginPlatformSettingsService):
+        // below every value an operator set, held to the property schema like an env value.
+        const platformValue = sources.platform?.[key];
+        if (platformValue !== undefined && this.platformValueConforms(definition, platformValue)) {
             return {
                 key,
-                value: this.parseEnvValue(process.env[envVar]!, definition),
-                source: 'env',
+                value: platformValue,
+                source: 'platform',
                 isFallback: true,
             };
         }
 
-        // 5. Default value
+        // 6. Default value
         return {
             key,
             value: defaultValue,
@@ -831,6 +864,77 @@ export class PluginSettingsService {
         if (scope === 'user' && !userId) {
             throw new BadRequestException('userId required for user scope');
         }
+    }
+
+    /** Env vars already reported as invalid — one warning per variable per process. */
+    private readonly rejectedEnvVars = new Set<string>();
+
+    /**
+     * Whether an env-bound value satisfies its own property schema (C-14).
+     *
+     * Secrets (`x-secret`) are not judged: a BYOK fallback key whose schema is stricter than the
+     * key itself would otherwise be dropped silently and the provider stop working. Without a
+     * validator (direct construction in tests) nothing is judged, as before.
+     *
+     * The warning names the variable and the schema errors, never the value.
+     */
+    private envValueConforms(definition: SettingDefinition, value: unknown): boolean {
+        if (!this.settingsValidator || definition.secret) return true;
+        const result = this.settingsValidator.validateSettings(
+            { [definition.key]: value },
+            { type: 'object', properties: { [definition.key]: definition.schema } } as JsonSchema,
+            definition.scope,
+        );
+        if (result.valid) return true;
+        const envVar = definition.envVar ?? definition.key;
+        if (!this.rejectedEnvVars.has(envVar)) {
+            this.rejectedEnvVars.add(envVar);
+            this.logger.warn(
+                `Ignoring ${envVar}: it does not match the "${definition.key}" setting's schema ` +
+                    `(${result.errors.join('; ')}); the setting falls back to its default.`,
+            );
+        }
+        return false;
+    }
+
+    /**
+     * The values Ever Platform handed over are one set (for Ever ID: issuer,
+     * client id and client secret of ONE client), so they are used whole or not
+     * at all. Once any of those keys resolves from an operator's level (work,
+     * user, admin or its environment variable), the whole set is dropped: resolving
+     * field by field would send the platform's secret to the operator's issuer.
+     */
+    private platformOfferUnlessConfigured(
+        definitions: SettingDefinition[],
+        offer: Readonly<Record<string, unknown>>,
+        sources: {
+            work: Record<string, unknown>;
+            user: Record<string, unknown>;
+            admin: Record<string, unknown>;
+        },
+        options: SettingsResolutionOptions | undefined,
+    ): Readonly<Record<string, unknown>> {
+        const offered = definitions.filter((def) => offer[def.key] !== undefined);
+        if (offered.length === 0) return offer;
+        // "Set by an operator" = what the cascade would actually use without
+        // this level, so a value the plugin's configurationMode ignores (an
+        // admin-only plugin's stored secret, a user value) does not count.
+        const configured = offered.some(
+            (def) =>
+                this.resolveSetting(def, { ...sources, platform: {} }, options).source !==
+                'default',
+        );
+        return configured ? {} : offer;
+    }
+
+    /** {@link envValueConforms} for a value Ever Platform handed over: refused silently. */
+    private platformValueConforms(definition: SettingDefinition, value: unknown): boolean {
+        if (!this.settingsValidator || definition.secret) return true;
+        return this.settingsValidator.validateSettings(
+            { [definition.key]: value },
+            { type: 'object', properties: { [definition.key]: definition.schema } } as JsonSchema,
+            definition.scope,
+        ).valid;
     }
 
     /**

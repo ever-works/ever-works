@@ -112,7 +112,17 @@ export function TiptapEditor({
     const editor = useEditor({
         immediatelyRender: false,
         extensions: [
-            StarterKit,
+            // Tiptap 3's StarterKit also bundles Link, Underline, TrailingNode and ListKeymap.
+            // Link is configured on its own below (a second `link` would be a duplicate), and the
+            // other three stay off to keep the v2 behaviour: TrailingNode would add an empty
+            // paragraph after a closing heading or list that the v2 editor never added (a document
+            // change, so an autosave), and markdown has no underline.
+            StarterKit.configure({
+                link: false,
+                underline: false,
+                trailingNode: false,
+                listKeymap: false,
+            }),
             Link.configure({
                 openOnClick: false,
                 HTMLAttributes: { rel: 'noopener noreferrer' },
@@ -155,10 +165,10 @@ export function TiptapEditor({
         const next = initialBody ?? (isBodyDto(document) ? document.body : '');
         autosave.reset(next);
         if (editor) {
-            // Tiptap v2's `setContent` second arg is `emitUpdate: boolean`.
-            // Pass `false` so the document swap doesn't fire the autosave
-            // listener we just reset above.
-            editor.commands.setContent(next, false);
+            // `emitUpdate: false` so the document swap doesn't fire the
+            // autosave listener we just reset above (Tiptap 3 takes an
+            // options object; v2 took a bare boolean).
+            editor.commands.setContent(next, { emitUpdate: false });
         }
     }, [document, initialBody, editor, autosave]);
 
@@ -250,7 +260,7 @@ function isBodyDto(document: KbDocumentDto | KbDocumentBodyDto): document is KbD
 }
 
 function readMarkdown(editor: Editor): string | undefined {
-    const storage = editor.storage as Record<string, { getMarkdown?: () => string }>;
+    const storage = editor.storage as unknown as Record<string, { getMarkdown?: () => string }>;
     return storage.markdown?.getMarkdown?.();
 }
 

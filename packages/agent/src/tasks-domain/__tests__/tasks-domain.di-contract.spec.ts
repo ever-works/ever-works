@@ -3,6 +3,9 @@ import 'reflect-metadata';
 import { AppSpecService } from '../../app-spec/app-spec.service';
 import { AppWorkChangeGateService } from '../../app-works/app-work-change-gate.service';
 import { AppWorkRulesService } from '../../app-works/app-work-rules.service';
+import { AppWorkIsolationService } from '../../app-works/app-work-isolation.service';
+import { AppWorkSpecAppliedListener } from '../../app-works/app-spec-applied.listener';
+import { AppWorkIsolationBackfillRunner } from '../../app-works/app-work-isolation-backfill.runner';
 import { APP_WORK_CHANGE_GATE } from '../app-work-change-gate.port';
 import { TaskWorkspaceService } from '../task-workspace.service';
 import { TasksDomainModule } from '../tasks.module';
@@ -121,6 +124,31 @@ describe('TasksDomainModule — the App Works providers can reach what they inje
     it('exports the gate, so the agent git tools can ask the same one', () => {
         const exported = (Reflect.getMetadata('exports', TasksDomainModule) ?? []) as unknown[];
         expect(exported).toContain(APP_WORK_CHANGE_GATE);
+    });
+
+    // APW-08 T11 / T50 — the App Work Task columns kept in step with the App spec. Every
+    // collaborator of all three is `@Optional()` (or required and provided here), which is
+    // exactly the shape whose unreachable dependency degrades silently: an unreachable
+    // `AppSpecService` would resolve no spec branch, an unreachable `GitFacadeService` no
+    // repository default, and an unreachable `NotificationService` would ask nobody.
+    it('AppWorkIsolationService, its listener and T50 runner are provided, with every parameter reachable', () => {
+        const tokens = providers.map(asToken);
+        for (const Service of [
+            AppWorkIsolationService,
+            AppWorkSpecAppliedListener,
+            AppWorkIsolationBackfillRunner,
+        ]) {
+            expect(tokens).toContain(Service);
+            expect({ service: Service.name, unreachable: unreachableParams(Service) }).toEqual({
+                service: Service.name,
+                unreachable: [],
+            });
+        }
+    });
+
+    it('exports the T50 runner, so the API can publish it to the backfill task', () => {
+        const exported = (Reflect.getMetadata('exports', TasksDomainModule) ?? []) as unknown[];
+        expect(exported).toContain(AppWorkIsolationBackfillRunner);
     });
 
     it('TaskWorkspaceService — every class-typed parameter is reachable', () => {

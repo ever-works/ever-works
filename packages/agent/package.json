@@ -320,7 +320,7 @@
     },
     "scripts": {
         "dev": "concurrently \"pnpm build:dev\" \"pnpm build:types:dev\"",
-        "build": "nest build -b swc && tsc -p tsconfig.types.json",
+        "build": "nest build -b swc && node scripts/strip-dist-specs.mjs && tsc -p tsconfig.types.json",
         "type-check": "tsc -p tsconfig.json --noEmit",
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
@@ -382,7 +382,7 @@
     },
     "dependencies": {
         "@ai-sdk/openai-compatible": "^2.0.87",
-        "@ever-co/connect-sdk": "1.0.0-rc.7",
+        "@ever-co/connect-sdk": "1.0.0-rc.8",
         "@ever-works/agent-plugins": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
@@ -407,7 +407,7 @@
         "jszip": "^3.10.1",
         "lodash": "^4.18.1",
         "mammoth": "^1.8.0",
-        "minimatch": "10.2.6",
+        "minimatch": "11.0.1",
         "p-map": "^7.0.4",
         "pacote": "^21.5.1",
         "papaparse": "^5.5.3",

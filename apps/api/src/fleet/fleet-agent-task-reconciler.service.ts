@@ -19,8 +19,13 @@ import {
     FleetNodeRepository,
 } from '@ever-works/agent/fleet';
 import { INBOX_PRODUCER, type InboxProducer } from '@ever-works/agent/inbox';
+import {
+    APP_WORK_RUN_CONTAINMENT_RECORDER,
+    type AppWorkRunContainmentRecorder,
+} from '@ever-works/agent/app-works';
 import { PluginUsageService } from '@ever-works/agent/usage';
 import {
+    foldNotAdmittedChecks,
     TaskChatService,
     TaskRepository,
     TaskRunDenormService,
@@ -162,6 +167,12 @@ export class FleetAgentTaskReconcilerService {
         // @Optional() per the positional-construction rule (handover §5.2):
         // absent, a fleet run simply has no timeline, as before the slice.
         @Optional() private readonly runLogs?: AgentRunLogRepository,
+        // APW-08 T48 (FR-70) — records what an App Work run's containment was, beside the
+        // receipt. Appended LAST and @Optional() per the positional-construction rule: absent,
+        // nothing is recorded, exactly as before T48.
+        @Optional()
+        @Inject(APP_WORK_RUN_CONTAINMENT_RECORDER)
+        private readonly containmentRecorder?: AppWorkRunContainmentRecorder,
     ) {}
 
     /**
@@ -368,7 +379,15 @@ export class FleetAgentTaskReconcilerService {
             return;
         }
 
-        const result = parseAgentTaskResult(event.result);
+        // APW-08 T13 (FR-14, ACC-08-10) — the node graded only what it ran.
+        // An App Work's not-admitted checks were frozen onto the JOB by the
+        // planner (never the node's report, which a node cannot forge into
+        // this list), and are folded in here, once, before any reader below:
+        // the run row, the finalize gate and the run message all see one
+        // verdict, and a required not-admitted check keeps it from being
+        // green. A job without the field is returned untouched.
+        const parsed = parseAgentTaskResult(event.result);
+        const result = parsed ? foldNotAdmittedChecks(parsed, plannedNotAdmitted(event.job)) : null;
         const task = await this.tasks.findById(ctx.taskId);
         const agentId = ctx.agentId ?? run.agentId;
 
@@ -398,6 +417,9 @@ export class FleetAgentTaskReconcilerService {
         // the usage row exists when the terminal CAS settles it, whichever
         // of markCompleted / markFailed / tryMarkCompleted that is.
         await this.accountModelSpend(event, ctx, run, task, agentId, result);
+        // APW-08 T48 — the containment record rides the run, written right after the receipt
+        // (for every verdict below, a question included). App Work Tasks only.
+        await this.recordRunContainment(event, ctx);
 
         // Self-build slice Q — the model asked the owner a question. Taken
         // for ANY status / gate verdict / git error, BEFORE the success-
@@ -518,8 +540,9 @@ export class FleetAgentTaskReconcilerService {
         const agent = agentId ? await this.agents.findById(agentId).catch(() => null) : null;
         let primaryPrUrl: string | null = null;
         if (task && result.git && result.git.pushed && !result.git.empty) {
-            const checksPassed =
-                result.gateStatus === 'green' && result.checks ? result.checks.length : 0;
+            // Rows that PASSED, never rows that merely exist: a not-admitted App
+            // check (APW-08 T13) or an advisory red sits under a green gate too.
+            const checksPassed = result.gateStatus === 'green' ? greenCheckCount(result) : 0;
             try {
                 const outcome = await this.taskWorkspace.finalizeRemotePush({
                     task,
@@ -1282,6 +1305,53 @@ export class FleetAgentTaskReconcilerService {
     }
 
     /**
+     * APW-08 T48 (FR-70, ACC-08-34) — hand the node's RAW containment block to the recorder,
+     * which normalizes it (`normalizeFleetAgentTaskContainment`, toward LESS containment) and
+     * writes `agent_runs.containment`. Asked ONLY for a job whose platform-written payload names
+     * its App Work (`appWorkId`, stamped by the fleet-aware dispatcher once isolated-run
+     * admission admitted the run), so a non-App completion reads nothing more (review of #3040).
+     * The recorder never throws into the reconcile. The record is what the Task's Cost view shows;
+     * a node's latest report also decides its next App Work lease.
+     *
+     * Not yet: T46's run-stop classifier (`classifyAppWorkRunStop`) does not exist on `develop`,
+     * so a downgrade reported by a run that was admitted (an allowed node) is recorded, not
+     * classified; the next lease is judged on it.
+     */
+    private async recordRunContainment(
+        event: FleetJobCompletedEvent,
+        ctx: FleetAgentTaskCorrelation,
+    ): Promise<void> {
+        if (!this.containmentRecorder) return;
+        const workId = (event.job.payload as { appWorkId?: unknown } | null | undefined)?.appWorkId;
+        if (typeof workId !== 'string' || workId.length === 0) return;
+        const raw = event.result?.containment;
+        if (raw === undefined || raw === null) return;
+        // APW-08 T51 (FR-61, S36) — a check on this run whose tool was missing on the node (the
+        // node marks exit 127 / 9009 `reason: 'missingTool'`): recorded on the run, with the node,
+        // so the lease passes that node over for this Task (`IsolatedRunAdmissionService`).
+        const checks = (event.result as { checks?: unknown } | null | undefined)?.checks;
+        const missingTool =
+            Array.isArray(checks) &&
+            checks.some(
+                (check) =>
+                    !!check &&
+                    typeof check === 'object' &&
+                    (check as { reason?: unknown }).reason === 'missingTool',
+            );
+        await this.bestEffort('containment record', () =>
+            this.containmentRecorder!.recordRunContainment({
+                taskId: ctx.taskId,
+                runId: ctx.runId,
+                userId: event.userId,
+                workId,
+                nodeId: event.nodeId,
+                rawContainment: raw,
+                ...(missingTool ? { missingTool: true } : {}),
+            }),
+        );
+    }
+
+    /**
      * Self-build slice AP — append the node's step records to the run's
      * `agent_run_logs` timeline, in the shape the cloud capture writes (see
      * `fleet-run-evidence.ts`).
@@ -1613,6 +1683,11 @@ function isCheckResult(value: unknown): value is TaskCheckResult {
     );
 }
 
+/** How many reported check rows actually passed (`status: 'green'`). */
+function greenCheckCount(result: FleetAgentTaskResult): number {
+    return (result.checks ?? []).filter((check) => check?.status === 'green').length;
+}
+
 function toGateStatus(value: unknown): GateStatus {
     return value === 'green' || value === 'red' || value === 'skipped' || value === 'none'
         ? value
@@ -1643,6 +1718,24 @@ function reportedPush(result: FleetAgentTaskResult | null | undefined): string |
     const git = result?.git;
     if (!git || !git.pushed || git.empty) return null;
     return typeof git.branch === 'string' && git.branch.trim() ? git.branch.trim() : null;
+}
+
+/**
+ * APW-08 T13 — the not-admitted App checks the PLANNER put on this job
+ * (`payload.notAdmittedChecks`), shape-checked: an entry without a string id
+ * is dropped, and `required` is anything but an explicit `false` (a check
+ * that cannot be read as advisory keeps the gate from grading green).
+ */
+function plannedNotAdmitted(job: FleetJobView): Array<{ id: string; required: boolean }> {
+    const payload = job.payload as Partial<FleetAgentTaskPayload> | null | undefined;
+    // Read as unknown: the job row is JSON, whatever its type says.
+    const raw: unknown = payload?.notAdmittedChecks;
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((entry: unknown) => {
+        if (!entry || typeof entry !== 'object') return [];
+        const { id, required } = entry as { id?: unknown; required?: unknown };
+        return typeof id === 'string' ? [{ id, required: required !== false }] : [];
+    });
 }
 
 /**
@@ -1701,8 +1794,16 @@ function composeSuccessMessage(
             `Model spend reported by the CLI: $${result.model.costUsd.toFixed(2)}${result.model.turns ? ` over ${result.model.turns} turn(s)` : ''}.`,
         );
     }
-    if (result.gateStatus === 'green' && result.checks?.length) {
-        lines.push(`Acceptance checks: all ${result.checks.length} green.`);
+    const green = greenCheckCount(result);
+    if (result.gateStatus === 'green' && green > 0) {
+        // APW-08 T13 — "all N green" only when every row IS green; a not-admitted
+        // or advisory row under a green gate is counted, never called green.
+        const total = result.checks?.length ?? 0;
+        lines.push(
+            green === total
+                ? `Acceptance checks: all ${total} green.`
+                : `Acceptance checks: ${green} of ${total} green.`,
+        );
     }
     return lines.join('\n');
 }

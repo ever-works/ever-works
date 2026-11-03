@@ -392,6 +392,49 @@ describe('normalizeGitHubCheck', () => {
             expect(normalized?.signal).toMatchObject({ prNumbers: [42], headBranch: TASK_BRANCH });
         });
 
+        // APW-08 T16 — the per-leg delivery carries each same-repository pull request's BASE, so
+        // the fix loop reads an App Work's advisory legs at the PR's real base (as the sweep does).
+        it('check_run: carries the base each same-repository pull request merges into; a suite never does', () => {
+            const run = normalizeGitHubCheck(
+                'check_run',
+                checkRunBody({
+                    check_run: {
+                        pull_requests: [
+                            {
+                                ...SAME_REPO_PR_42,
+                                base: { ...SAME_REPO_PR_42.base, ref: 'release' },
+                            },
+                        ],
+                    },
+                }) as never,
+            );
+            expect(run?.signal.prBaseRefs).toEqual([{ number: 42, baseRef: 'release' }]);
+            // Unchanged beside it.
+            expect(run?.signal.prHeads).toEqual([{ number: 42, headSha: HEAD }]);
+
+            const noPulls = normalizeGitHubCheck(
+                'check_run',
+                checkRunBody({ check_run: { pull_requests: [] } }) as never,
+            );
+            expect(noPulls?.signal).not.toHaveProperty('prBaseRefs');
+
+            const suite = normalizeGitHubCheck('check_suite', {
+                action: 'completed',
+                repository: { id: 7, full_name: 'octo/site' },
+                check_suite: {
+                    id: 9,
+                    status: 'completed',
+                    conclusion: 'failure',
+                    head_sha: HEAD,
+                    head_branch: TASK_BRANCH,
+                    updated_at: '2026-09-06T10:06:00Z',
+                    app: { slug: 'github-actions' },
+                    pull_requests: [SAME_REPO_PR_42],
+                },
+            } as never);
+            expect(suite?.signal).not.toHaveProperty('prBaseRefs');
+        });
+
         it('check_suite: the branch needs the same proof', () => {
             const suite = (pullRequests: unknown[]) =>
                 normalizeGitHubCheck('check_suite', {

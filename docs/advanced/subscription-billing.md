@@ -17,14 +17,15 @@ account under the `ever_works_*` lookup-key convention
 
 ## The three things Ever Works sells
 
-| What        | Shape                                                                                                                                                                                                                                                                                                                                                                                                                                                | Where priced                                   |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| **Plans**   | Free / Pro $49 / Enterprise $499 per month on cloud (annual $408 / $4,188), 90-day free trial on the cloud paid plans (one per account and per organization; Free-plan credits during the trial, the plan's monthly credits from the first paid period; reminder email 7 and 3 days before it ends); self-hosted Pro $49/mo, $408/yr or a $99 one-time perpetual licence; Enterprise Edition $499/mo, $4,188/yr (self-hosted is charged at purchase) | catalog + `subscription_plans` seed            |
-| **Seats**   | 15 on Free, 25 on Pro, 50 on Enterprise (Option 2, counted tenant-wide); +$5 (Pro) / +$10 (Enterprise) per additional seat per month. A seat is an employee OR an agent                                                                                                                                                                                                                                                                              | catalog seat prices                            |
-| **Credits** | 1 credit = 1¢ of platform-billed AI usage. Daily allowance 50 on every plan; monthly allowance 3,000 (Pro) / 25,000 (Enterprise) expiring at each allowance-month end; prepaid packs $10/1,000 · $50/5,500 · $200/25,000 (never expire); pay-as-you-go beyond the balance, opt-in, metered and billed in arrears                                                                                                                                     | `credit-packs.ts` + the catalog `payg` section |
+| What        | Shape                                                                                                                                                                                                                                                                                                                                                                                                                                              | Where priced                                   |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Plans**   | Free / Pro $49 / Unlimited $499 per month on cloud (annual $408 / $4,188), 90-day free trial on the cloud paid plans (one per account and per organization; Free-plan credits during the trial, the plan's monthly credits from the first paid period; reminder email 7 and 3 days before it ends); self-hosted Pro $49/mo, $408/yr or a $99 one-time perpetual licence; Unlimited Edition $499/mo, $4,188/yr (self-hosted is charged at purchase) | catalog + `subscription_plans` seed            |
+| **Seats**   | 15 on Free, 25 on Pro, 50 on Unlimited (Option 2, counted tenant-wide); +$5 (Pro) / +$10 (Unlimited) per additional seat per month. A seat is an employee OR an agent                                                                                                                                                                                                                                                                              | catalog seat prices                            |
+| **Credits** | 1 credit = 1¢ of platform-billed AI usage. Daily allowance 50 on every plan; monthly allowance 3,000 (Pro) / 25,000 (Unlimited) expiring at each allowance-month end; prepaid packs $10/1,000 · $50/5,500 · $200/25,000 (never expire); pay-as-you-go beyond the balance, opt-in, metered and billed in arrears                                                                                                                                    | `credit-packs.ts` + the catalog `payg` section |
 
 Plan codes are identities (`free` / `standard` / `premium`) and never change;
-`standard` is displayed as "Pro" and `premium` as "Enterprise".
+`standard` is displayed as "Pro" and `premium` as "Unlimited" (labelled "Enterprise" until the
+owner's pricing rules of 2026-11-01; the label changed, the code and the Stripe lookup keys did not).
 
 ## Credits pipeline
 
@@ -56,9 +57,9 @@ Plan codes are identities (`free` / `standard` / `premium`) and never change;
 ## Seats
 
 A seat is an **employee OR an agent** — interchangeable, which is the point of
-the product. Free includes 15, Pro 25 and Enterprise 50 (Option 2), since the
+the product. Free includes 15, Pro 25 and Unlimited 50 (Option 2), since the
 2026-10-05 repricing; extras are billed per seat per month from the catalog
-($5 Pro / $10 Enterprise).
+($5 Pro / $10 Unlimited).
 
 - **Counted tenant-wide.** Access in Ever Works is tenant-wide, so somebody
   who belongs to three Organizations in one Tenant occupies ONE seat, and an

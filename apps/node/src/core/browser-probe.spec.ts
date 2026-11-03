@@ -27,6 +27,11 @@ describe('browserCandidates', () => {
 		expect(windows).toContain('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
 	});
 
+	it('drops trailing backslashes from a Windows root before joining', () => {
+		const windows = browserCandidates('win32', { LOCALAPPDATA: 'D:\\Apps\\\\\\' });
+		expect(windows).toContain('D:\\Apps\\Google\\Chrome\\Application\\chrome.exe');
+	});
+
 	it('falls back to conventional Windows roots when the env is empty', () => {
 		const windows = browserCandidates('win32', {});
 		expect(windows.some((path) => path.startsWith('C:\\Program Files'))).toBe(true);

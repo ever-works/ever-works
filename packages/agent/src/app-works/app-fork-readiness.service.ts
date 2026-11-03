@@ -28,6 +28,7 @@ import {
     type AppReadinessAttempt,
     type AppReadinessProbe,
 } from './app-upstream-state.service';
+import { APP_UPSTREAM_TELEMETRY_EVENTS, AppUpstreamTelemetry } from './app-upstream.telemetry';
 
 /**
  * APW-02 T24 — the readiness run (plan §6.2, spec FR-17…FR-24a, ACC-02-04…06).
@@ -197,6 +198,9 @@ export class AppForkReadinessService {
         @Optional()
         @Inject(APP_PROVISION_EVENTS_PORT)
         private readonly provisionEvents?: AppProvisionEventsPort,
+        // APW-02 T39 (Gauzy Ever Works #37) - `app_fork.readiness_finished`. Appended LAST
+        // and `@Optional()`: absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppUpstreamTelemetry,
     ) {}
 
     /**
@@ -205,6 +209,23 @@ export class AppForkReadinessService {
      * exists for.
      */
     async run(
+        payload: AppForkReadinessJobPayload,
+        deps: AppForkReadinessDeps,
+    ): Promise<AppForkReadinessRunResult> {
+        const result = await this.runAttempt(payload, deps);
+        // APW-02 T39 - one readiness attempt, by its outcome code and counters (plan 9.1).
+        this.telemetry?.track(APP_UPSTREAM_TELEMETRY_EVENTS.readinessFinished, {
+            attempt: result.attempt,
+            outcome: result.outcome,
+            ...(result.reason ? { reason: result.reason } : {}),
+            durationMs: result.elapsedMs,
+            probes: result.probes,
+            hygieneRan: Boolean(result.hygiene),
+        });
+        return result;
+    }
+
+    private async runAttempt(
         payload: AppForkReadinessJobPayload,
         deps: AppForkReadinessDeps,
     ): Promise<AppForkReadinessRunResult> {

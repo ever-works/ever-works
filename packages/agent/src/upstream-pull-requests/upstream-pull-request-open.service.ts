@@ -13,6 +13,11 @@ import { ownershipScopeOf } from '../database/ownership-scope';
 import { UpstreamPullRequestRecordService } from './upstream-pull-request-record.service';
 import { UpstreamEligibilityService } from './upstream-eligibility.service';
 import type { UpstreamRateLimitRefusal } from './upstream-rate-limits';
+import {
+    UPSTREAM_PR_TELEMETRY_EVENTS,
+    UpstreamPrTelemetry,
+    upstreamPrRefusedPhase,
+} from './upstream-pr.telemetry';
 
 /**
  * APW-09 — the first surface over the upstream-PR facade: open a pull request from a
@@ -128,9 +133,44 @@ export class UpstreamPullRequestOpenService {
         @Optional() private readonly records?: UpstreamPullRequestRecordService,
         // APW-09 T8/T9 — the FR-26 / FR-39 limits. Appended LAST and optional.
         @Optional() private readonly eligibility?: UpstreamEligibilityService,
+        // Gauzy Ever Works #37 - plan 9.1's `upstream_pr.*` events. Appended LAST and
+        // optional: absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: UpstreamPrTelemetry,
     ) {}
 
+    /**
+     * Open one upstream pull request (see the class docstring). The answer is
+     * {@link decide}'s, unchanged; this wrapper only reports how it ended - the refusal
+     * CODE and its phase, or that it opened - never a title, a body, a branch or a
+     * repository.
+     */
     async open(input: UpstreamPullRequestOpenInput): Promise<UpstreamPullRequestOpenResult> {
+        const result = await this.decide(input);
+        if (this.telemetry) {
+            if (result.status === 'opened') {
+                this.telemetry.track(
+                    UPSTREAM_PR_TELEMETRY_EVENTS.opened,
+                    {
+                        minutesApprovalToOpen: null,
+                        draft: result.draft,
+                        fromTask: Boolean(input?.taskId),
+                    },
+                    input?.callerUserId ?? null,
+                );
+            } else {
+                this.telemetry.track(
+                    UPSTREAM_PR_TELEMETRY_EVENTS.refused,
+                    { code: result.code, phase: upstreamPrRefusedPhase(result.code) },
+                    input?.callerUserId ?? null,
+                );
+            }
+        }
+        return result;
+    }
+
+    private async decide(
+        input: UpstreamPullRequestOpenInput,
+    ): Promise<UpstreamPullRequestOpenResult> {
         if (!this.works || !this.git || !this.credentials) {
             return refused(
                 503,
@@ -276,6 +316,14 @@ export class UpstreamPullRequestOpenService {
             };
         }
         const row = claim.status === 'claimed' ? claim.row : null;
+        if (row) {
+            // Gauzy Ever Works #37 - the record exists: a proposal was made (plan 9.1).
+            this.telemetry?.track(
+                UPSTREAM_PR_TELEMETRY_EVENTS.proposed,
+                { workId: work.id, taskId: recordOn?.id ?? null },
+                input.callerUserId,
+            );
+        }
 
         // The second look, with this request's own claim counted (see the class docstring).
         if (row && this.eligibility && this.records) {

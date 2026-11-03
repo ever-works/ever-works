@@ -45,21 +45,34 @@ import { checkTimeoutMinutes } from './inputs-hash.js';
  *     from cancelling its siblings, and `max-parallel: 5` caps how many run at
  *     once (FR-67, `APP_BUILD_CHECKS_MAX_PARALLEL`).
  *
- * ## The trigger, and the one reading T41 had to fix (`APW05-G04`)
+ * ## The trigger: both legs (`APW05-G04`, then APW-08 FR-76)
  *
  * §2.4:283–287 sketches a two-legged guard — a same-repository pull request into
- * the tracked branch **or** a push to it. §4.14's resolution R-9 keeps one leg:
- * **same-repository pull requests into the tracked branch only**, no `push` and no
- * `workflow_dispatch` (FR-65, FR-11, ACC-05-29), and T41's own text states it as
- * the contract ("the trigger is same-repository pull requests into the tracked
- * branch only"). The guard below is therefore §2.4's pull-request leg alone, plus
- * `base.ref` so the leg is what the file says rather than a side effect of the
- * `on.pull_request.branches` filter. A pull request from another repository runs
- * no check: the head-repository comparison is the same expression the `build` job
- * uses, so both jobs refuse a fork identically. The `push` leg is reported as
- * dropped, not silently forgotten — it would have produced a check run on the
- * tracked branch, and no Build records it (plan §4.14's observation: a
- * checks-only run is never a Build).
+ * the tracked branch **or** a push to it. §4.14's resolution R-9 first kept one
+ * leg, same-repository pull requests only (FR-65, FR-11, ACC-05-29), and T41
+ * shipped that. APW-08 then SETTLED the trigger set the other way (APW-08
+ * `spec.md` FR-76, `tasks.md` T15, APW08-G05): `Ever Works check: {name}` legs are
+ * reported on a same-repository pull request **and** on a push to the tracked
+ * branch, so a change that lands by merge commits without an intervening pull
+ * request is still checked. APW-08 T15 asked for that as a cross-epic ADDITION to
+ * this guard — never a replacement of the pull-request leg — and this is it:
+ *
+ *   - **the pull-request leg is unchanged**: `pull_request`, the same
+ *     head-repository comparison the `build` job uses (so a fork's pull request
+ *     runs no check, ACC-05-29), and `base.ref` so the leg is what the file says
+ *     rather than a side effect of the `on.pull_request.branches` filter. This is
+ *     the leg FR-16's gate reads;
+ *   - **the tracked-branch leg** is `push` with `github.ref` equal to the tracked
+ *     branch's full ref, stated in the guard for the same reason `base.ref` is. A
+ *     push to this repository's branch is by construction not a fork's. It is
+ *     REPORTED only, and it can never change a Build: only the `build` job decides
+ *     a Build (`runs/run-observer.ts`, R-9, FR-69), and this job has no `needs:`.
+ *
+ * Still no `workflow_dispatch` and no `pull_request_target`. The checks-only file
+ * (T42, `generator.ts`) triggers `on: pull_request` alone, so there only the
+ * pull-request leg can fire until that file gains the same `push` trigger — the
+ * other half of APW-08 T15's request, which is `generator.ts`'s and not this
+ * module's.
  *
  * ## Three details worth knowing before you change this file
  *
@@ -132,16 +145,22 @@ export function expressionStringLiteral(value: string): string {
 }
 
 /**
- * The job's `if:` — a same-repository pull request into the tracked branch, and
- * nothing else (R-9, FR-65, ACC-05-29). See the module note on §2.4's dropped
- * `push` leg.
+ * The job's `if:` — a same-repository pull request into the tracked branch
+ * (R-9, FR-65, ACC-05-29) **or** a push to the tracked branch (APW-08 FR-76), and
+ * nothing else. Each leg is parenthesised so the guard reads the way it parses.
+ * See the module note on the trigger.
  */
 export function checksJobCondition(trackedBranch: string): string {
-	return [
+	const pullRequestLeg = [
 		`github.event_name == 'pull_request'`,
 		`github.event.pull_request.head.repo.full_name == github.repository`,
 		`github.event.pull_request.base.ref == ${expressionStringLiteral(trackedBranch)}`
 	].join(' && ');
+	const trackedBranchLeg = [
+		`github.event_name == 'push'`,
+		`github.ref == ${expressionStringLiteral(`refs/heads/${trackedBranch}`)}`
+	].join(' && ');
+	return `(${pullRequestLeg}) || (${trackedBranchLeg})`;
 }
 
 /** One App spec check as its matrix row (plan §4.14) — the minutes from {@link checkTimeoutMinutes}, the command only as base64. */

@@ -15,7 +15,11 @@ import {
 } from './works-config-sync-requested.event';
 import { WorksConfigSyncFailedEvent } from './works-config-sync-failed.event';
 import { AppSpecAppliedEvent } from './app-spec-applied.event';
-import { EverIdIdentityLinkedEvent, EverIdIdentityUnlinkedEvent } from './ever-id.events';
+import {
+    EverIdIdentityLinkedEvent,
+    EverIdIdentityUnlinkedEvent,
+    EverIdSignedInEvent,
+} from './ever-id.events';
 
 /**
  * Mirrors the existing `apps/api/src/events/index.spec.ts` style: every
@@ -38,6 +42,11 @@ describe('agent/events submodule', () => {
         it('pins the Ever ID identity event names (APW-12)', () => {
             expect(EverIdIdentityLinkedEvent.EVENT_NAME).toBe('ever_id.identity_linked');
             expect(EverIdIdentityUnlinkedEvent.EVENT_NAME).toBe('ever_id.identity_unlinked');
+            expect(EverIdSignedInEvent.EVENT_NAME).toBe('ever_id.signed_in');
+            expect({ ...new EverIdSignedInEvent({ identityId: 'i1', userId: 'u1' }) }).toEqual({
+                identityId: 'i1',
+                userId: 'u1',
+            });
             const linked = new EverIdIdentityLinkedEvent({
                 identityId: 'i1',
                 userId: 'u1',
@@ -229,6 +238,31 @@ describe('agent/events submodule', () => {
             expect(evt.errorMessage).toBe('remote returned 500');
         });
 
+        it('redacts URL credentials, keeping scheme and host, and stays linear on a long letter run', () => {
+            const evt = new WorksConfigSyncFailedEvent(
+                'w1',
+                'u1',
+                'provider_changed',
+                'org/repo',
+                'push to https://ghp_abc:x-oauth-basic@github.com/o/r failed',
+            );
+            expect(evt.errorMessage).toBe('push to https://[REDACTED]@github.com/o/r failed');
+            for (const url of ['https://:tok@github.com/o/r', 'https://ghp_tok@github.com/o/r']) {
+                const e = new WorksConfigSyncFailedEvent(
+                    'w',
+                    'u',
+                    'provider_changed',
+                    'r',
+                    `x ${url} y`,
+                );
+                expect(e.errorMessage).toBe('x https://[REDACTED]@github.com/o/r y');
+            }
+
+            const started = Date.now();
+            new WorksConfigSyncFailedEvent('w', 'u', 'provider_changed', 'r', 'a'.repeat(50_000));
+            expect(Date.now() - started).toBeLessThan(1_000);
+        });
+
         it('shares the WorksConfigSyncReason union with the *Requested* event', () => {
             // Compile-time + runtime: a value valid for one is valid for the
             // other. If someone forks the union, this test fails first.
@@ -359,10 +393,11 @@ describe('agent/events submodule', () => {
                     'DeploymentCompletedEvent',
                     'DeploymentDispatchedEvent',
                     'DeploymentFailedEvent',
-                    // APW-12 Ever ID — the connected-identity lifecycle, ids only,
-                    // no listener in this repository.
+                    // APW-12 Ever ID — the connected-identity lifecycle, ids only;
+                    // the Ever Connect module listens to report links.
                     'EverIdIdentityLinkedEvent',
                     'EverIdIdentityUnlinkedEvent',
+                    'EverIdSignedInEvent',
                     // Agent execution v2 (slice B) — fleet job lifecycle.
                     'FleetJobCompletedEvent',
                     'FleetJobLeasedEvent',

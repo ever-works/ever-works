@@ -5,8 +5,8 @@
 
 **Epic ID**: `APW-08-evolve-loop`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
-**Status**: `Draft`
-**Last updated**: 2026-09-17
+**Status**: `In progress` — P0 and P1 built on `develop` except the T30 ship gate; T43, T44 and T46 are partly built (their rest needs P2 or a Fleet producer); P2 (T31–T37) and P3 (T38–T42) not started (2026-10-31)
+**Last updated**: 2026-10-31
 
 ---
 
@@ -32,7 +32,7 @@
 
 _Delivers FR-1…FR-8. No migration, no UI._
 
-- [ ] **T1. Write the failing tests first.**
+- [x] **T1. Write the failing tests first.**
       **Modify** `apps/api/src/agents/agents.module.spec.ts` — add a `describe` block titled
       `api-side AgentsModule — AGENT_GIT_FACADE coordinates (APW-08 P0)` that builds the real factory from
       `findProvider(AGENT_GIT_FACADE)` with stubs. Each case asserts today's defect **before** any production change.
@@ -59,7 +59,7 @@ _Delivers FR-1…FR-8. No migration, no UI._
       runs in `AgentRunService.invokeTool` above this adapter, so these factory-level cases need no rung setup, and
       the adapter must not add a second gate (Resolution R-17).
 
-- [ ] **T2. Keyed commit lock.**
+- [x] **T2. Keyed commit lock.**
       **Create** `apps/api/src/agents/work-commit-lock.ts` (new) — `withWorkCommitLock(workId, fn, waitMs = 120_000)`
       over a `Map<string, Promise<void>>`; rejects with `Another commit to this Work is in progress.` when the wait
       elapses; the entry is released when `fn` throws.
@@ -68,7 +68,7 @@ _Delivers FR-1…FR-8. No migration, no UI._
       lock for the next caller. Run: `cd apps/api && pnpm test work-commit-lock`.
       **Done when**: the four cases pass.
 
-- [ ] **T3. Rewrite `commitToRepo`.**
+- [x] **T3. Rewrite `commitToRepo`.**
       **Modify** `apps/api/src/agents/agents.module.ts` — per [plan §2.2](./plan.md): resolve Work → provider from
       `work.gitProvider` (refuse when empty) → data-repo coordinates → `getRepository` default branch → base →
       target; resolve merge policy through `MergePolicyService` (`packages/agent/src/policy/merge-policy.service.ts`;
@@ -94,7 +94,7 @@ _Delivers FR-1…FR-8. No migration, no UI._
       **Done when**: those cases are green and `getRepoDir` is no longer called by the adapter (a spy asserts zero
       calls).
 
-- [ ] **T4. Rewrite `openPullRequest`.**
+- [x] **T4. Rewrite `openPullRequest`.**
       **Modify** `apps/api/src/agents/agents.module.ts` — same coordinate resolution **and the same
       `checkoutKey: 'work:<workId>:agent-commit'` as T3** (APW08-G24); `prGate.assertAllowed` keeps
       running first with `cwd` from a `cloneOrPull` of the base branch;
@@ -104,7 +104,7 @@ _Delivers FR-1…FR-8. No migration, no UI._
       branch is refused with the FR-5 copy and no `createPullRequest` call (ACC-08-04).
       **Done when**: T1 case 5, the missing-head case and every pre-existing PR-gate case are green.
 
-- [ ] **T5 (parallel with T4). Tool contract wording.**
+- [x] **T5 (parallel with T4). Tool contract wording.**
       **Modify** `packages/agent/src/agents/agent-git-facade.ts` — `branch` doc: "Defaults to the Work's Task base
       branch; refused when that branch is protected by the merge policy."
       **Modify** `packages/agent/src/agents/agent-tool.service.ts` `buildCommitToRepoTool` description to match.
@@ -113,7 +113,7 @@ _Delivers FR-1…FR-8. No migration, no UI._
       `pnpm --filter @ever-works/agent test agent-tool-git`.
       **Done when**: the spec is green.
 
-- [ ] **T6. P0 ship gate.**
+- [x] **T6. P0 ship gate.**
       **Modify** `docs/specs/features/app-works/TRACKER.md` — APW-08 row notes ("P0 merged") and this file's P0
       checkboxes.
       **Test**: `pnpm format:check && pnpm lint && pnpm type-check && pnpm test` at the root.
@@ -128,7 +128,7 @@ integration point degrades to today's behaviour when their tables are absent (pl
 
 ## P1.1 — Contracts and provider additions
 
-- [ ] **T7. Shared types.**
+- [x] **T7. Shared types.**
       **Create** `packages/contracts/src/apps/task-delivery.types.ts` (new) exactly as [plan §3.4](./plan.md)
       (Resolution R-1).
       **Modify** `packages/contracts/src/apps/index.ts` (created by APW-03 T1; if APW-03 has not landed, create it and
@@ -149,7 +149,7 @@ integration point degrades to today's behaviour when their tables are absent (pl
       **Done when**: the specs are green, `pnpm --filter @ever-works/contracts build` emits declarations, and
       `import { TASK_DELIVERY_STATES } from '@ever-works/contracts'` resolves from `apps/api`.
 
-- [ ] **T8. Merge commit and ancestry on the git capability.**
+- [x] **T8. Merge commit and ancestry on the git capability.**
       **Modify** `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` —
       `GitPullRequestStatus.mergeCommitSha?: string | null`; optional
       `isAncestorCommit?(owner, repo, ancestorSha, descendantSha, token): Promise<boolean | null>`.
@@ -167,7 +167,7 @@ integration point degrades to today's behaviour when their tables are absent (pl
 
 ## P1.2 — Schema
 
-- [ ] **T9. Task delivery columns + migration.**
+- [x] **T9. Task delivery columns + migration.**
       **Modify** `packages/agent/src/entities/task.entity.ts` — append the six columns of [plan §3.1](./plan.md)
       (dates via `PortableDateColumn`) and both indexes. Append only.
       **Create** `apps/api/src/migrations/1792080000000-AddTaskDeliveryState.ts` (new) — guarded `ADD COLUMN`s, the
@@ -180,7 +180,7 @@ integration point degrades to today's behaviour when their tables are absent (pl
 
 ## P1.3 — App rules, isolation, runtime admission
 
-- [ ] **T10. `AppWorkRulesService`.**
+- [x] **T10. `AppWorkRulesService`.**
       **Create** `packages/agent/src/app-works/app-work-rules.service.ts` (new) and export it from
       `packages/agent/src/app-works/index.ts` (created by APW-02 T15; the one App Works services folder) — `resolve(work, baseSha)` calls APW-03's `AppSpecService.getEffectiveSpec(workId, baseSha)` and returns
       `{ sourceBranch, checks (≤ 20), protectedPaths, humanMergePaths, instructionFiles (≤ 5), sizeGuidance }` with
@@ -194,7 +194,8 @@ integration point degrades to today's behaviour when their tables are absent (pl
       `pnpm --filter @ever-works/agent test app-work-rules`.
       **Done when**: the spec is green.
 
-- [ ] **T11. Keep the Work in step with the App spec; force isolation.**
+- [x] **T11. Keep the Work in step with the App spec; force isolation.**
+      **Status (2026-10-30, lane L8, branch `feat/apw08-app-isolation`): built, specs green locally** — `AppWorkSpecAppliedListener` (`app-works/app-spec-applied.listener.ts`) writes the five columns in one diff-only, ownership-scoped write (`WorkRepository.updateAppWorkColumns`: `id` + `userId` + `kind = 'app'`) through `AppWorkIsolationService` (`app-works/app-work-isolation.service.ts`), the ONE resolver (spec `source.branch` at `event.commitSha` → `WorkAppSpecState.trackedBranch` → Work Repository default on the `website` role) that T50 also uses; `taskIsolationTargetRepo` is written as `taskRepositoryRole(kind)` (`'website'`). An owner's `'warn'` (and an existing `'required'`) is kept. The checks notice (APW08-G19 — T51's first half) is one `NotificationService` row per `(spec hash, commit)`, read back first so a dismissed one is not re-asked, linking `/works/<id>/settings#app-checks`. `resolveTaskIsolation` forces `app` on; `dispatchAgentRun` refuses `canCommitToRepo === false` with `no_commit_permission: <FR-9 copy>` (review runs pass). **Verified, not changed:** the consumers already act on the Work Repository through `resolveTaskRepository` (kind rule, `task-repository.ts`) — `provisionForRun`, `describeFleetWorkspace`, `openPullRequestForBranch`, APW-05's `BuildFacadeService.repositoryOf` (`website`) / `AppBuildWorkContextSource` (top-level pair = the Work Repository), APW-06's `deploy.facade` (`website`), and `GitFacadeService.getRepoDir` (top-level pair; no production caller). The column is recorded, never an override (golden table in `task-workspace.app-base-branch.spec.ts`).
       **Create** `packages/agent/src/app-works/app-spec-applied.listener.ts` (new) — `@OnEvent` for APW-03's
       `AppSpecAppliedEvent` (`app.spec.applied`); read the spec at `event.commitSha`, then set
       `taskIsolation = 'worktree'`, `taskIsolationBaseBranch = <source branch>`, **`taskIsolationTargetRepo = 'website'`**
@@ -246,7 +247,9 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       half). Run: `pnpm --filter @ever-works/agent test task-isolation task-workspace task-transition app-spec-applied`.
       **Done when**: all four specs are green and the pre-existing `task-isolation.spec.ts` passes unchanged.
 
-- [ ] **T12. Isolated-run admission.**
+- [x] **T12. Isolated-run admission.**
+      **Status (2026-10-30, lane L10, review of #3040):** re-admission at every Fleet choke point — the fleet-aware dispatcher's `enqueue` runs the Fleet half of the admission for EVERY Fleet enqueue (the gate's drain and kill-switch promotion, every resume — CI fix loop and answered question — and assign-task), throwing `AppWorkRunNotAdmittedError` with the site-1 codes, and stamps an admitted job `appWorkId`; the LEASE (`FleetJobService.lease` → `FLEET_APP_WORK_LEASE_ADMISSION`) judges the node that actually takes such a job, so dispatch now admits a run some eligible node may take. `paused` / `enrolling` nodes count as candidates; no enrolled node is S15; an empty candidate set is held (`noEligibleNode`). Site 1 reads the Work once per dispatch (shared by T49, FR-9, T12), runs above the Agent-session schedule branch, and fails CLOSED on an unreadable Work (`dispatch-failed: work-unreadable`), as does the cloud worker. The push cache key carries the Task owner. Spec `isolated-run-admission.spec.ts` (31), `fleet-job.app-work-lease.spec.ts` (4), `fleet-app-work-readmission.spec.ts` (10).
+      **Status (2026-10-30, lane L10, branch `feat/apw08-run-admission`): built** — `isolated-run-admission.ts` (`AppWorkRunPlacement`, the pure `isAppWorkRunAdmitted(task, plan)`, the S15 / S28 / S33 copy, the cloud pre-flight `appWorkCloudRunRefusal`) and `isolated-run-admission.service.ts` (the facts, fail closed fact by fact). **Placement** comes from the fleet routing adapter: `AgentTaskExecuteDispatcher.previewPlacement` (`fleet-agent-task.dispatcher.ts`), the same `routeAgentTask` call `enqueue` makes, writing nothing. **Site 1** is `dispatchAgentRun`, after FR-9 and the session-schedule branch, ahead of `RunDispatchGateService` (not in `DEFAULT_RUN_ADMISSION_CHAIN`); an admitted App Work run hands the gate its Agent, so the AW-23 brake parks a paused Agent's run `agent-paused`. **Site 2** is the cloud worker (`agent-task-execute.task.ts`), before provisioning. The stop flag is deferred to the chain's `kill-switch` park. **Push credential (GAP-15):** the git facade has no non-minting installation lookup (`getInstallationTokenForOwner` mints and does not check coverage or ownership), so the admission asks `FleetPushCredentialService.describeScope` — the mint's own precondition — positive answers cached per `(workId, owner/repo)`, negatives never. **Cloud branch:** `enforcesRuntimeNetworking` exists (APW-04, `claude-managed-agent` only), but no Task-run executor runs through a pipeline plugin, so `cloudPipeline` is unbound and cloud App Work runs are refused (`noIsolatedRuntime`) until one does. The run brief now states that setup steps and App checks run with the machine's real home. Spec `isolated-run-admission.spec.ts` (25: the nine cases plus the unchanged paths, the facts and site 2). Not built: the evolve route's 422 mapping (the refusal reaches `dispatchError` with its code), the e2e `test.fixme`.
       **Note (2026-09-25):** T12's cloud admission is what lets `APP_WORKS_CLOUD_PUSH_ENABLED` default on; until then
       `finalizeRun` refuses to publish App Work branches from cloud runs (T17 status, plan §2.5).
       **Depends on** APW-04's `IPipelinePlugin.enforcesRuntimeNetworking?: boolean` (CONTRACTS §3); if APW-04 has not
@@ -298,7 +301,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 
 ## P1.4 — Checks
 
-- [ ] **T13. App checks on Fleet nodes.**
+- [x] **T13. App checks on Fleet nodes.**
       **Modify** `packages/agent/src/tasks-domain/repo-declared-commands.ts` — `parseRepoDeclaredCommands(spec, kind)`:
       for `kind === 'app'` map `spec.checks` (≤ 20) to `TaskAcceptanceCheck`; `repo` unchanged.
       **Keep the parser's id, carry the name (APW08-G03).** The check id is the **merge key** with owner-authored
@@ -327,8 +330,18 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `pnpm --filter @ever-works/agent test repo-declared-commands`.
       **Done when**: the new spec and the pre-existing `repo-declared-commands.spec.ts` and
       `task-workspace-repo-declared-commands.spec.ts` are green.
+      **Status (2026-10-30, lane L9, branch `feat/apw08-app-checks`): built, specs green locally, not merged.**
+      `parseRepoDeclaredCommands(spec, kind)` reads `spec.checks` for `app` (first 20, `required` /
+      `timeoutSeconds` honoured, ids stay `repo/check-N`); `admitRepoDeclaredCommands` returns `notAdmitted` for
+      `app` only; `TaskCheckResult.status` gains `'not-admitted'`. The node computes the gate over what it ran, so
+      the planner alone cannot change a verdict: it puts the not-admitted checks on the job
+      (`FleetAgentTaskPayload.notAdmittedChecks`, no command), and the reconciler folds them in with
+      `foldNotAdmittedChecks` (a required one turns `green` into `red`). That needed small additive edits to the
+      router, the plan type and the reconciler as well as the planner. Specs: new 21/21; `repo-declared-commands`
+      27/27 and `task-workspace-repo-declared-commands` 11/11 unchanged; planner 108/108 and reconciler 108/108
+      (2 new cases each).
 
-- [ ] **T14. Review-checks surface.**
+- [x] **T14. Review-checks surface.**
       **Create** `apps/web/src/components/works/detail/AppChecksAdmissionCard.tsx` (new) — lists App spec checks with
       admitted state and **Admit for my machines**, writing the existing `repoDeclaredCommands` allow-list
       (`packages/agent/src/dto/update-work.dto.ts`) via `PATCH /api/works/:id`.
@@ -338,8 +351,14 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       not-admitted rows render their text; **Admit for my machines** sends exactly the listed command; the card is
       absent for other kinds. Run: `pnpm --filter ever-works-web test AppChecksAdmissionCard`.
       **Done when**: the spec is green.
+      **Status (2026-10-30, lane L9, branch `feat/apw08-app-checks`): built, spec green locally (11/11), not merged.**
+      The card reads the effective spec's `checks` through a new `getAppSpecChecksAction`, writes the allow-list
+      through a new `updateRepoDeclaredCommands` action (`PATCH /api/works/:id`, `mode: 'allowlist'` plus the
+      normalized command), and sits at `#app-checks`, where T11's checks-change notification links.
+      `TaskChecksSection` renders the new `not-admitted` result. 14 leaves were added to `en.json` and mirrored in
+      English into the 20 other locales; there was no parity sync.
 
-- [ ] **T15. App checks in the repository's CI — verification of APW-05 T41 (Resolution R-9, APW08-G05).**
+- [x] **T15. App checks in the repository's CI — verification of APW-05 T41 (Resolution R-9, APW08-G05).**
       **Depends on** APW-05 T41, which **owns** `packages/plugins/github-actions-build/src/workflow/checks-job.ts`
       and the emission from `packages/plugins/github-actions-build/src/workflow/generator.ts` (APW-05 plan §4.14,
       normative). T15 writes **no second emitter** — a second `generator.ts` change for the same job is exactly the
@@ -366,8 +385,19 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `pnpm --filter @ever-works/github-actions-build-plugin test generator` (the package name APW-05 T7 gives it).
       **Done when**: the spec is green, the golden workflow passes `actionlint` locally, and no diff to
       `generator.ts` is in this task's PR.
+      **Status (2026-10-30, lane L9, branch `test/apw08-app-checks-golden`): golden and assertions green locally, not merged.**
+      `golden/app-checks-two.yml` plus a 9-case block in `generator.spec.ts` (84/84). **One drift was found and
+      fixed in `checks-job.ts`, as the cross-epic request above describes.** APW-05's job-level `if:` guard
+      had only the pull-request leg. It now reads `(<pull-request leg, unchanged>) || (github.event_name == 'push' && github.ref == 'refs/heads/<tracked>')`. APW-05's `checks-job.spec.ts` trigger pin is re-pinned
+      to both legs, just as strictly (17/17), and `golden/checks.yml` changed on that one line only. Every other
+      leg matched the contract: `EW_CHECK_COMMAND_B64`, `contents: read` only, `fail-fast: false`,
+      `max-parallel: 5`, the per-leg name, `persist-credentials: false`, and `continue-on-error` on the
+      advisory leg only. There is no diff to `generator.ts`. **Still open (generator.ts, APW-05 T42):** the
+      checks-only file of `image`/`none` triggers `on: pull_request` alone, so its push leg cannot fire until
+      that file gains `push: branches: [<tracked>]`. `actionlint` is not installed on EVERDESK2, so that leg
+      is unverified here.
 
-- [ ] **T16 (parallel with T15). Cloud gate never runs App checks; required vs advisory legs; the attempt budget.**
+- [x] **T16 (parallel with T15). Cloud gate never runs App checks; required vs advisory legs; the attempt budget.**
       **Modify** `packages/agent/src/tasks-domain/task-gates.ts` `resolveAcceptanceChecks` — for `work.kind === 'app'`,
       ignore any App spec source; only `checkDefaults` + Task checks resolve.
       **Modify** `packages/agent/src/tasks-domain/task-pr-status.service.ts` and
@@ -399,10 +429,33 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       from the env var**; **a provider that reports the advisory leg as failed still leaves the gate unchanged**
       (the fallback). Run: `pnpm --filter @ever-works/agent test task-gates task-pr-status`.
       **Done when**: both specs are green and `task-pr-status.service.spec.ts` passes unchanged.
+      **Status (2026-10-30, lane L9, branch `feat/apw08-app-checks`): built, specs green locally, not merged.**
+      A new ring-free port `TASK_APP_CHECKS` (`tasks-domain/task-app-checks.port.ts`) is bound in
+      `TasksDomainModule` to `app-works/task-app-checks.service.ts`. It reads the App rules at the PR base
+      branch's tip. `TaskPrStatusService` re-derives `ciState` with failing advisory legs counted as neutral,
+      but only when the capped check list provably holds every check. It also marks those legs
+      `advisory: true` on `prChecks`, which keeps them out of **Checks failed: {names}.** and the fix-loop
+      re-offer. `TaskCiAutoResumeService` takes an App Work's budget from `resolveMaxGateAttempts`; the env
+      var's `0` still switches the loop off. A red advisory leg from the webhook is not a failure. A spent
+      budget leads to `BLOCKED` plus a `gate-exhausted` escalation, while a repeat failure still files the
+      notice. `resolveAcceptanceChecks` drops `repo/` entries for `app`. The S3 copy note is in `spec.md`.
+      **Review of #3038 (2026-10-30):** for App Works the repeat-failure stop no longer applies; the same red
+      check is retried up to the Work's budget, counted over CI attempts only, then the Task is `BLOCKED`
+      with `gate-exhausted`. A red `check_suite` / `workflow_run` delivery never reds an App Work Task's
+      head; only per-leg `check_run` deliveries, read at the PR base the delivery names, and the sweep's
+      roll-up act. The budget is read below the stop checks. The sweep releases the stop marker when an
+      exhausted App Work Task is unblocked with budget left. Other kinds are unchanged.
+      `task-pr-status.app-checks` is now 17/17.
+      Specs: `task-pr-status.app-checks` 9/9 (new); `task-gates` 24/24 (3 new); `task-pr-status.service` 40/40
+      unchanged; `task-lifecycle-posts` 26/26 and `task-pr-status.lifecycle-posts` 13/13 (L7's specs, extended);
+      `github-check-intake.autoresume.integration` 60/60. **`continue-on-error` fact: unverified.** No failed
+      job-level `continue-on-error` leg was found to read. The repo's one such job (`ci.yml` `skills-oracle`)
+      did not fail in the last 40 `ci.yml` runs; the only non-success was run 40692666617, whose check run
+      reported `cancelled`.
 
 ## P1.5 — Guard, instructions, merge
 
-- [ ] **T17. `AppChangeGuard`.**
+- [x] **T17. `AppChangeGuard`.**
       **Status (2026-09-25, wave 2, `86e1a3ddf`):**
       _Cloud path:_ judged before the push (`checkPaths` over `IWorkspacePlugin.branchChanges`, then publish by
       `publishSha`). Default-off behind `APP_WORKS_CLOUD_PUSH_ENABLED` until T12 lands (owner decision 2026-09-25);
@@ -428,6 +481,28 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       _Fleet path:_ unchanged — a node still pushes before the platform judges the branch; the per-job push credential
       is `contents: write` only (pinned in `fleet-push-credential.service.spec.ts`, never `workflows`), and the merge
       gate re-judges the head.
+      **Status (2026-10-30, lane L11, branch `feat/apw08-guard-budget`): G06 and G22 built, specs green locally,
+      not merged.** _APW08-G06:_ the ring-free port (`tasks-domain/app-work-change-gate.port.ts`) carries
+      `APP_WORK_COMPARE_DIFF_OPTIONS` (`{ maxFiles: 300, maxBytes: 0 }`) and `appWorkDiffFileListIncomplete`:
+      refuse on `totalFiles >= 300` or a list shorter than its count, never on `truncated` alone (a diff with no
+      numeric `totalFiles` still refuses on `truncated`, fail closed). `AppChangeGuard.evaluate` rule 1 uses it, and
+      the change gate asks with those options. The two always-protected workflow floors that also judge an App Work
+      branch (`TaskWorkspaceService.protectedPathsRefusalForBranch` in finalize, and `openPullRequest`'s floor in
+      `apps/api/src/agents/agents.module.ts`) use the same request and rule for App Works only, so the five-file
+      lockfile change is not refused there instead; every other Work kind asks and refuses exactly as before. The
+      guard spec's "refuses a TRUNCATED diff" case is kept and now names a list cut short (two counted, one listed);
+      new cases: a five-file change with a huge lockfile patch is allowed, exactly 300 files refused, a short list
+      under the cap refused. _APW08-G22:_ `AppWorkRules.fileGuidance` = `agents.maxPullRequestChangedFiles`,
+      default 50, clamped 1–500 (`clampFileGuidance`; a rules object without it reads 50). Guard rule 5 adds a
+      note over it and refuses past 3× it (`tooManyFiles`, telemetry reason `too_large`), after the line refusal;
+      the 300-file ceiling still answers first whatever the App sets; lockfiles count as files (only their lines are
+      excluded). The run brief states the file guidance beside the line guidance. The e2e seed takes
+      `fileGuidance` and pads a fixture list to its count below 300 (what a provider asked for 300 files returns);
+      the 299-file e2e case sets `fileGuidance: 500`. Specs: `app-change-guard` 39/39 (12 new),
+      `app-work-change-gate.service` 33/33 (request assertion now `{ maxFiles: 300, maxBytes: 0 }`),
+      `app-work-rules.service` 18/18 (1 new), `app-run-brief` 15/15 (1 new), `task-workspace.app-change-guard`
+      76/76, `task-workspace-remote-push` 16/16, `task-workspace-mounts` 61/61, `app-change-guard.loosening` 13/13,
+      `app-change.telemetry` 13/13 unchanged.
       **Create** `packages/agent/src/app-works/app-change-guard.ts` (new) — [plan §2.5](./plan.md): compare diff
       (`{ maxFiles: 300, maxBytes: 0 }`, refuse on `totalFiles >= 300` **or** `files.length < totalFiles` — never on
       `truncated` alone, because `capDiffFiles` also sets it when patch text exceeds the 256 KiB default and a
@@ -472,7 +547,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       Run: `cd apps/api && pnpm test fleet-agent-task-planner` and `pnpm --filter @ever-works/trigger-tasks test agent-task-execute`.
       **Done when**: both specs are green.
 
-- [ ] **T19. Human-merge paths.**
+- [x] **T19. Human-merge paths.**
       **Modify** `packages/agent/src/tasks-domain/task-merge-gate.service.ts` `evaluate` — for App Works, when the pull
       request diff touches `humanMergePaths`, refuse the agent merge with code `human-merge-path` and the FR-28 copy
       (recorded like other refusals).
@@ -493,7 +568,19 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 
 ## P1.6 — Delivery chain
 
-- [ ] **T20. Pure delivery rules.**
+**Status (2026-10-29, lane L3, branch `feat/apw08-delivery-chain`, Gauzy Ever Works #10): the backend chain is built** —
+T7 (delivery constants, route codes, `delivery-failed`; not `TaskCheckResult 'not-admitted'`, which is the checks lane's),
+T8, T9 (stamped `1792320000000-AddTaskDeliveryState` — after the newest applied App Works migration — and carrying
+`followUpKey`, so slot `03` stays whole for T54), T20 (`task-delivery.rules.ts`, one case per plan §2.4 row), T21
+(`task-delivery.service.ts`, `delivery-follow-up.service.ts`), T22 (`refreshTask` → `{ task, status }`, hook by token
+`TASK_DELIVERY_TRACKER`), T23 (`app-change-delivery.task.ts`, RPC facade `reconcile` only), T24's delivery routes and
+T55's follow-up half (the guard half was already keyed on `Task.origin`). The APW08-G25 defaults the chain decides are
+env-backed in `packages/agent/src/app-works/app-delivery-defaults.ts`. **Not built:** T24's list filters
+(`deliveryState`, `includeDelivery` on `GET /api/tasks`), T26 thread posts and T54 (keyed posts, nullable `authorId`),
+and every web surface (T27–T29). The chain's states that CONTRACTS §6 does not name (`building`, `built`, `deploying`)
+are recorded as `app.change.progressed` so FR-35's timeline has every change.
+
+- [x] **T20. Pure delivery rules.**
       **Create** `packages/agent/src/app-works/task-delivery.rules.ts` (new) — `decideDelivery(input)` over merge sha,
       Builds, Deployments, ancestry answers, target and auto-deploy flags.
       **The input table is normative (APW08-G08).** `decideDelivery` implements **every row of plan §2.4's delivery
@@ -509,7 +596,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `pnpm --filter @ever-works/agent test task-delivery.rules`.
       **Done when**: every row of the table is a passing case and no case exists that the table does not name.
 
-- [ ] **T21. `TaskDeliveryService`.**
+- [x] **T21. `TaskDeliveryService`.**
       **Create** `packages/agent/src/app-works/task-delivery.service.ts` (new) — `isDeliveryTracked`, `recordMerge`
       (partial unique index = once; Activity `actionType: 'app_change'`, `action: 'app.change.merged'`),
       `reconcile(batch)` with compare-and-set writes, closing through
@@ -541,7 +628,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `pnpm --filter @ever-works/agent test task-delivery.service follow-up-key`.
       **Done when**: the specs are green.
 
-- [ ] **T22. Hook the PR-status sweep.**
+- [x] **T22. Hook the PR-status sweep.**
       **Modify** `packages/agent/src/tasks-domain/task-pr-status.service.ts` `syncDuePrStatuses` — when
       `after.prState === 'merged'`, ask `TaskDeliveryService.isDeliveryTracked(after, status)`; tracked →
       `recordMerge`, skip `completeOnMerge`; else unchanged. Inject the service `@Optional()`, appended last.
@@ -559,7 +646,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       **Done when**: the new spec and `task-pr-status.service.spec.ts` are green, with its existing assertions
       unchanged.
 
-- [ ] **T23. `app-change-delivery` schedule.**
+- [x] **T23. `app-change-delivery` schedule.**
       **Create** `packages/tasks/src/tasks/trigger/app-change-delivery.task.ts` (new) — `schedules.task` cron
       `1-59/2 * * * *`, `withWorkerContext`, `TaskDeliveryService.reconcile({ limit: 200 })`, logs counters.
       **Modify** `packages/tasks/src/tasks/trigger/index.ts` — export it.
@@ -570,7 +657,8 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 
 ## P1.7 — API and chat
 
-- [ ] **T24. Delivery and cost endpoints.**
+- [x] **T24. Delivery and cost endpoints.**
+      **Status (2026-10-29, lane L4, branch `feat/apw08-delivery-web`, Gauzy Ever Works #10): the list half is done** — `GET /api/tasks?deliveryState=` takes comma-separated delivery states plus `waiting` (`TASK_DELIVERY_FILTER_WAITING`: no delivery state and an open or draft pull request), OR-ed, AND-ed with every other filter after the owner / visibility predicate; an unknown token is a 400. `?includeDelivery=true` gives each row `delivery: TaskDeliveryEmbed | null` (`state`, `liveUrl`, `outcome`, `liveWithWarnings`, `carriedByLaterChange`) from `TaskDeliveryService.listEmbeds` — one `IN` read of the deciding Deployments, keyed on the rows' own ids, degrading to the state alone. The Delivery select's groups are `TASK_DELIVERY_FILTER_GROUPS` (contracts). Specs: `apps/api/src/tasks/tasks.controller.delivery-list.spec.ts`, `packages/agent/src/database/repositories/__tests__/task.repository.delivery-filter.spec.ts` (SQLite), `packages/agent/src/app-works/__tests__/task-delivery.list-embed.spec.ts`. With the delivery routes (lane L3), T24 is complete.
       **Status (2026-10-27, lane B2 `aw-evolve`): the cost half is done** — `GET /api/tasks/:id/cost` answers `TaskCostView` (`packages/contracts/src/apps/task-delivery.types.ts`, new): each run's cost is its receipt lines summed (`getRunSpendLines`, `null` while unpriced) with `receiptUrl` `/agents/sessions/<runId>`, up to 50 runs newest first (`runsTruncated`), and `totalCents` is every usage row attributed to the Task; `builds` stays `[]` until per-Task Build accounting exists. Spec `apps/api/src/tasks/task-cost.spec.ts`. **Not built:** `GET :id/delivery`, `…/delivery/close`, `…/delivery/follow-up` and the list's `deliveryState` / `includeDelivery` — they read the delivery chain's columns (T7–T9, T20–T23), which do not exist yet; the types (`TaskDeliveryView`, `TASK_DELIVERY_STATES`) are published so the chain and the web type against one shape.
       **Modify** `apps/api/src/tasks/tasks.controller.ts` — `GET :id/delivery`, `POST :id/delivery/close`,
       `POST :id/delivery/follow-up`, `GET :id/cost`; list query `deliveryState`, `includeDelivery`; throttles and
@@ -579,7 +667,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       (ACC-08-19, 22, 28, 29). Run: `cd apps/api && pnpm test tasks.controller.delivery`.
       **Done when**: the spec is green and the existing `tasks.controller.*.spec.ts` files pass unchanged.
 
-- [ ] **T25. `evolve` endpoint and the agent-resolution rule.**
+- [x] **T25. `evolve` endpoint and the agent-resolution rule.**
       **Create** `packages/agent/src/app-works/app-work-agent-resolver.ts` (new) — `AppWorkAgentResolver` +
       `APP_WORK_AGENT_RESOLVER` per [plan §2.8](./plan.md) (Resolution R-21): recent Task → only pinned → only
       assigned; archived or non-committing Agents skipped. Exported from `packages/agent/src/app-works/index.ts` for
@@ -624,7 +712,9 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `pnpm --filter @ever-works/agent test app-work-agent-resolver`.
       **Done when**: both specs are green.
 
-- [ ] **T26. Chat tool, card and Task thread posts.**
+- [x] **T26. Chat tool, card and Task thread posts.**
+      **Status (2026-10-29, lane L7, branch `feat/apw08-lifecycle-posts`): the run-side posts are built** — an App Work Task's thread now gets **Run started.**, **Opened pull request #{number}.** and **Checks passed.** / **Checks failed: {names}.** as keyed posts (`deliveryPosts.*`), once per event, through `TASK_LIFECYCLE_POSTER` (`TaskLifecyclePostsService`: App Work Tasks only; the run's Agent, else the Task's Agent, else `system`; never throws). Each post dedupes on a real transition of a recorded value, with no marker table (`task-lifecycle-posts.ts`): run start in `TaskRunDenormService.recordStarted` (the cloud claim and the fleet lease both pass through it) when the run pointer moves to (run, `running`); pull request open in `TaskWorkspaceService.openPullRequestForBranch` when the recorded `prNumber` changes; checks in `TaskPrStatusService.refreshTask` (sweep and on-demand read) when `ciState` settles as `passing` / `failing`, including a red the CI webhook recorded first (it writes `ciState` without the check list). `names` are the failing checks of the provider's capped list (≤ 5, then `+N`); a red with none listed posts the new `checksFailedUnnamed` ("Checks failed.", in every locale). Specs: `task-lifecycle-posts.spec.ts`, `task-pr-status.lifecycle-posts.spec.ts`, `task-workspace-lifecycle-posts.spec.ts`, `task-run-denorm.service.spec.ts` (extended).
+      **Status (2026-10-29, lane L5, branch `feat/apw08-thread-posts`): built** — `ChatChangeCard` (`apps/web/src/components/ai/ChatChangeCard.tsx`, wired in `ChatToolResult` for `request_app_change`): the §6.4 confirmation ("Start a change on {work}? · {agent} will work on it…", Start / Cancel sending the generic card's exact messages, so `generated/confirmation.ts` honours this card only) and the reply + chain Run → Pull request → Build → Deployment → Live (`getTaskChangeChainAction`), polling every 10 s while visible and stopping when settled or after 30 minutes without a change (FR-44). The `appworks` keyword slot already existed (APW08-G20); `registry-parity.unit.spec.ts` gains the "add an SMS reminder to my app" cases. `TaskDeliveryService` posts the FR-43 delivery posts as keyed posts (T54's storage), one per recorded state change, as the Task's Agent or as `system`. **Not built:** keyed posts for run started / pull request opened / checks (the copy keys exist; the run and finalize paths still post as before).
       **Modify** `apps/web/src/lib/ai/tools/generated/registry.ts` — append the `request_app_change` row
       ([plan §4](./plan.md)).
       **Give it a keyword slot (APW08-G20).** A generated registry entry with **no** keyword slot is gated out of
@@ -648,11 +738,14 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 
 ## P1.8 — Web
 
-- [ ] **T27. Chips, sections, dialog, filter.**
+- [x] **T27. Chips, sections, dialog, filter.**
+      **Status (2026-10-29, lane L5, branch `feat/apw08-thread-posts`): the section's two actions and the header button are done** — **Deploy now** (S20: `built` + auto-deploy off, `TaskDeliveryView.canDeployNow`) reuses APW-06's `AppDeployNowButton` for the change's Build; **Create a fix Task** (failed states, not while **Try once more** is offered) is confirmed first and calls `POST /api/tasks/:id/delivery/fix-task` (`TaskDeliveryService.createFixTask` → `DeliveryFollowUpService.open(…, { manual: true })`, one per failure); the Work Tasks tab header carries `RequestChangeDialog` on App Works. **Still not built:** `TaskRunContainmentNotice` (checks-admission lane).
+      **Status (2026-10-29, lane L4, branch `feat/apw08-delivery-web`): the delivery surfaces are done** — `TaskDeliveryChips` (after `GateChip` on the board card; on the list's cards and table), `TaskDeliverySection` (above Checks for a Task with a delivery state: timeline, Build logs / Builds / Deployments links, live URL, warnings, follow-ups; **Close anyway** / **Close without deploying** behind a confirm with focus return; **Try once more** when the Task's open `delivery-failed` escalation exists; polls every 10 s while open, stops at `live` / `closed_without_deploy` and 30 minutes after the page opened), `TaskCostSection` (last on the Task page; an unpriced run or total reads "unknown"), the Delivery select on an App Work's Tasks tab (`?delivery=`) with `includeDelivery` on that page, `ActivityTypeBadge` `app_change` → `appChange`, and `getTaskDeliveryAction` / `closeDeliveryAction` / `openDeliveryFollowUpAction` / `getTaskCostAction`. Specs beside each component. **Not built:** `TaskRunContainmentNotice` (checks-admission lane), **Deploy now** / **Create a fix Task** in the section, the Tasks-tab header **Request a change** button.
       **Status (2026-10-27, lane B2 `aw-evolve`): the dialog and the cost summary are done** — `RequestChangeDialog` (one field, `POST /api/works/:id/evolve` with `channel: 'card'` through `requestAppChangeAction`; the filed Task with the held-for-owner and cloud-push notes, or the refusal by the API's own code) and `WorkCostSummary` (`GET /api/works/:id/cost`: spent, monthly budget, remaining, alert) on `AppWorkOverviewCard`; English copy under `dashboard.workDetail.appChange` / `.appCost` (other locales fall back to English). Spec `RequestChangeDialog.unit.spec.tsx` (8). **Not built:** the delivery chips, the Task page's Delivery and Cost sections and the `deliveryState` filter (they need the delivery chain).
       **Create** `apps/web/src/components/tasks/TaskDeliveryChips.tsx`,
       `apps/web/src/components/tasks/TaskDeliverySection.tsx`, `apps/web/src/components/tasks/TaskCostSection.tsx`,
       `apps/web/src/components/works/detail/RequestChangeDialog.tsx` (all new).
+      **Status (2026-10-30, lane L10): `TaskRunContainmentNotice` is done** — inside `TaskCostSection` (which now takes `workId`): the latest Fleet run's containment (path, isolated home, every downgrade, the accepted downgrade) and, for each node holding the next run, `appRules.containmentDowngrade` with **Allow on this machine** → `allowAppRunContainmentAction` → the allowance route, then **Withdraw**; the section re-reads the view after a change. `cost.containment` and `appRules.containmentDowngrade` / `.allowOnThisMachine` in all 21 bundles (English placeholders), pinned by `app-works-evolve-messages.unit.spec.ts`. Spec `TaskRunContainmentNotice.unit.spec.tsx` (8); `TaskCostSection.unit.spec.tsx` unchanged.
       **Also create (additive, 2026-09-17):** `apps/web/src/components/tasks/TaskRunContainmentNotice.tsx` (the
       containment a run got, its downgrades and **Allow on this machine** — FR-70, XC-06) mounted inside
       `TaskCostSection`; and `apps/web/src/components/works/detail/WorkCostSummary.tsx` (FR-73's month spend, cap,
@@ -674,7 +767,9 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       unchanged. Run: `pnpm --filter ever-works-web test TaskDelivery TaskCostSection RequestChangeDialog TasksKanbanView`.
       **Done when**: the specs are green.
 
-- [ ] **T28. P1 i18n.**
+- [x] **T28. P1 i18n.**
+      **Status (2026-10-29, lane L5): `dashboard.tasksPage.deliveryPosts`, the new `.delivery` leaves (Deploy now, Create a fix Task), `dashboard.tasksPage.detail.systemAuthor`, `dashboard.workDetail.requestChange` and `dashboard.aiChat.changeCard` are done** in all 21 bundles (English placeholders), mirrored by the same scoped copy of `sync-locale-parity.mjs`'s algorithm limited to those paths (second run: 0 added) and pinned by `app-works-evolve-messages.unit.spec.ts`. **Not built:** `.appRules`, `dashboard.workDetail.costSummary`.
+      **Status (2026-10-29, lane L4): `dashboard.tasksPage.delivery`, `dashboard.tasksPage.cost` and `dashboard.activity.filters.types.appChange` are done** in all 21 bundles (English placeholders in the 20 siblings), pinned by `apps/web/src/lib/__tests__/app-works-evolve-messages.unit.spec.ts`. They were mirrored by a scoped copy of `sync-locale-parity.mjs`'s algorithm limited to those sub-trees (second run: 0 added): the repo-wide script would also backfill ~4 700 unrelated keys per locale that develop is missing. **Not built:** `.appRules`, `.deliveryPosts`, `dashboard.workDetail.requestChange` / `.costSummary`.
       **Modify** `apps/web/messages/en.json` — `dashboard.tasksPage.delivery`, `.appRules` (incl. `runHeld`,
       `safetyRail`, `noAgentResolved`, **and the keys added 2026-09-17: `overFileGuidance`, `containmentDowngrade`,
       `allowOnThisMachine`, `changesPaused`, `repoTooLarge`, `noPushCredential`, `createAgentAndStart`,
@@ -688,7 +783,8 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       half). Run: `pnpm --filter ever-works-web test app-works-evolve-messages`.
       **Done when**: the spec is green and the parity script reports zero keys added on a second run.
 
-- [ ] **T29. P1 e2e.**
+- [x] **T29. P1 e2e.**
+      **Status (2026-10-29, lane L6, branch `test/apw08-e2e`, Gauzy Ever Works #10): the three specs are written and green locally, except the not-admitted case** (one spec file at a time, SQLite in-memory API + `next dev`; counts include the `setup` project): `app-works-evolve-chat` 4 passed, `app-works-delivery-chips` 5 passed, `app-works-guard-refusals` 7 passed + 1 skipped, `flow-task-isolation-gates-contract` 12 passed, `flow-task-branch-gate-ui-journey` 7 passed (both unchanged). The worker-only state is seeded through a new non-production route `POST /api/e2e/app-works/task-seed` (`apps/api/src/tasks/e2e-task-seed.controller.ts`, same gate and guard as APW-11's seed route). Its `guard` body runs the real `AppChangeGuard`, so the refusal copy is the guard's own. Only the model is mocked in the chat spec. **Open:** the not-admitted copy (ACC-08-08, ACC-08-10) is a `test.fixme`, because T12 and T13/T14 have no surface yet.
       **Create** `apps/web/e2e/app-works-evolve-chat.spec.ts`, `apps/web/e2e/app-works-delivery-chips.spec.ts`,
       `apps/web/e2e/app-works-guard-refusals.spec.ts` (new) per [plan §9.4](./plan.md); prefer `getByTestId` for board
       cards. API behaviour is asserted here or in the controller specs — never in `apps/api/test/` (Resolution R-22).
@@ -702,6 +798,14 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       **Test**: root `pnpm format:check && pnpm lint && pnpm type-check && pnpm test && pnpm build`.
       **Done when**: the commands are green and ACC-08-06…ACC-08-24, ACC-08-28…32 are walked on a running build with a
       fixture App Work, each observation recorded in the PR description.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2): open.** Every P1 task above is merged and ticked. The root
+      gate (`pnpm format:check && pnpm lint && pnpm type-check && pnpm test && pnpm build`) has not been run as one
+      command: PR CI runs CodeQL, egress and route-list only, and the lead's PC cannot hold a full root test run. Each
+      PR ran its own specs, type-checks and builds locally instead (recorded in each PR). The ACC walk is covered
+      in part by the Playwright lanes run green locally on a SQLite stack: - `app-works-evolve-chat`: ACC-08-24; - `app-works-delivery-chips`: ACC-08-17, ‑21, ‑22; - `app-works-guard-refusals`: ACC-08-08, ‑11, ‑12, ‑14, and FR-9/FR-12; - `app-works-a11y`: ACC-08-35.
+
+    ACC-08-10 needs a Fleet node, and ACC-08-31 needs a Fleet producer of `rail_refusals`. Closing T30 is an
+    owner-run step: the root gate on a CI-sized runner, then the walk on stage.
 
 ---
 
@@ -712,7 +816,7 @@ _Delivers FR-45…FR-55._
 - [ ] **T31. Goal Work scope — schema and API.**
       **Modify** `packages/agent/src/entities/goal.entity.ts` — append `workId` (uuid, nullable, no relation) and
       `@Index('idx_goals_work', ['workId'])`.
-      **Create** `apps/api/src/migrations/1792080100000-AddGoalWorkScope.ts` (new).
+      **Create** `apps/api/src/migrations/1792350000000-AddGoalWorkScope.ts` (new).
       **Modify** `apps/api/src/goals/dto/goal.dto.ts` (`workId?: string | null`, `@IsUUID`),
       `apps/api/src/goals/goals.controller.ts`, `packages/agent/src/goals/goals.service.ts` — validate reachability in
       the Goal's scope; `409 loopRunning` on change while running.
@@ -723,6 +827,13 @@ _Delivers FR-45…FR-55._
       Work answers not found. Run: `cd apps/api && pnpm test AddGoalWorkScope goal` and
       `pnpm --filter @ever-works/agent test goals.service`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-work-scope`): built.** - `goals.workId` (uuid, nullable, no FK so a deleted Work pauses rather than cascades) and `idx_goals_work`.
+      The migration is `1792350000000-AddGoalWorkScope`: the next free App Works slot. The plan's
+      `1792080100000` predates the block's later stamps. - `GoalsService` resolves the Work the way Task creation does: it must exist, be the acting user's, and be in
+      the same scope. A missing Work, another account's Work, or one in another scope all get the same
+      `404 workNotFound`. Without a Work repository a `workId` is refused, never stored unchecked. - A change while `loopStatus = 'running'` is `409 loopRunning`; resending the current Work is not a change. - The single read adds `workName`. - DTOs: `workId?: uuid | null`.
+
+    Specs: migration 3/3; DTO 35/35; service 60/60, with both rules bite-proven; controller 30/30 (3 new).
 
 - [ ] **T32. Orchestrator.**
       **Modify** `packages/agent/src/goals/goal-orchestrator.service.ts` — `applyDispatch` passes
@@ -734,6 +845,33 @@ _Delivers FR-45…FR-55._
       existing `goal-orchestrator-rules.spec.ts` passes unchanged. Run:
       `pnpm --filter @ever-works/agent test goal-orchestrator`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-orchestrator-work`, stacked on T31):
+      built.** - `applyDispatch` files every iteration on `goal.workId` (FR-46). - `advanceOne` reads the Goal's Tasks and runs once. For an App Work, it counts the iteration Tasks in review
+      whose pull request is still open and that have no run in flight; those hold the concurrency ceiling
+      (`awaiting-merge`, with the S10 copy that names the iteration). - A Work that is gone, or no longer the owner's in the Goal's scope, pauses the loop (`work-unavailable`, S26).
+      It is checked after "finished" and before the ceilings. A failed Work READ does not pause. - The rules take optional `pullRequestsAwaitingMerge`, `awaitingMergeIterations` and `workUnavailable`; the
+      existing decision table is unchanged.
+
+    **Independent review (2026-10-31), fixed:**
+    - **High:** `GoalsModule` did not register `Work`, so the `@Optional()` repository was `undefined` in
+      production. Every `workId` was refused and the loop never checked its Work. Now registered, and pinned by
+      `goals.module.work-repository.spec`.
+    - "Open pull request" now uses the workspace's own rule (`openPullRequestOf`) instead of
+      `in_review` + `prState = 'open'`. An unknown state (before the PR sweep first runs) and a draft count as
+      open, and so does a BLOCKED change whose PR is still open.
+    - It counts only this Work's unfinished Tasks, through their own query, so the Goal's 500-Task window can
+      never hide one.
+    - The S10 wait line is logged once, when the wait begins.
+    - A Work read failure waits (`work-unreadable`) rather than dispatching.
+    - `startLoop` refuses a Work that is gone (`422 workUnavailable`).
+    - A teammate reading a shared Goal never sees the owner's Work name.
+
+    Specs:
+    - `goal-orchestrator-rules.awaiting-merge` 9/9 (new);
+    - `goal-orchestrator-rules` 43/43, unchanged;
+    - `goal-orchestrator.service` 91/91 (the T32 cases live there rather than in a separate
+      `work-scope` spec; the new rules are bite-proven);
+    - the run-order integration spec 8/8.
 
 - [ ] **T33 (parallel with T32). Goal form.**
       **Modify** `apps/web/src/components/goals/GoalForm.tsx`, `apps/web/src/components/goals/goal-form-payload.ts`,
@@ -743,6 +881,19 @@ _Delivers FR-45…FR-55._
       **Test**: extend `apps/web/src/components/goals/GoalForm.unit.spec.tsx` — the Work select sends `workId`, is
       disabled while the loop runs, and clears to `null`. Run: `pnpm --filter ever-works-web test GoalForm`.
       **Done when**: the spec is green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-form-work`, stacked on T32): built.**
+    - **Create form:** an optional Work picker (`WorkSelect`, "No Work" by default) sends `workId` only when one
+      is picked.
+    - **Goal page:** a new `GoalWorkSection` links the Work by name and changes it. "No Work" clears it to
+      `null`. The control is locked while the loop runs, with "Pause the loop to change its Work." (the API's
+      `409 loopRunning`).
+    - **Web types:** `Goal.workId` / `workName` and `workId` on create/update.
+    - **Copy:** `dashboard.goalNew.work` and `dashboard.goalDetail.work`, in all 21 locales.
+    - The loop's log lines come from the orchestrator's own `reasoning` (S10 / S26 copy), so no extra keys
+      were needed.
+
+    Specs: `GoalForm.unit.spec` (3 new), `GoalWorkSection.unit.spec` (4, new); `components/goals` 33/33;
+    `src/lib/__tests__` 15/15; web `tsc` clean.
 
 - [ ] **T34. Mission output — schema and API.**
       **Modify** `packages/agent/src/entities/mission.entity.ts` — append `outputMode`, `taskOutput`,
@@ -758,6 +909,26 @@ _Delivers FR-45…FR-55._
       Run: `cd apps/api && pnpm test AddMissionTaskOutput mission` and
       `pnpm --filter @ever-works/agent test mission-task-output`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-task-output`, stacked on T33):
+      built.**
+    - **Columns.** `missions.outputMode` (varchar(8), NOT NULL, default `'ideas'`), `taskOutput` (simple-json) and
+      `taskOutputNoticeAt`, via migration `1792360000000-AddMissionTaskOutput`. That is the next free slot after
+      T31's; the plan's `1792080200000` predates the block's later stamps.
+    - **Normalizer.** `mission-task-output.ts` holds `normalizeMissionTaskOutput` (`tasksPerTick` 1..3, default 1;
+      `openTasksCap` 1..10, default 3; `agentId` kept only as a uuid; garbage gives the defaults) and
+      `normalizeMissionOutputMode`, where anything unknown is `ideas`.
+    - **Service.** `MissionsService` refuses an unknown mode with `400` and stores Task output normalized
+      (`null` resets it). A Mission that files Tasks with no App Work attached as Improves or Operates is
+      accepted, with `warnings: ['noAppWorkRelation']`.
+    - **Supporting changes.** `MissionWorkRepository.listForMissionWithWork` now also selects the Work's kind.
+      The API DTOs validate the mode and the bounds.
+
+    Specs:
+    - `mission-task-output` 13/13;
+    - `missions.service` 51/51 (5 new; the warning is bite-proven);
+    - migration 3/3;
+    - `mission.dto` 22/22;
+    - `missions.controller` 2/2 (new).
 
 - [ ] **T35. Planner and tick branch.**
       **Create** `packages/agent/src/missions/mission-task-planner.service.ts` (new) — `AiFacadeService.askJson` with
@@ -790,6 +961,54 @@ _Delivers FR-45…FR-55._
       plan carries `maxBudgetUsd` rounded down** (APW08-G15); the existing `mission-tick.service.spec.ts` passes
       unchanged. Run: `pnpm --filter @ever-works/agent test mission-tick`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-task-tick`, stacked on T34):
+      part 1 built — the planner and the tick branch; the per-run budget (APW08-G15) is part 2.**
+    - **Planner.** `MissionTaskPlannerService` uses `AiFacadeService.askJson`, schema-checked (title ≤ 120,
+      description ≤ 4000). It is given the Mission, the Work, its 20 latest Task titles and the relation
+      (Improves → product changes, Operates → maintenance). The Work description and the titles are fenced as
+      untrusted data.
+    - **Tick branch.** `MissionTickService` branches on `outputMode`: `ideas` is unchanged, `tasks` files Tasks,
+      `both` files Ideas then Tasks.
+        - It covers at most 5 App Works attached as Improves or Operates.
+        - The open-Tasks cap counts this Mission's open Tasks on that Work. Each tick files at most
+          `tasksPerTick`, within the cap.
+        - A proposal whose normalised title matches an open Task on that Work is dropped.
+        - Tasks are filed with the Mission, the Work and the `mission-task` label: in Backlog when
+          `requireApprovalBeforeCreate` is set; otherwise in To do, and started through `TasksService.runTask`
+          with the Mission's Agent (else the Work's default).
+        - The work is per Work and best-effort: one Work failing never stops the others.
+
+    - **Notice.** "Nothing to file" (FR-54, S27) is at most one `mission_nothing_to_file` Activity per Mission
+      per UTC day, stamped on `taskOutputNoticeAt`. The feed narration copy is in `en`, the only locale with a
+      feed tree.
+    - **Telemetry.** `mission.task_output.tick` and `mission.task_output.nothing_to_file` are emitted (the rest of
+      T43).
+    - **Wiring.** `MissionsModule` registers `Task` and imports `FacadesModule`; `missions.module.task-output.spec`
+      pins it. `TasksService` is resolved lazily, so there is no module cycle.
+
+    Specs:
+    - `mission-tick.task-output` 9/9 (cap and duplicate rules bite-proven);
+    - `mission-task-planner` 4/4;
+    - module wiring 2/2;
+    - `mission-tick.service` 28/28 and `missions.service` 51/51, unchanged.
+      **Part 2, the per-run budget (APW08-G15), branch `feat/apw08-run-budget-cap`: built.**
+
+    - `agent_runs.budgetCapCents` (int, NULL = no cap), via migration `1792370000000-AddAgentRunBudgetCap`.
+    - `dispatchAgentRun` / `runTask` take `maxBudgetCents` (a positive whole number, otherwise no cap) and store
+      it on the run row, so a parked, drained or resumed run keeps it.
+    - The Mission tick passes `guardrailsOverride.maxBudgetCentsPerRun`.
+    - The Fleet planner maps the cap to `execution.maxBudgetUsd` as `floor(cents) / 100`, never above the
+      Agent's own cap.
+
+    **Known limit:** the cloud loop has no per-run cost accounting (it counts tokens only), so on the cloud path
+    the cap is recorded but not enforced. Cloud App Work runs are refused today (T12, `noIsolatedRuntime`), so
+    every Mission-filed App Work Task runs on a Fleet node, where the cap applies.
+
+    Specs:
+    - `task-transition` 34/34;
+    - `mission-tick.task-output` 10/10;
+    - planner `app-work-policy` 16/16 (the mapping is bite-proven);
+    - `AddAgentRunBudgetCap` 2/2.
 
 - [ ] **T36. Mission web.**
       **Create** `apps/web/src/components/missions/MissionOutputCard.tsx`,
@@ -800,6 +1019,21 @@ _Delivers FR-45…FR-55._
       no-App-Work notice, 20 rows per page; `MissionDetailClient.unit.spec.tsx` passes unchanged. Run:
       `pnpm --filter ever-works-web test Mission`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-mission-web`, stacked on T35): built.**
+    - **`MissionOutputCard`** (in the Mission page's right rail): three radios. When the Mission files Tasks it
+      shows the Tasks-per-tick (1..3) and open-cap (1..10) inputs, clamped like the API. The no-App-Work notice
+      shows when no App Work is attached as Improves or Operates, and after the API answers `noAppWorkRelation`.
+    - **`MissionTasksOnWorksPanel`** (in the content column, only while the Mission files Tasks): the
+      `mission-task` Tasks, 20 per page, via the new `listMissionTasksOnWorksAction`. They are sorted by the list
+      API's own order, most recent activity first.
+    - **Web types:** `Mission.outputMode` / `taskOutput` / `warnings`, and `MissionWorkRelationDto.workKind`.
+    - **Copy:** `dashboard.missionDetail.output` in all 21 locales.
+
+    Specs:
+    - `MissionOutputCard.unit` 4/4;
+    - `MissionTasksOnWorksPanel.unit` 3/3;
+    - `components/missions` 77/77, with `MissionDetailClient.unit` unchanged;
+    - web `tsc` clean.
 
 - [ ] **T37. P2 i18n, e2e, gate.**
       **Modify** `apps/web/messages/en.json` — `dashboard.goalNew.work`, `dashboard.missionDetail.output`; mirror into
@@ -809,6 +1043,22 @@ _Delivers FR-45…FR-55._
       **Test**: `pnpm --filter ever-works-web test app-works-evolve-messages` and
       `cd apps/web && pnpm exec playwright test goals-work-scope missions-task-output flow-goal-lifecycle flow-goals-lifecycle-deep flow-mission-crud-schedule flow-mission-guardrails`.
       **Done when**: all pass (the four pre-existing flows unchanged) and ACC-08-25/26 are walked.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-p2-i18n-e2e`, stacked on T36):
+      written; the local Playwright run is pending.**
+    - **Copy.** `dashboard.goalNew.work`, `dashboard.goalDetail.work` and `dashboard.missionDetail.output` are in
+      all 21 locales (T33 / T36). The Run-now toasts `tasks-filed` / `no-tasks` are in 21 locales (T35).
+    - **Messages spec.** `app-works-evolve-messages` now covers the three sub-trees (every leaf in 21 bundles,
+      camelCase, valid ICU, the plan's copy verbatim): 7/7 with the P2 case.
+    - **e2e specs:**
+        - `goals-work-scope.spec.ts`: a Goal names a reachable Work, the Goal page links it, an unreachable Work
+          is `404 workNotFound`, and `null` clears it;
+        - `missions-task-output.spec.ts`: `noAppWorkRelation` until an App Work is attached, the API's bounds,
+          and the Output card plus the "Tasks on attached Works" panel on the Mission page.
+    - **Not exercised in the e2e lane** (no agent or AI provider there): the loop's iterations and awaiting-merge
+      wait, and the tick's planning. Both are unit-covered (`goal-orchestrator.service.spec`,
+      `mission-tick.task-output.spec`).
+    - **Pending:** the local Playwright run of the two new files plus the four pre-existing flows. It was
+      deferred because a parallel session held this PC's ports and memory for its own e2e stack.
 
 ---
 
@@ -923,6 +1173,16 @@ _Delivers FR-56…FR-60._
       telemetry half); **a dependency assertion that `packages/agent/package.json` still does not list
       `@ever-works/monitoring`** (APW08-G16). Run: `pnpm --filter @ever-works/monitoring test app-change-events`.
       **Done when**: the spec is green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-tool-denied`): every P1 event has an
+      emitter.** Built differently from the text above, as recorded in `app-change.telemetry.ts`: the agent package
+      keeps no `@ever-works/monitoring` dependency and uses APW-01's one sanitizer (`AppWorksTelemetryService`, rule 3
+      drops any free text) over the API's `@Global()` `APP_WORKS_TELEMETRY_SINK`. The emitters: - `started` / `blocked_by_switch` / `guard_refused`: #3027; - the delivery events: the chain (#3030); - `run_admitted`: #3047; - **`tool_denied` (this branch):** the Fleet planner sends group `mcp` when it withholds an App Work run's
+      platform-MCP bridge (the live path), and `AgentRunService` sends one event per group the policy withholds or
+      refuses (cloud loop). The properties are `{ workId, taskId, group }`, attributed to the App Work through the
+      new `AppWorkRunClassifier.appWorkIdOf`.
+
+    Specs: planner `app-work-policy` 12/12, `app-work-tool-policy` 25/25, both emitters bite-proven. Still
+    missing: `mission.task_output.*` (comes with P2 T35).
 
 - [ ] **T44. Docs.**
       **Create** `docs/features/app-works-evolve.md` (behaviour: delivery states, rules, follow-ups, Goals/Missions
@@ -931,11 +1191,20 @@ _Delivers FR-56…FR-60._
       (list the new page), `docs/specs/features/app-works/TRACKER.md`.
       **Test**: `pnpm --filter ever-works-docs build`.
       **Done when**: the docs build has no broken-link warning for the new page.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2): the page and the edits that apply today are merged (#3052
+      `b1168176d`; parking text refreshed in #3055).** `docs/features/app-works-evolve.md` (asking for a change, where runs may
+      execute, isolation, checks, merge → live, cost and budget, the operator switches, and a "Not yet" list naming
+      P2 / P3 and the safety-rail holds), listed under App Works in `apps/docs/sidebarsPlatform.ts`;
+      `docs/features/app-works.md` corrected for G06 / G22 (no refusal on a truncated patch alone; the file-count
+      guidance) and linked to the new page; the APW-08 TRACKER row updated. **Waits on P2 / P3:** the `missions.md`
+      (Output), `goals.md` (Work) and `mission-templates.md` edits — they describe surfaces that do not exist yet.
 
 - [ ] **T45. Statuses.**
       **Modify** `spec.md`, `plan.md` and this file — status `Implemented`.
       **Test**: re-read every gate in [plan §11](./plan.md) against the merged code.
       **Done when**: every checklist item still holds and the known gaps are still recorded.
+      **Status (2026-10-31): partly.** The header's status moved off `Draft`, and the P0/P1 boxes are ticked from the
+      merged PRs (the boxes had never been ticked). It closes with P3.
 
 - [ ] **T46. Safety-rail holds on App Work runs (added 2026-09-17, Resolution R-17).**
       **Create** `packages/agent/src/app-works/app-work-run-holds.ts` (new) — `classifyAppWorkRunStop(input)` → `wait` for a
@@ -964,6 +1233,36 @@ _Delivers FR-56…FR-60._
       `pnpm --filter @ever-works/agent test app-work-run-holds`.
       **Done when**: the spec is green and `packages/agent/src/tasks-domain/__tests__/task-ci-auto-resume.spec.ts`
       passes unchanged.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-run-holds`): built, specs green locally,
+      not merged.** `app-work-run-holds.ts` — `classifyAppWorkRunStop` (park reasons `kill-switch` / `agent-paused`
+      and the stop / pause rails → `wait`; any other `refused` / `held` → `needs_input` with the FIRST such rail and
+      its category; a wait wins over a refusal in the same run). **The producer is the safety gate's own record,
+      not a new run column:** `SafetyGateService.evaluate` already writes a `rail_refusals` row (with `runId`,
+      `railId`, `category`) for every non-allow verdict, so nothing in `AgentRunService` changes and nothing depends
+      on the model reporting. **One hook for both paths:** `TaskRunDenormService.recordTerminal` — the write the
+      cloud worker (over its RPC proxy) and the Fleet reconciler both make when a run ends — asks
+      `APP_WORK_RUN_STOP_HANDLER` (`AppWorkRunHoldsService`, fire-and-forget, the Task's current run only). On
+      `needs_input` for an App Work Task: `in_progress` / `in_review` → `BLOCKED`, and ONE `guardrail-refusal`
+      escalation (`dedupKey` per run) whose summary names the rail and category only. A `wait` moves nothing.
+      `TaskTransitionService` is resolved lazily (it depends on the denorm service). Spec `app-work-run-holds`
+      21/21 (every rail id and park reason, wait wins, first refusal decides; block + one escalation; wait and
+      non-App untouched; never throws; end to end through `recordTerminal`; a stale run touches nothing) —
+      bite-proven (the hook; the needs_input rule). **Known limit:** the CI fix loop has no explicit stop for a
+      BLOCKED Task (a guardrail block usually lands before any pull request, so it has nothing to resume);
+      `appRules.runHeld` copy and pausing the run's deadline clock while it waits are not built.
+      **Independent review (2026-10-31), fixed on the branch:** the escalation is filed only when the Task IS
+      blocked (already, by this move, or by a concurrent move that won the compare-and-set) — a Task that is done,
+      cancelled or back in todo is left alone and nothing is filed; a stop / pause rail is found wherever it falls in
+      the run (its own query, not the oldest 50); the window opens a minute before the run ROW was created (a
+      re-claimed run re-stamps `startedAt`). The cloud worker's `dispatched` success path now mirrors the run's end
+      (`recordTerminal('completed')`) after finalize and on the no-workspace return: before, it mirrored nothing
+      (the Task kept `latestRunStatus: running`) and never asked the hook. Spec `app-work-run-holds` 26/26,
+      `agent-task-execute.task` 57/57 (both bite-proven). **ACC-08-31 stays OPEN — no live producer on the Fleet
+      path:** a Fleet node runs its coding agent locally, so the platform's `SafetyGateService` never sees its tool
+      calls and no `rail_refusals` row carries a Fleet run's id; cloud App Work runs are refused today
+      (`noIsolatedRuntime`). The hook is ready for either producer: a node-side verdict report on the `agent-task`
+      result (the reconciler writes `rail_refusals` from it), or the plan's `runSafetyStop`. Owner call: a `held`
+      ladder verdict also files an approval, so a held run can raise two Inbox items.
 
 ---
 
@@ -993,7 +1292,9 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       **Done when**: the spec is green and APW-09's plan references this constant instead of a second list (a
       cross-epic request, not an edit here).
 
-- [ ] **T48. Fleet containment: admission, record, and the Task view (XC-06, SK-14, GAP-21, FR-12, FR-70).**
+- [x] **T48. Fleet containment: admission, record, and the Task view (XC-06, SK-14, GAP-21, FR-12, FR-70).**
+      **Status (2026-10-30, lane L10, review of #3040):** the reconciler asks the recorder only for a job carrying `appWorkId` (no read for any other completion); the allowance store writes by compare-and-set (`WorkRepository.casAppRunContainmentAllowances`, retried) so concurrent allowances never lose one; the route is human-only (`requireHumanSession`) and answers 409 on a lost race; the Cost view marks `viewerOwnsNode` and the notice offers Allow / Withdraw only on the viewer's own named nodes. Spec `run-containment.spec.ts` (15).
+      **Status (2026-10-30, lane L10, branch `feat/apw08-run-admission`): built** — `run-containment.ts` (`toAppWorkRunContainment` through the normalizer, `needsOwnerAllowance`, `admitFleetContainment` over every node that could lease the run, the allowance store helpers). The reconciler hands the raw block to `APP_WORK_RUN_CONTAINMENT_RECORDER` right after the receipt (14th optional slot, own method); the recorder writes `agent_runs.containment` for App Work Tasks only. The allowance store is `works.appRunContainmentAllowances` (EW-807 shape) behind `POST /api/works/:id/app-runs/allow-containment` (node must be the caller's own; 404 `notFound`, 422 `notAppWork`, 10/min). `TaskCostView` gains `containment` and `containmentHolds` (optional, so every non-App view is unchanged). Migration `1792340000000-AddAppRunContainment`. A node's admission reads its latest `agent-task` report from `fleet_jobs.result` (purged after `FLEET_JOB_RETENTION_DAYS`: an idle node reads "not reported"). Shared-file appends made to `EXISTING-SUBSTRATE.md`, `ACCEPTANCE.md` and README §7 rule 9. Spec `run-containment.spec.ts` (12); reconciler `fleet-agent-task-reconciler.containment.spec.ts` (5); `fleet-agent-task-reconciler.spec.ts` unchanged (106). Not built: T46's classifier call (T46 is not on `develop`).
       **Create** `packages/agent/src/app-works/run-containment.ts` (new) — `AppWorkRunContainment` (plan §3.4),
       `needsOwnerAllowance` (false-only or an `isolated-home` downgrade), and the pure admission predicate T12 calls.
       **Modify** `apps/api/src/fleet/fleet-agent-task-reconciler.service.ts` — carry the normalized containment onto
@@ -1039,8 +1340,27 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test app-work-kill-switch`.
       **Done when**: the spec is green and every pre-existing dispatcher spec passes unchanged with the switches at
       their defaults.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-switch-park`): park-with-auto-resume
+      built, not merged.** With `EVER_WORKS_APP_CHANGES_ENABLED` off, `dispatchAgentRun` no longer refuses an App Work
+      Task's run: it PARKS it (`QUEUED_REASON_APP_CHANGES_PAUSED = 'app-changes-paused'`) — the run row exists,
+      nothing is enqueued (the gate is not asked: its chain does not know the switch). The FR-9 / T12 refusals still
+      come first, and an install with no run repository is refused as before. The stuck-run sweeper never reaps such
+      a run (SQL and service), and each tick `releaseAppChangesWaits` releases them through the gate's
+      `promoteParked` once the switch is ON again — reading nothing while it is off; a switch that flips off again in
+      between is still refused by the worker's own `switch_off` check. Specs: `app-work-kill-switch` 20/20 (the
+      switch-off dispatch case now asserts the parked row and no enqueue — just as strict — plus the no-repository
+      refusal), `agent-run-sweeper.app-changes` 4/4 (new); both bite-proven.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-switch-banner`): the web read-only banner
+      built, not merged.** `GET /api/app-works/switches` (`AppWorkSwitchesController`, any signed-in caller — two
+      booleans of installation config, nothing per Work) answers `readAppWorkSwitches()` as the dispatchers read it.
+      The App Work Overview reads it fail-soft: with changes off it shows **"Changes to apps are paused by the
+      operator."** (S34; `role="status"`) and offers no **Request a change** (R-30: the UI is read-only); boards,
+      delivery chains, the chat entry and history stay readable. Specs: `app-work-switches.controller` 3/3,
+      `AppWorkOverviewCard.unit` 2/2 (bite-proven). **Still not built:** park-with-auto-resume (a refused Task is run
+      again by hand) and the Mission tick read (T35).
 
-- [ ] **T50. One-off backfill of App Work isolation columns (APW08-G07).**
+- [x] **T50. One-off backfill of App Work isolation columns (APW08-G07).**
+      **Status (2026-10-30, lane L8, branch `feat/apw08-app-isolation`): built, NOT run anywhere** — `AppWorkIsolationBackfillRunner.run({ limit, afterId, dryRun })` visits one keyset page of `kind = 'app'` Works with no base branch (`WorkRepository.findAppWorkIdsWithoutIsolationBase`), resolves through T11's `AppWorkIsolationService.resolveSourceBranch` and writes the three columns through its `apply` (no copy of either; a source-text case pins it). Exposed as the one-shot Trigger task `app-work-isolation-backfill` (`packages/tasks/src/tasks/trigger/app-work-isolation-backfill.task.ts`, never scheduled), which loops pages over the internal RPC channel (`TriggerInternalModule` proxy + `TriggerInternalController.remoteMap` entry, `run` only); `{ "dryRun": true }` previews. The checks switches (APW08-G02) are deliberately NOT backfilled — an owner question on the PR. The prod run is the owner's call; `docs/features/app-works.md` records the job (T44's `app-works-evolve.md` does not exist yet).
       **Create** `packages/agent/src/app-works/app-work-isolation-backfill.runner.ts` (new) — walks every
       `kind = 'app'` Work whose `taskIsolationBaseBranch` is unset, resolves the branch exactly as T11's listener does
       (applied spec → `WorkAppSpecState` tracked branch → Work Repository default branch) and writes
@@ -1058,7 +1378,7 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test app-work-isolation-backfill`.
       **Done when**: the spec is green.
 
-- [ ] **T51. Ask the owner once about checks; classify a missing tool (APW08-G19, FR-14, FR-61).**
+- [x] **T51. Ask the owner once about checks; classify a missing tool (APW08-G19, FR-14, FR-61).**
       **Modify** `packages/agent/src/app-works/app-spec-applied.listener.ts` (T11's file) — when the applied spec's
       `checks` differ from the checks the owner was last asked about (deduplicated on the applied spec hash), send
       **one** notification through the existing Task-notification path, linking to the App Checks admission card
@@ -1078,8 +1398,22 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       half). Run: `pnpm --filter @ever-works/agent test app-spec-applied` and
       `pnpm --filter @ever-works/node test acceptance-checks`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-missing-tool`): the node half built, specs
+      green locally, not merged** (the first half, the checks-change notice, landed with T11 in #3036).
+      `apps/node/.../acceptance-checks.missing-tool.ts` classifies exit 127 (POSIX) and 9009 (`cmd.exe`) — on every
+      platform — as `error` with `reason: 'missingTool'` (`TaskCheckResult.reason`, additive); every other exit code
+      stays red, and the gate treats the error like any other non-green required check. The reconciler passes check
+      rows through whole, so the reason reaches the Task. **Exclusion** reuses #3040's lease check instead of a new
+      store: `admitsLease` (now given the job's `taskId`) passes over a node whose LATEST completed run of THAT Task,
+      within 24 h (`APP_WORK_MISSING_TOOL_EXCLUSION_MS`), reported a missing tool — read from the node's own job rows
+      (`findLatestCompletedAgentTasksForNode`). Bounded so a machine whose owner installs the tool can take the Task
+      again; a failed read admits (a hint, not a safety rule — containment, checked first, fails closed). Web:
+      `TaskChecksSection` labels the row `result.missingTool` (S36's copy, English in all 21 locales). Specs: node
+      acceptance-checks (127 / 9009 → missingTool, 7 other codes stay red), isolated-run-admission 36/36 (2 new:
+      passed over for that Task only, a day back, no task id, fail open; never admits a node containment refuses),
+      `fleet-job.app-work-lease` 4/4 (the call now carries `taskId`), web `TaskChecksSection.unit` 2/2 (new).
 
-- [ ] **T52. Keyboard and accessibility for the P1 surfaces (XC-25, FR-71).**
+- [x] **T52. Keyboard and accessibility for the P1 surfaces (XC-25, FR-71).**
       **Modify** `apps/web/src/components/tasks/TaskDeliveryChips.tsx`, `TaskDeliverySection.tsx`,
       `TaskCostSection.tsx`, `TaskRunContainmentNotice.tsx`,
       `apps/web/src/components/works/detail/RequestChangeDialog.tsx`, `WorkCostSummary.tsx`,
@@ -1093,7 +1427,7 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `cd apps/web && pnpm exec playwright test app-works-a11y`.
       **Done when**: the spec is green and the pre-existing e2e flows pass unchanged.
 
-- [ ] **T53. Repository size limits come from one table (XC-29, FR-72).**
+- [x] **T53. Repository size limits come from one table (XC-29, FR-72).**
       **Consume** `packages/contracts/src/apps/apps-limits.ts` (CONTRACTS §2A — shared-file request; APW-01/03 own the
       file) — per stage, the maximum repository size and LFS support. This epic adds **no** limit of its own.
       **Modify** `packages/agent/src/app-works/isolated-run-admission.ts` (T12's file) and the workspace provisioning
@@ -1105,8 +1439,22 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       the limit is not refused; no local constant exists (a source-text assertion on the epic's own files)
       (ACC-08-36). Run: `pnpm --filter @ever-works/agent test repo-size-limit`.
       **Done when**: the spec is green.
+      **Status (2026-10-30, lead `43c536` on EVERDESK2, branch `feat/apw08-repo-size-limit`): built, spec green
+      locally, not merged.** `APP_WORK_RUN_CHECKOUT_STAGE = 'sandbox'` (FR-72's "Fleet or isolated sandbox" checkout
+      is the table's `sandbox` stage — a stage name, never a number). `appWorkRepositorySizeRefusal` decides with the
+      shared table's own `firstRefusingRepositoryStage` and answers the new refusal `repositoryTooLarge` (stage, size,
+      limit, the S35 copy; an unmeasurable size is refused wherever a limit exists).
+      `IsolatedRunAdmissionService.admit` asks it FIRST, before any placement rule, so site 1, every Fleet enqueue
+      and the cloud pre-flight all refuse alike. **Today the table states no size for `sandbox`**
+      (`APP_REPOSITORY_STAGES_WITHOUT_SPEC_LIMIT`), so nothing is refused and the size is never read (no provider
+      call added). The day a number lands there, every App Work run checks against it with no change here. The read
+      (`repositorySizeKb`) is APW-01 Inspect's own: `GitFacadeService.getRepository(...).sizeKb`, bound optionally
+      in `apps/api` `isolated-run-admission.providers.ts`. Spec `repo-size-limit` 9/9: the table, the stage Inspect
+      names, the copy, inside the limit, unmeasurable, the no-local-constant source assertion, and through the
+      service: no read today, refusal before placement once a limit is entered, fail closed on a failed read.
 
-- [ ] **T54. Keyed Task-thread posts (APW08-G12, FR-43).**
+- [x] **T54. Keyed Task-thread posts (APW08-G12, FR-43).**
+      **Status (2026-10-29, lane L5, branch `feat/apw08-thread-posts`): built** — migration `1792330000000-AddTaskChatMessageKey` (stamped after the newest App Works migration, like slot `00`; `followUpKey` already shipped with `1792320000000-AddTaskDeliveryState`), `TaskChatMessage.messageKey` / `messageParams`, nullable `authorId` and `TaskChatAuthorType` (`'system'`); `TaskChatService.post` and `TaskWorkspaceService.postSystemMessage` accept a key and params with the English in `body`; the delivery chain posts through the `TASK_THREAD_POSTER` token; the Task page renders a stored key in the reader's locale (`TaskChatMessageText`) and falls back to `body`.
       **Create** `apps/api/src/migrations/1792080300000-AddTaskChatMessageKey.ts` (new) — plan §3.5 slot `03`:
       nullable `messageKey varchar(64)`, nullable `messageParams simple-json`, `authorId` **made nullable**
       (widening only) with a `system` `authorType`, and `followUpKey varchar(120) NULL` + `uq_tasks_follow_up_key` on
@@ -1126,7 +1474,7 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test task-delivery.service`.
       **Done when**: the specs are green.
 
-- [ ] **T55. Follow-up lineage and the provisioner exemption are not labels (APW08-G23).**
+- [x] **T55. Follow-up lineage and the provisioner exemption are not labels (APW08-G23).**
       **Modify** `packages/agent/src/app-works/delivery-follow-up.service.ts` (T21's file) — write `followUpKey` on
       the follow-up Task and dedupe on it; keep the existing `follow-up` Task relation as the lineage; **remove the
       label** from the dedup path (the relation and the column carry it), so clearing or editing labels changes no
@@ -1142,8 +1490,32 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       full 82-character value. Run: `pnpm --filter @ever-works/agent test follow-up-key app-change-guard`.
       **Done when**: the specs are green and the pre-existing `app-change-guard.spec.ts` cases pass unchanged.
 
-- [ ] **T56. Per-App-Work cost rollup against the Work budget (XC-19, FR-73).**
+- [x] **T56. Per-App-Work cost rollup against the Work budget (XC-19, FR-73).**
       **Status (2026-10-27, lane B2 `aw-evolve`): the read is done** — `GET /api/works/:id/cost?month=YYYY-MM` (`WorkCostController`, view access, one `404 not_found`, `400 invalidMonth`) answers `WorkCostRollup` from the usage ledger (`getTotalSpendCents`, the budget guard's own query, in the budget's currency) and the Work's existing global `WorkBudget`: spend, cap, remaining (never negative), percent and the EW-602 alert ladder (75 / 90 / 100 / overage). Spec `apps/api/src/works/work-cost.controller.spec.ts`. **Not built:** booking the App Work run paths against the Work's budget through the guard, and `WorkCostSummary` on the App Work overview.
+      **Status (2026-10-30, lane L11, branch `feat/apw08-guard-budget`): booking and the overview half built, specs
+      green locally, not merged.** `AppWorkBudgetService` (`packages/agent/src/app-works/app-work-budget.ts`) is the
+      one booking door: `book({ workId, userId, charge })` calls `BudgetGuardService.checkBudget` with the App
+      Work's own id (never the Agent's Work) for the charges `run` (AI, `app-works-run`), `preparation` (APW-09
+      T44's own capability and plugin id) and `build` (BUILD, `app-works-build`); App Works only — any other kind
+      answers `not-app-work` without reading a budget. No table, no migration, no second spend account: the cap is
+      the Work's global `WorkBudget`, the alert is the guard's `BudgetThresholdCrossedEvent` (once per threshold and
+      period). _Runs:_ `createWorkBudgetAdmission` (`agents/run-admission-chain.ts`) asks the service through the
+      leaf port `agents/run-work-budget.ts`; `AppWorkBudgetAdmissionInstaller` (agent `AgentsModule`, next to the
+      gate) installs it with the gate's documented `withAdmissionChain` seam, right after the Agent brake —
+      `run-dispatch-gate.service.ts` and `DEFAULT_RUN_ADMISSION_CHAIN` are unchanged. A spent budget parks the run
+      `work-budget` on every dispatch and drain of a Task on an App Work (T25 `evolve`, T21 follow-up, the board,
+      chat, a Goal): a queued row that never reaches a runtime, so no gate attempt, no delivery failure and no
+      follow-up. The stuck-run sweeper exempts the reason (SQL and service) and its tick releases it through
+      `promoteParked('work-budget')` once the budget allows. A budget that cannot be read fails open (billing).
+      _Not existing yet:_ T35's Mission dispatch (it will dispatch Task runs through the same chain), APW-09's
+      preparation step (`preparationAvailable: false`), a managed Build (repository-CI Builds are the owner's CI,
+      `payer: workspace`, `costCents: 0`, and are not gated) and any hosting charge. _Read:_
+      `WorkCostRollup.spendCents` is `null` when the ledger total is not a number (ACC-08-37, one rule
+      `totalCostCents` in contracts), and then `remainingCents`/`percentUsed` are `null` too; the rollup adds
+      `tasks` — the month's costliest Tasks of this Work that the viewer owns (≤ 5, `getSpendByTaskForWork`).
+      `WorkCostSummary` (`apps/web/src/components/works/app/`, on `AppWorkOverviewCard`) shows **Unknown** instead
+      of `$0.00` and links each Task line to its Task page, whose last section is the Cost section. Specs:
+      `work-budget` 30/30 (new), `WorkCostSummary.unit` (new), `work-cost.controller` (4 new cases).
       **Modify** `apps/api/src/works/work-evolve.controller.ts` — `GET /api/works/:id/cost` returning
       `WorkCostRollup` (month spend, cap, remaining, alert state) through the **existing** `WorkBudget` /
       `WorkBudgetAlertState` entities and `BudgetGuardService` (`packages/agent/src/entities/work-budget.entity.ts`;

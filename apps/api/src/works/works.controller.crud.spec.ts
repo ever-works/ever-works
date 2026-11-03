@@ -33,7 +33,14 @@ jest.mock('@ever-works/agent/entities', () => ({
     WorkScheduleStatus: { ACTIVE: 'ACTIVE' },
 }));
 jest.mock('@ever-works/agent/subscriptions', () => ({}));
-jest.mock('@ever-works/agent/activity-log', () => ({}));
+jest.mock('@ever-works/agent/activity-log', () => ({
+    // C-13 — `deleteWork` builds its Activity record with the shared `workDeletedActivity` (also
+    // used by the internal CLI). The REAL builder, imported by path (the barrel drags the module
+    // graph in), so the deletion cases below pin the record that is actually written.
+    workDeletedActivity: jest.requireActual(
+        '../../../../packages/agent/src/activity-log/work-deleted-activity',
+    ).workDeletedActivity,
+}));
 // APW-01 T18 — nothing else is mocked for the App Work block: the assertions there
 // are driven by the REAL `AppWorkCreateService`, imported by path (the
 // `@ever-works/agent/app-works` barrel would drag the whole agent module graph in, and
@@ -918,9 +925,9 @@ describe('WorksController — core CRUD endpoints', () => {
             });
             expect(s.activityLogService.log).toHaveBeenCalledWith({
                 userId: 'auth-1',
-                actionType: 'WORK_DELETED',
+                actionType: 'work_deleted',
                 action: 'work.deleted',
-                status: 'COMPLETED',
+                status: 'completed',
                 summary: 'Deleted work',
                 details: {
                     workId: 'w-1',
@@ -959,9 +966,9 @@ describe('WorksController — core CRUD endpoints', () => {
             expect(s.activityLogService.log).toHaveBeenCalledWith({
                 userId: 'auth-1',
                 workId: 'w-1',
-                actionType: 'WORK_DELETED',
+                actionType: 'work_deleted',
                 action: 'work.deleted',
-                status: 'COMPLETED',
+                status: 'completed',
                 summary: 'Deleting work',
                 details: {
                     workId: 'w-1',

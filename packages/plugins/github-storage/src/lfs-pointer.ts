@@ -92,7 +92,7 @@ export function parsePointer(content: string): LfsPointer | null {
  * below.
  */
 export function gitattributesLine(pathPrefix: string): string {
-	const safe = pathPrefix.replace(/^\/+|\/+$/g, '');
+	const safe = pathPrefix.replace(/^\/+|(?<!\/)\/+$/g, '');
 	if (safe.length === 0) {
 		// LFS-track the whole repo. Unusual but valid.
 		return '* filter=lfs diff=lfs merge=lfs -text\n';

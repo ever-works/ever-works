@@ -1,5 +1,6 @@
 import {
     INBOX_DECISION_DORMANT_AFTER_DAYS,
+    normalizeInboxEmailMeta,
     type InboxDecisionContext,
     type InboxDecisionDto,
     type InboxItemDto,
@@ -31,6 +32,13 @@ export function toInboxItemDto(row: InboxItem): InboxItemDto {
         firstViewedAt: toIsoOrNull(row.firstViewedAt),
         createdAt: row.createdAt?.toISOString() ?? new Date(0).toISOString(),
         updatedAt: row.updatedAt?.toISOString() ?? new Date(0).toISOString(),
+        // Integration inbox push — what the web needs to show where an item came from.
+        origin: row.origin === 'integration' ? 'integration' : 'platform',
+        sourceLabel: row.sourceLabel ?? null,
+        sourceUrl: row.sourceUrl ?? null,
+        email: normalizeInboxEmailMeta(row.emailMeta),
+        occurredAt: toIsoOrNull(row.occurredAt),
+        goalId: row.goalId ?? null,
     };
 }
 
@@ -46,9 +54,11 @@ export function toInboxDecisionDto(
     now: Date = new Date(),
 ): InboxDecisionDto {
     const item = toInboxItemDto(row.item);
+    // An integration item never blocks a Task: answering it routes nowhere (same
+    // rule as `DECISION_BLOCKING_SQL` in the repository).
     const blockingReason: InboxDecisionContext['blockingReason'] = row.runParked
         ? 'run-parked'
-        : row.taskStatus === 'blocked'
+        : row.taskStatus === 'blocked' && row.item.origin !== 'integration'
           ? 'task-blocked'
           : null;
     const runLive = row.runStatus === 'queued' || row.runStatus === 'running';

@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { configBackupPath, loadConfig, saveConfig, type ConfigFileSystem } from './core/config-store';
 import { createLogger, type LogEntry } from './core/logger';
-import { createHelperFs } from './core/screen/helper/helper-trust';
+import { createHelperFs, HelperAclUnavailableError } from './core/screen/helper/helper-trust';
 import { clampResourceLimits, DEFAULT_HEARTBEAT_INTERVAL_MS, type NodeConfig } from './core/types';
 import { createConfigFileSystem, windowsAclUser } from './node-io';
 
@@ -230,5 +230,20 @@ describe('createHelperFs — the screen helper trust files on a real disk', () =
 			expect((await fsp.stat(policy)).mode & 0o777).toBe(0o600);
 			expect((await fsp.stat(binary)).mode & 0o777).toBe(0o755);
 		}
+	});
+
+	it('fails closed on Windows without an ACL step: nothing written, the old record kept (#380)', async () => {
+		const policy = path.join(dir, 'helper-policy.json');
+		await fsp.writeFile(policy, '{"v":1}');
+		const fs = createHelperFs({ platform: 'win32' });
+
+		await expect(fs.writePrivate(policy, '{"v":2}')).rejects.toBeInstanceOf(HelperAclUnavailableError);
+		await expect(
+			fs.writeExecutable(path.join(dir, 'screen-helper', 'ever-works-screen.exe'), new Uint8Array([1]))
+		).rejects.toBeInstanceOf(HelperAclUnavailableError);
+
+		expect(await fsp.readFile(policy, 'utf8')).toBe('{"v":1}');
+		expect((await fsp.readdir(dir)).sort()).toEqual(['helper-policy.json', 'screen-helper']);
+		expect(await fsp.readdir(path.join(dir, 'screen-helper'))).toEqual([]);
 	});
 });

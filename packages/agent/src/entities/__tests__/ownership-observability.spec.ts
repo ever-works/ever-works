@@ -28,7 +28,10 @@ describe('organization ownership response contracts', () => {
             'MissionWorkWithWork',
             {
                 id: 'relation-1',
-                ...ownership,
+                // Explicit, not spread: `satisfies` excess-checks only literal properties, so a
+                // spread would keep compiling after the type dropped these columns.
+                tenantId: ownership.tenantId,
+                organizationId: ownership.organizationId,
                 missionId: 'mission-1',
                 workId: 'work-1',
                 relation: 'created',
@@ -41,7 +44,10 @@ describe('organization ownership response contracts', () => {
             'MissionWorkWithMission',
             {
                 id: 'relation-1',
-                ...ownership,
+                // Explicit, not spread: `satisfies` excess-checks only literal properties, so a
+                // spread would keep compiling after the type dropped these columns.
+                tenantId: ownership.tenantId,
+                organizationId: ownership.organizationId,
                 missionId: 'mission-1',
                 workId: 'work-1',
                 relation: 'created',
@@ -50,7 +56,12 @@ describe('organization ownership response contracts', () => {
                 missionStatus: 'active',
             } satisfies MissionWorkWithMission,
         ],
-    ])('%s projects persisted ownership', (_name, projection) => {
+        // A TYPE contract, not a runtime one (#2213 `ownership-observability-tautology`): the
+        // `satisfies` above stops compiling if either projection type drops `tenantId` /
+        // `organizationId`, but these literals never touch the repository, so a broken SELECT
+        // would stay green here. The runtime projection is pinned by the select strings in
+        // `database/repositories/mission-work.repository.organization-scope.spec.ts`.
+    ])('%s type carries the ownership columns (compile-time contract)', (_name, projection) => {
         expect(projection).toMatchObject(ownership);
     });
 });

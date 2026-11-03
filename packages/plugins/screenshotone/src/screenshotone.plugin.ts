@@ -53,6 +53,19 @@ interface ScreenshotOneSettings {
  *
  * Configuration mode: hybrid - allows admin-level defaults with user/work overrides.
  */
+/**
+ * `true` when `url` parses and its host is exactly `host`. A substring test
+ * (`url.includes(host)`) also accepts `https://evil.test/?api.example.com`
+ * (CodeQL js/incomplete-url-substring-sanitization).
+ */
+function urlHostIs(url: unknown, host: string): boolean {
+	try {
+		return new URL(String(url)).hostname === host;
+	} catch {
+		return false;
+	}
+}
+
 export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 	// ============================================================================
 	// IPlugin Properties
@@ -280,7 +293,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				: await Promise.resolve(client.generateTakeURL(testOptions));
 
 			const urlString = String(url);
-			if (urlString && urlString.includes('api.screenshotone.com')) {
+			if (urlHostIs(urlString, 'api.screenshotone.com')) {
 				return { success: true, message: 'ScreenshotOne connection verified.' };
 			}
 
@@ -325,7 +338,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				: await Promise.resolve(client.generateTakeURL(testOptions));
 
 			const urlString = String(url);
-			if (urlString && urlString.includes('api.screenshotone.com')) {
+			if (urlHostIs(urlString, 'api.screenshotone.com')) {
 				return {
 					valid: true,
 					message: 'Credentials are valid'

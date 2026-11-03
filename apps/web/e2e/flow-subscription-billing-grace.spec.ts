@@ -353,7 +353,7 @@ test.describe('Flow: subscription billing grace / past-due / dunning / reactivat
         )) {
             expect(c.allowed, `${c.cadence} gated on standard`).toBe(false);
             expect(c.payPerUse, `${c.cadence} pay-per-use on standard`).toBe(true);
-            expect(c.reason, `${c.cadence} carries an upgrade reason`).toContain('Enterprise');
+            expect(c.reason, `${c.cadence} carries an upgrade reason`).toContain('Unlimited');
         }
 
         // HARD-STOP: enabling a gated cadence under SUBSCRIPTION billing is rejected

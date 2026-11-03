@@ -21,6 +21,7 @@ import {
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
+import { normalizeMissionOutputMode, normalizeMissionTaskOutput } from './mission-task-output';
 
 /**
  * Optional caller-supplied overrides for the cloned Mission.
@@ -193,6 +194,13 @@ export class MissionCloneService {
                     // Security: strip unknown keys before propagating to the clone.
                     guardrailsOverride: this.sanitizeGuardrailsOverride(source.guardrailsOverride),
                     missionTemplateRepo: source.missionTemplateRepo ?? null,
+                    // APW-08 T34 (review of #3061) — the clone files what the source files, with
+                    // the same Task-output bounds and Agent (same owner, same scope), read
+                    // through the normalizers so nothing out of bounds propagates.
+                    outputMode: normalizeMissionOutputMode(source.outputMode),
+                    taskOutput: source.taskOutput
+                        ? normalizeMissionTaskOutput(source.taskOutput)
+                        : null,
                     // Clone gets its own repo at scaffold time
                     // (Phase 8 PR X) — until then NULL.
                     missionRepo: null,

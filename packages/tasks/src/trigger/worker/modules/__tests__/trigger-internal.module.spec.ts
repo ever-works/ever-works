@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { AppWorkIsolationBackfillRunner } from '@ever-works/agent/tasks-domain';
 import {
     APP_UPSTREAM_STATE_SERVICE,
     APP_UPSTREAM_SYNC_DISPATCHER_SERVICE,
@@ -110,5 +111,31 @@ describe('TriggerInternalModule — the APW-02 upstream proxies (T28)', () => {
             // sibling proxy in this module.
             expect(providerFor(token).inject).toHaveLength(1);
         }
+    });
+});
+
+/**
+ * APW-08 T50 — the `app-work-isolation-backfill` task resolves `AppWorkIsolationBackfillRunner`
+ * from this module, and the proxy must dial the name the API's `remoteMap` publishes
+ * (`AppWorkIsolationBackfillRunner`), or the one-off run fails at its first page with
+ * `Unknown remote target`.
+ */
+describe('TriggerInternalModule — the APW-08 T50 backfill runner proxy', () => {
+    it('dials the API-side AppWorkIsolationBackfillRunner.run', async () => {
+        const entry = providers().find(
+            (candidate) => candidate?.provide === AppWorkIsolationBackfillRunner,
+        );
+        expect(entry, 'no provider is registered for AppWorkIsolationBackfillRunner').toBeDefined();
+        expect(entry?.inject).toHaveLength(1);
+
+        const client = fakeApiClient();
+        const proxy = entry!.useFactory!(client) as {
+            run: (options: { afterId: string | null }) => Promise<unknown>;
+        };
+        await proxy.run({ afterId: null });
+
+        expect(client.callRemote).toHaveBeenCalledTimes(1);
+        expect(client.callRemote.mock.calls[0][0]).toBe('AppWorkIsolationBackfillRunner');
+        expect(client.callRemote.mock.calls[0][1]).toBe('run');
     });
 });

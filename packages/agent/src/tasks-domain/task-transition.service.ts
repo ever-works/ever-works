@@ -7,6 +7,10 @@ import {
     Logger,
     Optional,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Mission } from '../entities/mission.entity';
+import { resolveTaskRunBudgetCapCents } from './run-budget-cap';
 import { TaskStatus } from '../entities/task.entity';
 import type { Task, TaskActorType } from '../entities/task.entity';
 import {
@@ -48,6 +52,8 @@ import {
 // real class reference. No cycle: run-dispatch-gate.service imports only
 // task-dispatcher (leaf), the run repository, and config.
 import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
+// APW-08 T49 — the park reason the change switch stamps (a constant from the same leaf family).
+import { QUEUED_REASON_APP_CHANGES_PAUSED } from '../agents/run-admission-chain';
 // Value import for the same @Optional() class-injection reason as the
 // gate above. No cycle: task-agent-review.service imports repositories,
 // the git facade and two leaf modules — never this file.
@@ -71,6 +77,26 @@ import { AWAITING_OWNER_LABEL, isAwaitingOwner, withoutAwaitingOwner } from './a
 import { agentBlockLiftRefusal, agentMayLiftBlock } from './agent-block-lift';
 // APW-08 T49 — a leaf (the Nest logger only).
 import { describeAppChangesPaused, readAppWorkSwitches } from '../app-works/app-work-switches';
+// APW-08 T11 (FR-9) — the refusal copy lives in the isolation leaf (contracts only).
+import { describeAppWorkNoCommitPermission } from './task-isolation';
+// APW-08 T12 — the isolated-run admission port and its refusal copy. A leaf (contracts and the
+// T48 containment leaf only): the token is read in a parameter decorator below.
+import {
+    APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+    APP_WORK_RUN_ADMISSION,
+    describeAppWorkRunRefusal,
+    describeAppWorkUnreadableDispatch,
+    isAppWorkRunRefusal,
+    type AppWorkRunAdmissionGate,
+    type AppWorkRunPlacementPreview,
+} from '../app-works/isolated-run-admission';
+
+/** Review of #3040 — the one Work read a dispatch shares between T49, FR-9 and T12. */
+type DispatchWorkRead =
+    | { status: 'none' }
+    | { status: 'unavailable' }
+    | { status: 'ok'; work: Awaited<ReturnType<WorkRepository['findById']>> }
+    | { status: 'unreadable'; error: unknown };
 
 /**
  * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
@@ -284,6 +310,17 @@ export function withAgentFanOutSuppressed(
     return { ...opts, suppressAgentFanOut: true };
 }
 
+// APW-08 T35 (APW08-G15) — moved to `run-budget-cap.ts` (shared with the Task chat's runs);
+// re-exported so existing imports keep working.
+export { runBudgetCapCents } from './run-budget-cap';
+
+/**
+ * Review of #3061 — the dispatch error for an Agent-session schedule fire that must be capped:
+ * an Agent session has no platform-set spend limit, so it is refused instead of started uncapped.
+ */
+export const TASK_SESSION_BUDGET_CAP_UNSUPPORTED =
+    'session-budget-cap-unsupported: an Agent session cannot be held to a per-run budget, so this capped run was not started';
+
 @Injectable()
 export class TaskTransitionService {
     private readonly logger = new Logger(TaskTransitionService.name);
@@ -351,6 +388,21 @@ export class TaskTransitionService {
         @Optional()
         @Inject(TASK_SESSION_SCHEDULE_DISPATCHER)
         private readonly sessionSchedules?: TaskSessionScheduleDispatcher,
+        // APW-08 T12 (FR-12, FR-70, FR-75) — isolated-run admission for a Task on an App Work,
+        // asked in `dispatchAgentRun` ahead of the dispatch gate. Appended LAST + @Optional
+        // (positional-spec arity rule); absent, no run is admission-checked and every dispatch is
+        // exactly as before. Bound by the API's @Global() TasksModule.
+        @Optional()
+        @Inject(APP_WORK_RUN_ADMISSION)
+        private readonly appWorkRunAdmission?: AppWorkRunAdmissionGate,
+        // APW-08 T35 (FR-53, review of #3061) — the Missions table, read in `dispatchAgentRun` for
+        // a Task with a `missionId`, so EVERY run of a Mission's Task carries the Mission's
+        // per-run cap (board drag, Run, retry, review, recurrence, Goal, delegation — not only the
+        // tick's own run). `Mission` is in TasksDomainModule's `forFeature`. Appended LAST +
+        // @Optional (positional-spec arity rule); absent, only an explicit `maxBudgetCents` caps.
+        @Optional()
+        @InjectRepository(Mission)
+        private readonly missionRows?: Repository<Mission>,
     ) {}
 
     /**
@@ -1296,20 +1348,189 @@ export class TaskTransitionService {
     }
 
     /**
+     * Review of #3040 (minor 8) — ONE read of the Task's Work per dispatch, shared by T49, FR-9
+     * and T12. Lazy: nothing is read until a check needs it (T49 only once the switch is off,
+     * FR-9 only for an Agent that may not commit, T12 whenever its port is bound), and the first
+     * answer — or failure — is the answer for the whole dispatch.
+     */
+    private dispatchWorkRead(task: Pick<Task, 'id' | 'workId'>): () => Promise<DispatchWorkRead> {
+        let pending: Promise<DispatchWorkRead> | null = null;
+        return () => {
+            if (!pending) {
+                pending = (async (): Promise<DispatchWorkRead> => {
+                    if (!task.workId) return { status: 'none' };
+                    if (!this.works) return { status: 'unavailable' };
+                    try {
+                        return { status: 'ok', work: await this.works.findById(task.workId) };
+                    } catch (error) {
+                        return { status: 'unreadable', error };
+                    }
+                })();
+            }
+            return pending;
+        };
+    }
+
+    /**
      * APW-08 T49 — is `EVER_WORKS_APP_CHANGES_ENABLED` off AND this Task on an App Work? The
      * switch is read first, so the common case (switch on) costs no query. Fail closed once the
      * switch is off: a Work that cannot be read, or no Work repository, counts as an App Work —
      * an operator who stopped changes is never surprised by one that slipped through.
      */
-    private async appChangesPausedFor(task: Pick<Task, 'id' | 'workId'>): Promise<boolean> {
+    private async appChangesPausedFor(
+        task: Pick<Task, 'id' | 'workId'>,
+        readWork: () => Promise<DispatchWorkRead> = this.dispatchWorkRead(task),
+    ): Promise<boolean> {
         if (readAppWorkSwitches().changesEnabled) return false;
         if (!task.workId) return false;
-        if (!this.works) return true;
+        const read = await readWork();
+        if (read.status === 'ok') return !read.work || isAppWorkKind(read.work.kind);
+        return read.status !== 'none';
+    }
+
+    /**
+     * APW-08 T11 (FR-9, ACC-08-07) — is this Task on an App Work, for the commit-permission
+     * refusal? Asked ONLY after the Agent was found to lack `canCommitToRepo`, so a dispatch
+     * whose Agent may commit (and every Work-less Task) asks nothing of its own.
+     *
+     * Fails OPEN — unlike {@link appChangesPausedFor} — and that difference is deliberate. This
+     * refusal fires for an Agent that merely lacks a permission, which is the platform's DEFAULT
+     * (`DEFAULT_AGENT_PERMISSIONS.canCommitToRepo = false`), so a graph without the Work
+     * repository or a failed read would otherwise refuse ordinary Tasks on every other kind. And
+     * nothing unsafe follows from letting one through: an Agent without the permission has no
+     * commit tool, and its run gets no workspace (`resolveTaskIsolation`), so it cannot change
+     * the App's repository at all — the refusal exists to say so up front rather than to guard.
+     */
+    private async isAppWorkTask(
+        task: Pick<Task, 'id' | 'workId'>,
+        readWork: () => Promise<DispatchWorkRead> = this.dispatchWorkRead(task),
+    ): Promise<boolean> {
+        if (!task.workId || !this.works) return false;
+        const read = await readWork();
+        if (read.status === 'unreadable') {
+            this.logger.warn(
+                `Task ${task.id}: the Work could not be read for the FR-9 commit-permission check (${read.error}); dispatching as before.`,
+            );
+            return false;
+        }
+        return read.status === 'ok' && !!read.work && isAppWorkKind(read.work.kind);
+    }
+
+    /**
+     * APW-08 T12 (FR-12, FR-70, FR-75) — isolated-run admission, site 1: may this run of an App
+     * Work Task start where the routing adapter would place it?
+     *
+     * 1. The Work comes from the dispatch's ONE shared read. A Work-less Task asks nothing; a
+     *    Task on any other kind dispatches exactly as before — no placement is computed for it.
+     *    A Work that cannot be read REFUSES (review of #3040, decision: fail CLOSED as T12 says):
+     *    `dispatch-failed: work-unreadable: …`, retryable — for a Task on ANY kind, because an
+     *    unreadable Work cannot be shown not to be an App Work.
+     * 2. The placement comes from the SAME routing call `dispatcher.enqueue` makes
+     *    (`previewPlacement`, APW08-G11). An adapter that cannot answer, or an answer that throws,
+     *    is `'unknown'` — treated as `'cloud'`, so the predicate fails closed. A fire of an
+     *    Agent-session schedule is a Fleet session on the Agent's pinned computer (FL-13), so its
+     *    placement is `'fleet'` and the gate judges the pinned node.
+     * 3. The platform's global stop flag (`halted`) is NOT judged here — no placement can be
+     *    computed, and the admission chain parks the run `kill-switch` (a wait, FR-66). It is NOT
+     *    waved through either: when the flag clears, the gate's promotion enqueues the run through
+     *    the fleet-aware dispatcher, which re-runs the Fleet half of this admission (and the lease
+     *    judges the node that takes it), and a cloud placement meets the worker's pre-flight.
+     * 4. The gate gathers the facts (push credential, enrolled nodes, node containment and the
+     *    owner's allowances, or the cloud pipeline and Environment) and runs the predicate. A gate
+     *    that throws refuses (`noIsolatedRuntime`): an App Work run never starts on an admission
+     *    no one could evaluate.
+     *
+     * `noIsolatedRuntime` / `noPushCredential` / `work-unreadable` are refusals;
+     * `containmentDowngrade` and `noEligibleNode` are `needs_input` (the Task's Cost view offers
+     * **Allow on this machine** for a held node). All reach the caller as the dispatch `error`
+     * (`code: copy`), before any run row exists, and leave the Task where it is — the same Task
+     * starts once the cause is fixed.
+     */
+    private async refuseUnadmittedAppWorkRun(
+        task: Task,
+        agent: { id: string; userId: string; environmentId?: string | null },
+        dedupKey: string,
+        readWork: () => Promise<DispatchWorkRead>,
+    ): Promise<{ error?: string; appWorkAdmitted: boolean }> {
+        if (!this.appWorkRunAdmission || !task.workId) return { appWorkAdmitted: false };
+        const read = await readWork();
+        if (read.status === 'unreadable' || read.status === 'unavailable') {
+            const error = describeAppWorkUnreadableDispatch(task.workId);
+            this.logger.warn(
+                `Task ${task.id}: no run dispatched for agent ${agent.id} — the Work could not be read (${
+                    read.status === 'unreadable' ? read.error : 'no Work repository'
+                }); refusing (fail closed).`,
+            );
+            return { error, appWorkAdmitted: false };
+        }
+        if (read.status !== 'ok' || !read.work || !isAppWorkKind(read.work.kind)) {
+            return { appWorkAdmitted: false };
+        }
+        let placement: AppWorkRunPlacementPreview = { placement: 'unknown' };
+        if (this.sessionSchedules && isFleetSessionScheduleTask(task)) {
+            placement = { placement: 'fleet' };
+        } else if (this.dispatcher?.previewPlacement) {
+            try {
+                placement = await this.dispatcher.previewPlacement({
+                    agentId: agent.id,
+                    userId: task.userId,
+                    taskId: task.id,
+                    dedupKey,
+                    tenantId: task.tenantId ?? null,
+                    organizationId: task.organizationId ?? null,
+                });
+            } catch (err) {
+                this.logger.warn(
+                    `Task ${task.id}: the run's placement could not be previewed (${err}); judging it as 'unknown' (cloud).`,
+                );
+                placement = { placement: 'unknown' };
+            }
+        }
+        if (placement.halted) {
+            // Parked `kill-switch` by the chain below, and re-admitted when that park is promoted
+            // (the fleet-aware dispatcher's Fleet half, the lease, or the worker's pre-flight).
+            return { appWorkAdmitted: true };
+        }
         try {
-            const work = await this.works.findById(task.workId);
-            return !work || isAppWorkKind(work.kind);
-        } catch {
-            return true;
+            const verdict = await this.appWorkRunAdmission.admit({
+                task: {
+                    id: task.id,
+                    userId: task.userId,
+                    workId: task.workId ?? null,
+                    tenantId: task.tenantId ?? null,
+                    organizationId: task.organizationId ?? null,
+                },
+                agent: {
+                    id: agent.id,
+                    userId: agent.userId,
+                    environmentId: agent.environmentId ?? null,
+                },
+                placement,
+                work: read.work,
+            });
+            if (!verdict) return { appWorkAdmitted: false };
+            if (!isAppWorkRunRefusal(verdict)) return { appWorkAdmitted: true };
+            const error =
+                verdict.code === 'work-unreadable'
+                    ? describeAppWorkUnreadableDispatch(task.workId)
+                    : describeAppWorkRunRefusal(verdict);
+            this.logger.warn(
+                `Task ${task.id}: no run dispatched for agent ${agent.id} (${verdict.outcome}) — ${error}`,
+            );
+            return { error, appWorkAdmitted: false };
+        } catch (err) {
+            this.logger.warn(
+                `Task ${task.id}: isolated-run admission failed (${err}); refusing the App Work run (fail closed).`,
+            );
+            return {
+                error: describeAppWorkRunRefusal({
+                    admitted: false,
+                    outcome: 'refused',
+                    code: 'noIsolatedRuntime',
+                    message: APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+                }),
+                appWorkAdmitted: false,
+            };
         }
     }
 
@@ -1380,6 +1601,16 @@ export class TaskTransitionService {
              */
             seedPendingInput?: string[];
             /**
+             * APW-08 T35 (FR-53, APW08-G15) — this run's own spend cap in cents (a positive
+             * integer), stored on the run row. A Task with a `missionId` is ALSO capped by its
+             * Mission's `guardrailsOverride.maxBudgetCentsPerRun`, resolved here for every caller
+             * (see {@link resolveTaskRunBudgetCapCents}); with both, the lower one wins. Omitted, and
+             * no Mission cap = no cap beyond the Agent's settings. An Agent-session schedule fire
+             * that would be capped is refused ({@link TASK_SESSION_BUDGET_CAP_UNSUPPORTED}): a
+             * session has no platform-set spend limit.
+             */
+            maxBudgetCents?: number;
+            /**
              * Reviewer agent stage (slice AD, EW-811) — the review-ledger
              * row this run is being created for. Bound to the run row
              * right after it is created and BEFORE the seed and the
@@ -1417,25 +1648,93 @@ export class TaskTransitionService {
                 error: 'agent-not-found',
             };
         }
-        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
-        // session on the computer the Agent is pinned to — the Fleet starts it
-        // (its own Run, trigger `session`, linked to this Task). Ownership was
-        // checked just above, at the one dispatch choke point.
-        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
-            return this.sessionSchedules.dispatch(task, agentId);
-        }
         // APW-08 T49 (R-30) — the operator's change switch, read HERE, at the one dispatch
         // choke point, so it bites for every surface (board, chat, Goal, recurrence, fan-out)
-        // and for Tasks created before it was flipped. Off, an App Work Task gets no new run
-        // and no run row; the Task stays where it is, to be run again once changes resume.
-        // A review run is not a change (it reads the PR and records a verdict), so it passes.
-        if (!opts.reviewId && (await this.appChangesPausedFor(task))) {
+        // and for Tasks created before it was flipped. Off, an App Work Task's run is PARKED
+        // `app-changes-paused` (below, in place of the gate): its row exists, nothing starts, and
+        // the sweeper releases it once changes resume (R-30: "turning it back on resumes"). A
+        // review run is not a change (it reads the PR and records a verdict), so it passes.
+        // Without a run repository there is no row to park in, and the run is refused as before;
+        // so is an Agent-session fire (below: a session has no run row of its own here to park).
+        // Review of #3040 (minor 8) — the Task's Work is read at most ONCE for this dispatch.
+        const readWork = this.dispatchWorkRead(task);
+        const appChangesPaused = !opts.reviewId && (await this.appChangesPausedFor(task, readWork));
+        if (appChangesPaused && !this.runs) {
             const error = describeAppChangesPaused();
             this.logger.warn(`Task ${task.id}: no run dispatched — ${error}`);
             return { runId: null, dispatched: false, parked: false, error };
         }
+        // APW-08 T11 (FR-9, ACC-08-07) — an Agent without commit permission cannot be started on
+        // an App Work Task: the App's changes always go through a branch, and isolation (forced on
+        // for an App Work by `resolveTaskIsolation`) only ever cuts one for an Agent that may
+        // commit. Refused HERE, at the one dispatch choke point, before a run row exists — the
+        // alternative was a run that silently did nothing, because the worker gives such an Agent
+        // no workspace. Explicit `false` only, matching the worker's own reading
+        // (`canCommitToRepo !== false`). A review run is not a change (it reads the PR and records
+        // a verdict), so it passes, exactly as it does the T49 switch above.
+        if (
+            !opts.reviewId &&
+            agent.permissions?.canCommitToRepo === false &&
+            (await this.isAppWorkTask(task, readWork))
+        ) {
+            const error = describeAppWorkNoCommitPermission();
+            this.logger.warn(`Task ${task.id}: no run dispatched for agent ${agentId} — ${error}`);
+            return { runId: null, dispatched: false, parked: false, error };
+        }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;
+        // APW-08 T12 (FR-12, FR-70, FR-75; ACC-08-08, -34, -39) — isolated-run admission, site 1,
+        // ahead of the Agent-session schedule branch (review of #3040: a session on an App Work
+        // Task is a run like any other, as for T49 and FR-9 above) and of `RunDispatchGateService`
+        // (Resolution R-17): a refusal, before a run row exists, never a park. See
+        // `refuseUnadmittedAppWorkRun`. `appWorkAdmitted` is true only for an App Work run the
+        // predicate admitted; it is what hands the gate the Agent below.
+        let appWorkAdmitted = false;
+        if (!opts.reviewId && this.appWorkRunAdmission) {
+            const verdict = await this.refuseUnadmittedAppWorkRun(task, agent, dedupKey, readWork);
+            if (verdict.error) {
+                return { runId: null, dispatched: false, parked: false, error: verdict.error };
+            }
+            appWorkAdmitted = verdict.appWorkAdmitted;
+        }
+        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
+        // session on the computer the Agent is pinned to — the Fleet starts it
+        // (its own Run, trigger `session`, linked to this Task). Ownership was
+        // checked above, at the one dispatch choke point. Placed AFTER the App
+        // Work refusals above (reviews of #3036 and #3040): a session on an App
+        // Work Task is a change like any run, so the operator's T49 switch, the
+        // FR-9 commit permission and T12's isolated-run admission bite for it
+        // too. T49 and FR-9 read nothing unless changes are paused or the Agent
+        // may not commit; T12 reads the Work once (shared) when its port is bound.
+        // FR-9 refuses App Work Tasks only (it fails open). The paused switch and
+        // T12 fail CLOSED: a Task whose Work is unreadable is refused.
+        // APW-08 T35 (FR-53, review of #3061) — the run's spend cap, resolved ONCE here, before
+        // any branch can start anything, so no path skips it.
+        const budgetCapCents = await resolveTaskRunBudgetCapCents(
+            this.missionRows,
+            task,
+            opts.maxBudgetCents,
+            this.logger,
+        );
+        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
+            // Review of #3053 — the session path starts the Fleet session at once and has no run
+            // row to park, so while App changes are paused the fire is refused, as before T49's
+            // park (a recurring schedule fires again once changes resume).
+            if (appChangesPaused) {
+                const error = describeAppChangesPaused();
+                this.logger.warn(`Task ${task.id}: no session started — ${error}`);
+                return { runId: null, dispatched: false, parked: false, error };
+            }
+            // Review of #3061 — an Agent session runs on its computer's own CLI with no spend
+            // limit the platform can set, so a fire that must be capped (a Mission's per-run
+            // budget, or the caller's) is refused rather than started uncapped.
+            if (budgetCapCents !== null) {
+                const error = TASK_SESSION_BUDGET_CAP_UNSUPPORTED;
+                this.logger.warn(`Task ${task.id}: no session started — ${error}`);
+                return { runId: null, dispatched: false, parked: false, error };
+            }
+            return this.sessionSchedules.dispatch(task, agentId);
+        }
         {
             let run: { id: string } | null = null;
             try {
@@ -1472,16 +1771,30 @@ export class TaskTransitionService {
                                   ? null
                                   : (verdict.queuedReason ?? 'concurrency-limit'),
                               delegationScope: opts.delegationScope ?? null,
+                              ...(budgetCapCents !== null ? { budgetCapCents } : {}),
                           })
                         : null;
                 };
-                if (this.dispatchGate) {
+                if (appChangesPaused) {
+                    // APW-08 T49 — parked by the operator's change switch, not by the gate: the
+                    // gate's chain does not know the switch, so it is never asked to admit this
+                    // run. Released by `AgentRunSweeperService.releaseAppChangesWaits` once
+                    // `EVER_WORKS_APP_CHANGES_ENABLED` is on again.
+                    admission = { admitted: false, queuedReason: QUEUED_REASON_APP_CHANGES_PAUSED };
+                    await reserve(admission);
+                } else if (this.dispatchGate) {
                     try {
                         admission = await this.dispatchGate.admit(
                             {
                                 userId: task.userId,
                                 workId: task.workId ?? null,
                                 organizationId: task.organizationId ?? null,
+                                // APW-08 T12 (FR-66, R-17) — an admitted App Work run passes the
+                                // unchanged chain WITH its Agent, so the AW-23 brake parks a
+                                // paused Agent's run `agent-paused` (a wait) instead of it
+                                // starting. Every other dispatch hands the gate exactly the
+                                // three keys it always did.
+                                ...(appWorkAdmitted ? { agentId } : {}),
                             },
                             reserve,
                         );

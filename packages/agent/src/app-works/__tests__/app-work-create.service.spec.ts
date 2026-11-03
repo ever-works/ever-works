@@ -793,6 +793,177 @@ describe('AppWorkCreateService', () => {
                 },
             );
 
+            /**
+             * C-16 — the requests whose repository is not reported up front: a
+             * brand-new private copy, and a fork into an owner the inspection's
+             * fork scan did not check. The first request's repository exists, but
+             * there are no coordinates to look its Work up by, so the slug
+             * holder's RECORDED upstream state is compared with the request.
+             */
+            describe('a repository the inspection does not report (C-16)', () => {
+                function privateCopyHolder() {
+                    return freshOwnAppWork({
+                        sourceRepository: {
+                            url: 'https://github.com/member/widgets',
+                            owner: 'member',
+                            repo: 'widgets',
+                            type: 'app_private_copy',
+                            importedAt: new Date(),
+                            relatedRepositories: {
+                                website: { owner: 'member', repo: 'widgets' },
+                            },
+                            upstream: { owner: 'upstream', repo: 'widgets', defaultBranch: 'main' },
+                            createdByThisWork: true,
+                        },
+                    });
+                }
+
+                function upstreamState(overrides: Record<string, unknown> = {}) {
+                    return {
+                        workId: 'work-9',
+                        relation: 'private-copy',
+                        dataOwner: 'member',
+                        dataRepo: 'widgets',
+                        upstreamOwner: 'upstream',
+                        upstreamRepo: 'widgets',
+                        readinessState: 'ready',
+                        ...overrides,
+                    };
+                }
+
+                /** The member's own account, which the fork scan did not reach. */
+                function inspectionWithUncheckedOwner() {
+                    return inspectResponse({
+                        scanIncomplete: true,
+                        targetOwners: [
+                            {
+                                login: 'member',
+                                type: 'user',
+                                available: true,
+                                existingForkChecked: false,
+                            },
+                        ],
+                    });
+                }
+
+                it('answers a double-submitted private copy with alreadyExisted', async () => {
+                    const holder = privateCopyHolder();
+                    const h = harness({ slugTaken: true, slugHolder: holder });
+                    h.workUpstreamStates.findByWorkId.mockResolvedValue(upstreamState());
+
+                    const result = await h.service.create(
+                        dto({ repositoryMode: 'private-copy' }),
+                        USER,
+                    );
+
+                    expect(result.alreadyExisted).toBe(true);
+                    expect(result.work.id).toBe('work-9');
+                    expect(result.appSource.relation).toBe('private-copy');
+                    expect(result.appSource.readiness).toBe('ready');
+                    expect(h.workUpstreamStates.findByWorkId).toHaveBeenCalledWith('work-9');
+                    // No candidate name was even probed: the copy already exists.
+                    expect(h.gitFacade.getRepository).not.toHaveBeenCalled();
+                    expectNoWrites(h);
+                });
+
+                it('answers a fork double-submit into an owner the scan did not reach with alreadyExisted', async () => {
+                    const holder = freshOwnAppWork();
+                    const h = harness({
+                        slugTaken: true,
+                        slugHolder: holder,
+                        inspect: inspectionWithUncheckedOwner(),
+                    });
+                    h.workUpstreamStates.findByWorkId.mockResolvedValue(
+                        upstreamState({ relation: 'fork', readinessState: 'preparing' }),
+                    );
+
+                    const result = await h.service.create(dto(), USER);
+
+                    expect(result.alreadyExisted).toBe(true);
+                    expect(result.work.id).toBe('work-9');
+                    expect(result.appSource.relation).toBe('fork');
+                    // Answered before step 9 asks GitHub the question the scan could not.
+                    expect(h.gitFacade.findExistingFork).not.toHaveBeenCalled();
+                    expect(h.gitFacade.forkRepository).not.toHaveBeenCalled();
+                    expectNoWrites(h);
+                });
+
+                it('compares owners and repositories case-insensitively, as GitHub does', async () => {
+                    const h = harness({ slugTaken: true, slugHolder: privateCopyHolder() });
+                    h.workUpstreamStates.findByWorkId.mockResolvedValue(
+                        upstreamState({
+                            dataOwner: 'Member',
+                            upstreamOwner: 'UPSTREAM',
+                            upstreamRepo: 'Widgets',
+                        }),
+                    );
+
+                    const result = await h.service.create(
+                        dto({ repositoryMode: 'private-copy' }),
+                        USER,
+                    );
+
+                    expect(result.alreadyExisted).toBe(true);
+                });
+
+                it.each([
+                    ['records another relation', upstreamState({ relation: 'fork' })],
+                    ['was made into another owner', upstreamState({ dataOwner: 'acme' })],
+                    ['copies another upstream', upstreamState({ upstreamRepo: 'gadgets' })],
+                    ['has no upstream state row', null],
+                ])(
+                    'still refuses a private copy with the slug 409 and zero writes when the holder %s',
+                    async (_label, state) => {
+                        const h = harness({ slugTaken: true, slugHolder: privateCopyHolder() });
+                        h.workUpstreamStates.findByWorkId.mockResolvedValue(state);
+
+                        const attempt = h.service.create(
+                            dto({ repositoryMode: 'private-copy' }),
+                            USER,
+                        );
+
+                        await expect(attempt).rejects.toMatchObject({ status: 409 });
+                        await expect(attempt).rejects.toThrow(SLUG_MESSAGE);
+                        expect(h.gitFacade.createRepository).not.toHaveBeenCalled();
+                        expectNoWrites(h);
+                    },
+                );
+
+                it('still refuses the slug once the holder has left the idempotency window during the inspection', async () => {
+                    const holder = privateCopyHolder();
+                    const h = harness({ slugTaken: true, slugHolder: holder });
+                    // Step 5 read a fresh holder; step 8's re-read finds it stale.
+                    h.workRepository.findByOwnerAndSlug
+                        .mockResolvedValueOnce(holder)
+                        .mockResolvedValueOnce({
+                            ...holder,
+                            createdAt: new Date(Date.now() - APP_CREATE_IDEMPOTENCY_WINDOW_MS - 1),
+                        });
+                    h.workUpstreamStates.findByWorkId.mockResolvedValue(upstreamState());
+
+                    await expect(
+                        h.service.create(dto({ repositoryMode: 'private-copy' }), USER),
+                    ).rejects.toThrow(SLUG_MESSAGE);
+                    expectNoWrites(h);
+                });
+
+                it('does not compare a fork into an owner the scan checked and found empty', async () => {
+                    // The scan DID check `member` and found no fork, so the holder's
+                    // recorded fork is not there: returning its Work would hide that.
+                    const h = harness({ slugTaken: true, slugHolder: freshOwnAppWork() });
+                    h.workUpstreamStates.findByWorkId.mockResolvedValue(
+                        upstreamState({ relation: 'fork' }),
+                    );
+
+                    const attempt = h.service.create(dto(), USER);
+
+                    await expect(attempt).rejects.toMatchObject({ status: 409 });
+                    await expect(attempt).rejects.toThrow(SLUG_MESSAGE);
+                    expect(h.workUpstreamStates.findByWorkId).not.toHaveBeenCalled();
+                    expectNoWrites(h);
+                });
+            });
+
             it.each([
                 ['a Repository Work', freshOwnAppWork({ kind: 'repo' })],
                 ['a Work with no kind', freshOwnAppWork({ kind: undefined })],

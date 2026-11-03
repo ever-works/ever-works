@@ -487,6 +487,25 @@ export function canCancelSubscription(
     );
 }
 
+/**
+ * The owner already pays for a live recurring plan, scheduled cancellation included (it runs until
+ * the period end). The server refuses a second recurring checkout for them with a 409
+ * (`ActivePlanSubscriptionError`, billing finding A1) because it would open a second live provider
+ * subscription, so the plan cards send these owners to the billing portal instead of offering a
+ * checkout that can only fail. Lifetime licences are not subscriptions and stay buyable.
+ */
+export function holdsRecurringSubscription(overview: BillingOverview | null): boolean {
+    const state = subscriptionState(overview);
+    return (
+        state.manageable &&
+        (state.status === 'active' ||
+            state.status === 'trialing' ||
+            state.status === 'past_due' ||
+            state.status === 'unpaid' ||
+            state.status === 'paused')
+    );
+}
+
 /** Resume is offerable only while a scheduled cancellation is still pending. */
 export function canResumeSubscription(
     overview: BillingOverview | null,

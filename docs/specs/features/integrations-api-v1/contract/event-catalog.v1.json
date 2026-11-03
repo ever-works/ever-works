@@ -569,6 +569,15 @@
 			"notes": "data.recipientUserId is always set. Recipient-scoped: served (feed, webhooks v2) only to a key that also holds inbox:read; never to a user-owned subscription (CR-4)."
 		},
 		{
+			"type": "inbox.item.updated",
+			"version": 1,
+			"domain": "inbox",
+			"aggregateType": "inbox_item",
+			"dataSchema": "schemas/resources/inbox-item.schema.json",
+			"phase": "P3",
+			"notes": "CR-15 (integration inbox push), origin integration items only: the integration's own PATCH /inbox/items/:id, and the member's answer to the item in Ever Works (status answered, answerOptionId / answerText; no run is started). changedFields names what moved. The key's own writes carry its X-Sync-Origin, so excludeOrigin leaves them out of its feed. Recipient-scoped like every inbox.item.* event."
+		},
+		{
 			"type": "kb.document.created",
 			"version": 1,
 			"domain": "kb",

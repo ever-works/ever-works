@@ -111,7 +111,7 @@ See the [CLI Quickstart](./guides/cli-quickstart.md) and the [command reference]
 | Bucket                 | Amount                                                            |
 | ---------------------- | ----------------------------------------------------------------- |
 | Daily allowance        | 50 credits, every plan, topped up **to** 50 (never accumulating). |
-| Monthly plan allowance | 3,000 (Pro) / 25,000 (Enterprise), expiring at the month end.     |
+| Monthly plan allowance | 3,000 (Pro) / 25,000 (Unlimited), expiring at the month end.      |
 | Credit packs           | $10 / 1,000 · $50 / 5,500 · $200 / 25,000.                        |
 | Pay-as-you-go          | Opt-in, needs a card, hard monthly cap (default 10,000 credits).  |
 

@@ -32,6 +32,59 @@ export * from './app-work-cloud-push';
 export * from './task-repository';
 // PR insights (kanban run cockpit M5/M6) — PR status cache + capped diff.
 export * from './task-pr-status.service';
+// APW-08 T21–T24 — the App Works delivery chain (provided by TasksDomainModule): the merge hook's
+// port, the reconciler behind `app-change-delivery`, the Task delivery routes and follow-ups.
+export * from './task-delivery.port';
+// APW-08 T26 / T54 — keyed Task-thread posts (FR-43).
+export * from './task-thread-poster.port';
+export * from './task-thread-posts';
+// APW-08 lane L7 — the run-side posts (Run started, Opened pull request, Checks passed / failed).
+export * from './task-lifecycle-poster.port';
+// APW-08 T46 — told when a run ends (R-17 safety-rail holds).
+export * from './task-run-stop.port';
+export * from './task-lifecycle-posts';
+export * from './task-lifecycle-posts.service';
+export {
+    TaskDeliveryService,
+    APP_CHANGE_ACTIONS,
+    type DeliverySweepSummary,
+} from '../app-works/task-delivery.service';
+export {
+    DeliveryFollowUpService,
+    FOLLOW_UP_NO_LONGER_NEEDED_NOTE,
+    followUpKeyOf,
+} from '../app-works/delivery-follow-up.service';
+export { decideDelivery } from '../app-works/task-delivery.rules';
+// APW-08 T11 / T50 (provided by TasksDomainModule) — the App Work Task columns kept in step with
+// the App spec, and the one-off backfill behind the `app-work-isolation-backfill` task.
+export {
+    AppWorkIsolationService,
+    APP_WORK_BASE_BRANCH_MAX,
+    type AppWorkIsolationColumn,
+    type AppWorkIsolationPatch,
+    type AppWorkSourceBranchResolution,
+    type AppWorkSourceBranchSource,
+} from '../app-works/app-work-isolation.service';
+export {
+    AppWorkSpecAppliedListener,
+    APP_CHECKS_ADMISSION_ANCHOR,
+    appChecksAdmissionUrl,
+    appChecksNotificationKey,
+    type AppWorkSpecAppliedOutcome,
+} from '../app-works/app-spec-applied.listener';
+export {
+    AppWorkIsolationBackfillRunner,
+    APP_WORK_ISOLATION_BACKFILL_JOB_ID,
+    APP_WORK_ISOLATION_BACKFILL_PAGE,
+    APP_WORK_ISOLATION_BACKFILL_PAGE_MAX,
+    type AppWorkIsolationBackfillOptions,
+    type AppWorkIsolationBackfillSummary,
+} from '../app-works/app-work-isolation-backfill.runner';
+export {
+    APP_DELIVERY_DEFAULTS_ENV,
+    APP_DELIVERY_DEFAULT_VALUES,
+    readAppDeliveryDefaults,
+} from '../app-works/app-delivery-defaults';
 export * from './agent-task-tools';
 export * from './recurrence';
 export * from './task-recurrence-dispatcher.service';

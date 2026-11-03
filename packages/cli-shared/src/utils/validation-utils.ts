@@ -20,10 +20,13 @@ export function validateUrl(url: string): { isValid: boolean; error?: string } {
 }
 
 /**
- * Validates email format
+ * Validates email format: a local part, `@`, then dot-separated labels (at
+ * least two). The domain's labels exclude `.`, so no two runs can trade
+ * characters and the check is linear (CodeQL js/polynomial-redos); it also
+ * refuses an empty label (`a@b..c`, `a@b.c.`).
  */
 export function validateEmail(email: string): { isValid: boolean; error?: string } {
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	const emailRegex = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 	if (!emailRegex.test(email)) {
 		return { isValid: false, error: 'Please enter a valid email address' };
 	}

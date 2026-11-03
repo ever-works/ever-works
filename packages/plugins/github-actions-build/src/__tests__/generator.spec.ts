@@ -954,3 +954,154 @@ describe('the embedded verify script', () => {
 		expect(elapsedMs).toBeLessThan(2_000);
 	});
 });
+
+/**
+ * APW-08 T15 (Resolution R-9, APW08-G05) — APW-08's acceptance fixture for the emitted
+ * `checks` job, `golden/app-checks-two.yml`.
+ *
+ * APW-05 T41 OWNS the job (`workflow/checks-job.ts`) and its emission from `generator.ts`;
+ * APW-08 writes no second emitter. This block pins APW-05's output against APW-08's contract
+ * (`docs/specs/features/app-works/APW-08-evolve-loop/tasks.md` T15) so a drift on either side
+ * fails here: two App spec checks, one required and one advisory, in declared order — not
+ * alphabetical — with their own timeouts, through the ordinary Dockerfile file.
+ *
+ * The contract, leg by leg: `strategy.matrix.check` in declared order (`fail-fast: false`,
+ * `max-parallel: 5`); each leg named `Ever Works check: ${{ matrix.check.name }}`; job
+ * `permissions: contents: read` and nothing else; `timeout-minutes` from `timeoutSeconds`;
+ * checkout with `persist-credentials: false`; the command only through
+ * `env: EW_CHECK_COMMAND_B64` (base64) — never `env.CHECK_COMMAND`; job-level
+ * `continue-on-error` for `required: false` only; no `secrets.`, no other `EW_` name and no
+ * cache in the job; both triggers — a same-repository pull request AND a push to the tracked
+ * branch (FR-76) — and deterministic output.
+ */
+describe('generator — APW-08 App checks contract (T15, golden/app-checks-two.yml)', () => {
+	const APP_CHECKS_TWO = [
+		{ name: 'type-check', command: 'pnpm type-check', required: true, timeoutSeconds: 600 },
+		{ name: 'e2e', command: 'pnpm e2e --reporter=line', required: false, timeoutSeconds: 1801 }
+	] as const;
+	const appChecksInput = (): WorkflowGeneratorInput => ({ ...fixtures.minimal, checks: [...APP_CHECKS_TWO] });
+
+	interface ChecksJobShape {
+		if: string;
+		name: string;
+		'timeout-minutes': string;
+		'continue-on-error': string;
+		permissions: Record<string, string>;
+		strategy: {
+			'fail-fast': boolean;
+			'max-parallel': number;
+			matrix: { check: Array<{ name: string; required: boolean; timeoutMinutes: number; commandB64: string }> };
+		};
+		steps: Array<{
+			uses?: string;
+			name?: string;
+			env?: Record<string, string>;
+			run?: string;
+			with?: Record<string, unknown>;
+		}>;
+	}
+
+	const file = generateWorkflow(appChecksInput());
+	const parsed = yaml.load(file) as {
+		on: Record<string, { branches?: string[] }>;
+		jobs: Record<string, ChecksJobShape>;
+	};
+	const job = parsed.jobs[APP_BUILD_CHECKS_JOB];
+	const section = jobSection(file, APP_BUILD_CHECKS_JOB);
+
+	/** GitHub's evaluation of the job-level `${{ !matrix.check.required }}` for one leg. */
+	const continueOnErrorFor = (row: { required: boolean }): boolean => {
+		expect(job['continue-on-error']).toBe('${{ !matrix.check.required }}');
+		return !row.required;
+	};
+
+	it('records the golden and reproduces it byte for byte on two runs (deterministic, APW-05 FR-6)', () => {
+		const first = generateWorkflow(appChecksInput());
+		const second = generateWorkflow(appChecksInput());
+		expect(second).toBe(first);
+		expect(first).toBe(golden('app-checks-two', first));
+	});
+
+	it('expands to exactly two matrix legs, in declared order, each its own named check run', () => {
+		const rows = job.strategy.matrix.check;
+		expect(rows.map((row) => [row.name, row.required])).toEqual([
+			['type-check', true],
+			['e2e', false]
+		]);
+		expect(job.name).toBe(`${APP_BUILD_CHECK_NAME_PREFIX}\${{ matrix.check.name }}`);
+		expect(job.name).toBe('Ever Works check: ${{ matrix.check.name }}');
+		expect(job.strategy['fail-fast']).toBe(false);
+		expect(job.strategy['max-parallel']).toBe(5);
+		expect(rows.length).toBeLessThanOrEqual(APP_BUILD_CHECKS_MAX);
+	});
+
+	it('takes timeout-minutes from timeoutSeconds, rounded up', () => {
+		expect(job['timeout-minutes']).toBe('${{ matrix.check.timeoutMinutes }}');
+		expect(job.strategy.matrix.check.map((row) => row.timeoutMinutes)).toEqual([10, 31]);
+	});
+
+	it('can only read the repository: contents: read and nothing else, no secrets., no other EW_ name, no cache', () => {
+		expect(job.permissions).toEqual({ contents: 'read' });
+		expect(section).not.toContain('secrets.');
+		expect(section).not.toContain('cache');
+		expect(section.match(/EW_[A-Z0-9_]+/g) ?? []).toEqual(['EW_CHECK_COMMAND_B64', 'EW_CHECK_COMMAND_B64']);
+		expect(section).not.toContain('needs:');
+	});
+
+	it('passes the command only through env EW_CHECK_COMMAND_B64 — never as text, never env.CHECK_COMMAND', () => {
+		for (const check of APP_CHECKS_TWO) {
+			// Not one byte of the command as text, anywhere in the file.
+			expect(file).not.toContain(check.command);
+			const b64 = Buffer.from(check.command, 'utf8').toString('base64');
+			// Its base64 only in its own matrix row, once.
+			expect(file.split(b64)).toHaveLength(2);
+			expect(job.strategy.matrix.check.find((row) => row.name === check.name)?.commandB64).toBe(b64);
+		}
+		const run = job.steps.find((step) => step.name === 'Run check');
+		expect(run?.env).toEqual({ EW_CHECK_COMMAND_B64: '${{ matrix.check.commandB64 }}' });
+		expect(run?.run).not.toContain('${{');
+		expect(run?.run).toContain('"$EW_CHECK_COMMAND_B64" | base64 -d');
+		expect(file).not.toMatch(/\bCHECK_COMMAND\b/);
+		expect(job.steps.filter((step) => step.env !== undefined)).toHaveLength(1);
+	});
+
+	it('sets continue-on-error on the non-required leg only', () => {
+		expect(job.strategy.matrix.check.map((row) => [row.name, continueOnErrorFor(row)])).toEqual([
+			['type-check', false],
+			['e2e', true]
+		]);
+	});
+
+	it('checks out the pull-request head without persisting a credential', () => {
+		// The pin's `# vX` comment is YAML's, so the parsed value is the SHA-pinned ref alone.
+		expect(section).toContain(`      - uses: ${actionPin(ACTION_PINS.checkout)}`);
+		expect(job.steps[0]?.uses).toMatch(/^actions\/checkout@[0-9a-f]{40}$/);
+		expect(job.steps[0]?.with).toMatchObject({ 'persist-credentials': false });
+	});
+
+	it('runs on a same-repository pull request AND on a push to the tracked branch (FR-76)', () => {
+		// The file triggers on both…
+		expect(parsed.on.push?.branches).toEqual(['main']);
+		expect(parsed.on.pull_request?.branches).toEqual(['main']);
+		// …and the job's guard admits both legs, the pull-request one unchanged.
+		expect(job.if).toContain(
+			"(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.ref == 'main')"
+		);
+		expect(job.if).toContain("(github.event_name == 'push' && github.ref == 'refs/heads/main')");
+		expect(job.if).not.toContain('workflow_dispatch');
+		expect(job.if).not.toContain('pull_request_target');
+	});
+
+	it('is written for every build strategy, and the image/none checks-only file carries the same job', () => {
+		for (const strategy of ['image', 'none'] as const) {
+			const checksOnly = generateWorkflow({ ...appChecksInput(), build: minimalBuild({ strategy }) });
+			expect(checksOnlyFile({ ...appChecksInput(), build: minimalBuild({ strategy }) })).toBe(true);
+			expect(jobSection(checksOnly, APP_BUILD_CHECKS_JOB)).toBe(section);
+			// No Build job in a checks-only file: a check never changes a Build's status.
+			expect(checksOnly).not.toContain('\n  build:\n');
+		}
+		// …and the Dockerfile file runs `build` and `checks` side by side, with no `needs:` between them.
+		expect(file).toContain('\n  build:\n');
+		expect(section).not.toContain('needs:');
+	});
+});

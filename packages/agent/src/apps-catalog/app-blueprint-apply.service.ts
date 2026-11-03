@@ -26,6 +26,10 @@
  *  3. `recordOutcome(…)` stores `blueprintApplyStatus` / `blueprintApplyRef` and writes
  *     `app.blueprint.applied` / `app.blueprint.apply_failed` Activity.
  *
+ * Step 1 also records `app.blueprint.matched` (T53) the first time a Work is matched to
+ * a Blueprint version, so the Activity order is matched, then applied / apply_failed;
+ * step 3 emits the `app.blueprint.apply_finished` telemetry event (T49).
+ *
  * `request(…)` — the signature the ready handler was written against — is kept for every
  * other caller (an explicit re-apply). It answers `applyInProgress` while another apply
  * is in flight, a §4.2 code on refusal, and `{ status: 'composed' }` otherwise; the
@@ -58,12 +62,19 @@ import {
     AppBlueprintResolverService,
     AppsCatalogCredentialUnavailableError,
 } from './app-blueprint-resolver.service';
+import { APP_SPEC_TELEMETRY_EVENTS, AppSpecTelemetry } from '../app-spec/app-spec-telemetry.port';
 
 /** R-2's Activity family for this epic's Blueprint rows (a local constant, like `app_source`). */
 export const APP_BLUEPRINT_ACTIVITY_ACTION_TYPE = 'app_blueprint';
 
 /** CONTRACTS §6 names. */
 export const APP_BLUEPRINT_ACTIVITY_EVENTS = {
+    /**
+     * APW-03 T53 (FR-82) — recorded once per `(workId, blueprintId, version)`, when
+     * `markBlueprintMatched` answers `true`, and always BEFORE `applied` / `apply_failed`
+     * (the match is recorded by `compose`, the landing after it).
+     */
+    matched: 'app.blueprint.matched',
     applied: 'app.blueprint.applied',
     applyFailed: 'app.blueprint.apply_failed',
 } as const;
@@ -222,6 +233,9 @@ export class AppBlueprintApplyService implements AppBlueprintInlineApplyCapabili
         @Optional() private readonly works?: WorkRepository,
         @Optional() private readonly activity?: ActivityLogService,
         @Optional() private readonly moduleRef?: ModuleRef,
+        // APW-03 T49 — `app.blueprint.apply_finished`. Appended LAST and `@Optional()`:
+        // absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppSpecTelemetry,
     ) {}
 
     /** The App spec state repository, when this graph has one (the API's does). */
@@ -321,13 +335,17 @@ export class AppBlueprintApplyService implements AppBlueprintInlineApplyCapabili
             input.relation,
         );
 
-        await this.recordMatch(input.workId, {
-            id: resolution.id,
-            version: resolution.version,
-            repo: resolution.repo,
-            displayName: resolution.displayName,
-            matchSource: toMatchSource(input.matchSource),
-        });
+        await this.recordMatch(
+            input.workId,
+            {
+                id: resolution.id,
+                version: resolution.version,
+                repo: resolution.repo,
+                displayName: resolution.displayName,
+                matchSource: toMatchSource(input.matchSource),
+            },
+            input.userId,
+        );
 
         return {
             status: 'composed',
@@ -384,6 +402,24 @@ export class AppBlueprintApplyService implements AppBlueprintInlineApplyCapabili
             }
         }
 
+        // APW-03 T49 — once per landing (a repeated `commit` report returned above). The
+        // failure reason is the ready handler's closed code; no sha, url or repository.
+        this.telemetry?.track(
+            APP_SPEC_TELEMETRY_EVENTS.blueprintApplyFinished,
+            {
+                mode: 'apply',
+                path:
+                    landing.kind === 'commit'
+                        ? 'commit'
+                        : landing.kind === 'pull_request'
+                          ? 'pull_request'
+                          : null,
+                outcome: failed ? 'failed' : landing.kind === 'commit' ? 'applied' : 'proposed',
+                ...(landing.kind === 'failed' ? { reason: landing.reason } : {}),
+            },
+            userId ?? null,
+        );
+
         if (!this.activity) return;
         const state = await this.safeState(workId);
         try {
@@ -422,11 +458,18 @@ export class AppBlueprintApplyService implements AppBlueprintInlineApplyCapabili
             displayName?: string;
             matchSource: BlueprintMatchSource;
         },
+        userId?: string,
     ): Promise<void> {
         const states = this.states();
         if (!states) return;
+        let first = false;
         try {
-            await states.markBlueprintMatched(workId, match.id, match.version, match.matchSource);
+            first = await states.markBlueprintMatched(
+                workId,
+                match.id,
+                match.version,
+                match.matchSource,
+            );
             await states.patchBlueprint(workId, {
                 blueprintRepo: match.repo,
                 blueprintApplyStatus: 'applying',
@@ -436,6 +479,43 @@ export class AppBlueprintApplyService implements AppBlueprintInlineApplyCapabili
         } catch (error) {
             this.logger.warn(
                 `Blueprint apply: recording the match for work ${workId} failed (${errorText(error)}).`,
+            );
+        }
+        if (first === true) {
+            await this.recordMatchedActivity(workId, match, userId);
+        }
+    }
+
+    /**
+     * APW-03 T53 (FR-82, plan §2.5 step 0) — `app.blueprint.matched`, exactly once per
+     * `(workId, blueprintId, version)`: only when `markBlueprintMatched`'s guarded update
+     * answered `true`, so a retried request, a re-invoked ready handler or a re-dispatch
+     * records nothing new. Details hold the id, the version and the match source only.
+     * Best effort: a failed Activity write is logged and never fails the apply.
+     */
+    private async recordMatchedActivity(
+        workId: string,
+        match: { id: string; version: string; matchSource: BlueprintMatchSource },
+        userId?: string,
+    ): Promise<void> {
+        if (!this.activity) return;
+        try {
+            await this.activity.log({
+                userId: userId ?? (await this.ownerOf(workId)) ?? undefined,
+                workId,
+                actionType: APP_BLUEPRINT_ACTIVITY_ACTION_TYPE as unknown as ActivityActionType,
+                action: APP_BLUEPRINT_ACTIVITY_EVENTS.matched,
+                status: ActivityStatus.COMPLETED,
+                summary: `The ${match.id} Blueprint was matched to this App Work`,
+                details: {
+                    blueprintId: match.id,
+                    version: match.version,
+                    matchSource: match.matchSource,
+                },
+            } as never);
+        } catch (error) {
+            this.logger.warn(
+                `Blueprint apply: recording app.blueprint.matched for work ${workId} failed (${errorText(error)}).`,
             );
         }
     }

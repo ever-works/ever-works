@@ -36,4 +36,19 @@ export const appChangesAPI = {
 
     cost: async (workId: string): Promise<WorkCostRollup> =>
         serverFetch<WorkCostRollup>(`${base(workId)}/cost`),
+
+    /**
+     * APW-08 T48 (S33) — **Allow on this machine** (`allow: true`) or withdraw it: one Fleet node's
+     * containment downgrade, on this App Work. `204`, no body.
+     */
+    allowContainment: async (
+        workId: string,
+        body: { nodeId: string; allow: boolean },
+    ): Promise<void> =>
+        serverMutation<void>({
+            endpoint: `${base(workId)}/app-runs/allow-containment`,
+            data: { nodeId: body.nodeId, allow: body.allow },
+            method: 'POST',
+            wrapInData: false,
+        }),
 };

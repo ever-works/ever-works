@@ -1,7 +1,8 @@
 import { PromptAssemblerService } from '@ever-works/agent/agents';
 import type { Agent, Task } from '@ever-works/agent/entities';
 import { TaskStatus } from '@ever-works/agent/tasks-domain';
-import { FleetAgentTaskPlannerService } from '../fleet-agent-task-planner.service';
+import { FLEET_AGENT_EXECUTION_MAX_BUDGET_USD } from '@ever-works/contracts';
+import { FleetAgentTaskPlannerService, runBudgetCapUsd } from '../fleet-agent-task-planner.service';
 
 /**
  * APW-08 T47 (XC-05, FR-69) — the App Work Task tool policy on the fleet path.
@@ -83,7 +84,7 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
 
-    const build = (appRunBriefs?: unknown) =>
+    const build = (appRunBriefs?: unknown, appWorksSink?: unknown) =>
         new FleetAgentTaskPlannerService(
             tasks as never,
             agents as never,
@@ -113,6 +114,7 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
                 }),
             } as never,
             appRunBriefs as never,
+            appWorksSink as never,
         );
 
     beforeEach(() => {
@@ -151,6 +153,47 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
         const plan = await build().plan(payload);
 
         expect(plan!.mcp).toBeUndefined();
+    });
+
+    // APW-08 T43 (plan §8.1, XC-05) — the withheld bridge is reported as `app.change.tool_denied`
+    // with the group only, attributed to the App Work (the Task's, else the Agent's own).
+    describe('app.change.tool_denied (T43)', () => {
+        const sink = () => ({ track: jest.fn() });
+
+        it('is sent once, group `mcp`, for a Task on an App Work', async () => {
+            const telemetry = sink();
+            await build(undefined, telemetry).plan(payload);
+            expect(telemetry.track).toHaveBeenCalledTimes(1);
+            const [distinctId, event, properties] = telemetry.track.mock.calls[0];
+            expect(event).toBe('app.change.tool_denied');
+            expect(distinctId).toBe(task().userId);
+            expect(properties).toEqual({ workId: 'work-app', taskId: task().id, group: 'mcp' });
+        });
+
+        it('names the Agent’s App Work when the Task’s Work is another kind', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            agents.findByIdAndUser.mockResolvedValue(agent({ workId: 'work-app' }));
+            const telemetry = sink();
+            await build(undefined, telemetry).plan(payload);
+            expect(telemetry.track.mock.calls[0][2]).toMatchObject({ workId: 'work-app' });
+        });
+
+        it('is not sent when the bridge is withheld only because the Agent’s Work is unreadable', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            agents.findByIdAndUser.mockResolvedValue(agent({ workId: 'work-gone' }));
+            const telemetry = sink();
+            const plan = await build(undefined, telemetry).plan(payload);
+            // Still fail closed: no bridge. But no Work is named as the denied App Work.
+            expect(plan!.mcp).toBeUndefined();
+            expect(telemetry.track).not.toHaveBeenCalled();
+        });
+
+        it('is not sent for an ordinary Work (the bridge is stamped)', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const telemetry = sink();
+            await build(undefined, telemetry).plan(payload);
+            expect(telemetry.track).not.toHaveBeenCalled();
+        });
     });
 
     it('fails closed when the Agent’s Work cannot be read', async () => {
@@ -235,5 +278,73 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
             }).plan(payload);
             expect(plan).not.toBeNull();
         });
+    });
+
+    // APW-08 T35 (FR-53, APW08-G15) — a run's own spend cap reaches the node as maxBudgetUsd.
+    describe('the run budget cap (T35)', () => {
+        const withRun = (budgetCapCents: number | null) =>
+            new FleetAgentTaskPlannerService(
+                tasks as never,
+                agents as never,
+                works as never,
+                {
+                    describeFleetWorkspace: jest.fn().mockResolvedValue(workspace),
+                    resolveFleetRunEnvGrants: jest.fn().mockResolvedValue([]),
+                    readFleetRepoDeclaredCommands: jest
+                        .fn()
+                        .mockResolvedValue({ setup: [], checks: [] }),
+                } as never,
+                new PromptAssemblerService(),
+                undefined,
+                { getResolvedSettings: jest.fn().mockResolvedValue({}) } as never,
+                {
+                    findById: jest.fn().mockResolvedValue({
+                        id: payload.runId,
+                        userId: payload.userId,
+                        budgetCapCents,
+                    }),
+                    findRecentForTask: jest.fn().mockResolvedValue([]),
+                } as never,
+                {
+                    describeScope: jest.fn().mockResolvedValue({
+                        ok: true,
+                        reason: null,
+                        installationEntityId: 'inst-entity-1',
+                        installationId: '9001',
+                        repositoryIds: ['1'],
+                        repositories: ['member/cal-fork'],
+                    }),
+                } as never,
+            );
+
+        it('carries the cap as maxBudgetUsd, rounded down to whole cents', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const plan = await withRun(1599).plan(payload);
+            expect(plan!.execution.maxBudgetUsd).toBe(15.99);
+        });
+
+        // Review of #3061 — a Mission may allow up to 1,000,000 cents per run; the node refuses
+        // any maxBudgetUsd above FLEET_AGENT_EXECUTION_MAX_BUDGET_USD, so the plan clamps to it.
+        it('clamps a cap above the node maximum to that maximum', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const plan = await withRun(1_000_000).plan(payload);
+            expect(plan!.execution.maxBudgetUsd).toBe(FLEET_AGENT_EXECUTION_MAX_BUDGET_USD);
+        });
+
+        it('no cap on the run leaves the plan as it was', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const plan = await withRun(null).plan(payload);
+            expect(plan!.execution.maxBudgetUsd).toBeUndefined();
+        });
+    });
+
+    it('runBudgetCapUsd never raises a cap and ignores nonsense', () => {
+        expect(runBudgetCapUsd(1500)).toBe(15);
+        expect(runBudgetCapUsd(1599.9)).toBe(15.99);
+        expect(runBudgetCapUsd(50_001)).toBe(FLEET_AGENT_EXECUTION_MAX_BUDGET_USD);
+        expect(runBudgetCapUsd(0.5)).toBeNull();
+        for (const raw of [0, -1, null, undefined, Number.NaN, '1500']) {
+            expect(runBudgetCapUsd(raw)).toBeNull();
+        }
     });
 });

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
 import { withUploadServeScope } from '@/lib/api/upload-serve-url';
+import { safeDownloadHref } from '@/lib/utils/safe-link';
 import {
     AlertCircle,
     Download,
@@ -220,9 +221,10 @@ function FileTile({
     // Only once the upload resolves — before that there is no URL to point at.
     // The download anchor is a navigation, so the tab's workspace rides on the href.
     const workspace = useWorkspaceScope();
+    // The row's URL is data, so it is checked before it becomes an href.
     const downloadHref =
         !onOpen && !error && !uploading
-            ? withUploadServeScope(attachment.url, workspace)
+            ? (safeDownloadHref(withUploadServeScope(attachment.url, workspace)) ?? undefined)
             : undefined;
 
     return (

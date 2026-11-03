@@ -462,6 +462,12 @@ export class FleetRunRouterService {
         if (payload.runId) {
             jobPayload.runId = payload.runId;
         }
+        // APW-08 T12 / T48 — set only by the fleet-aware dispatcher, after isolated-run admission
+        // admitted the run: the lease judges the node that takes this job, and the reconciler
+        // records the containment it got. Absent on every other job.
+        if (typeof payload.appWorkId === 'string' && payload.appWorkId) {
+            jobPayload.appWorkId = payload.appWorkId;
+        }
         if (workspacePath) {
             jobPayload.workspacePath = workspacePath;
         }
@@ -479,6 +485,13 @@ export class FleetRunRouterService {
             // of the system rather than a promise.
             if (plan.setup && plan.setup.length > 0) {
                 jobPayload.setup = plan.setup;
+            }
+            // APW-08 T13 — frozen beside the checks that run, for the same
+            // reason: the reconciler folds THESE into the node's verdict, so
+            // a later admission (or a re-read of the App spec) can never
+            // change what this run is graded by. Carries no command.
+            if (plan.notAdmittedChecks && plan.notAdmittedChecks.length > 0) {
+                jobPayload.notAdmittedChecks = plan.notAdmittedChecks;
             }
             jobPayload.git = plan.git;
             // Self-build slice Z (EW-796) — only when the planner actually

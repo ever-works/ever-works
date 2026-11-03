@@ -1,4 +1,8 @@
-import { TerminalSessionLauncher } from '../terminal-session-launcher.service';
+import {
+    TERMINAL_SESSIONS_ENABLED_ENV,
+    TerminalSessionLauncher,
+    terminalSessionsEnabled,
+} from '../terminal-session-launcher.service';
 import {
     TERMINAL_SESSION_COMMAND_DEFAULT,
     TERMINAL_SESSION_COMMAND_ENV,
@@ -32,8 +36,17 @@ describe('TerminalSessionLauncher', () => {
         releaseTerminalSessionClaim: jest.Mock;
     };
     let dispatcher: { enqueue: jest.Mock };
+    const savedSessionsFlag = process.env[TERMINAL_SESSIONS_ENABLED_ENV];
+
+    afterEach(() => {
+        if (savedSessionsFlag === undefined) delete process.env[TERMINAL_SESSIONS_ENABLED_ENV];
+        else process.env[TERMINAL_SESSIONS_ENABLED_ENV] = savedSessionsFlag;
+    });
 
     beforeEach(() => {
+        // Sessions are opt-in; every case below runs on an install that opted in
+        // unless it says otherwise.
+        process.env[TERMINAL_SESSIONS_ENABLED_ENV] = 'true';
         runs = {
             findByIdAndUser: jest.fn().mockResolvedValue(makeRun()),
             casClaimTerminalSession: jest.fn().mockResolvedValue(true),
@@ -178,6 +191,32 @@ describe('TerminalSessionLauncher', () => {
             ).resolves.toEqual({ started: false, reason: 'run-not-live' });
         }
         expect(runs.casClaimTerminalSession).not.toHaveBeenCalled();
+    });
+
+    it('reports sessions-disabled (and claims nothing) unless TERMINAL_SESSIONS_ENABLED is true', async () => {
+        delete process.env[TERMINAL_SESSIONS_ENABLED_ENV];
+        // The automatic callers (steering resume, task transitions) pass
+        // requirePersistent on a persistent run: they must not claim a slot the
+        // worker will never fill.
+        runs.findByIdAndUser.mockResolvedValue(makeRun({ persistent: true }));
+
+        const outcome = await makeLauncher().startForRun({
+            userId: USER,
+            agentId: AGENT,
+            runId: RUN,
+            requirePersistent: true,
+        });
+
+        expect(outcome).toEqual({ started: false, reason: 'sessions-disabled' });
+        expect(runs.casClaimTerminalSession).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('terminalSessionsEnabled is opt-in only: "true" (any case, padded) enables, anything else is off', () => {
+        expect(terminalSessionsEnabled({})).toBe(false);
+        expect(terminalSessionsEnabled({ [TERMINAL_SESSIONS_ENABLED_ENV]: '1' })).toBe(false);
+        expect(terminalSessionsEnabled({ [TERMINAL_SESSIONS_ENABLED_ENV]: 'false' })).toBe(false);
+        expect(terminalSessionsEnabled({ [TERMINAL_SESSIONS_ENABLED_ENV]: ' TRUE ' })).toBe(true);
     });
 
     it('reports dispatcher-unavailable (and claims nothing) with no job runtime bound', async () => {

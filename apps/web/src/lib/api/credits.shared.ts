@@ -463,3 +463,86 @@ export function planOffersTrial(
     const price = Number(plan.monthlyPrice);
     return Number.isFinite(price) && price > 0;
 }
+
+// ── Billing cycle + seats at checkout (Gauzy Ever Works #126) ─────────
+// Display-side mirrors of the server's pricing rules. The server still prices every checkout
+// from the catalog and the plan row; these only decide what the card shows and which `interval`
+// / `seats` hints the checkout call carries.
+
+/** The two recurring cycles a paid plan card can be bought on. */
+export type PlanBillingCycle = 'monthly' | 'annual';
+
+type PlanPricing = Pick<
+    SubscriptionPlanListItem,
+    'monthlyPrice' | 'annualPrice' | 'seatsIncluded' | 'seatMonthlyPrice'
+>;
+
+/** True when a paid plan has a positive yearly price — the server 400s an interval a plan does not sell. */
+export function planSellsAnnual(plan: Pick<PlanPricing, 'monthlyPrice' | 'annualPrice'>): boolean {
+    if (isFreePlan(plan)) return false;
+    const annual = Number(plan.annualPrice ?? 0);
+    return Number.isFinite(annual) && annual > 0;
+}
+
+/** The interval actually bought for this plan: annual only where the plan sells it. */
+export function planCheckoutInterval(
+    plan: Pick<PlanPricing, 'monthlyPrice' | 'annualPrice'>,
+    cycle: PlanBillingCycle,
+): PlanBillingCycle {
+    return cycle === 'annual' && planSellsAnnual(plan) ? 'annual' : 'monthly';
+}
+
+/**
+ * The price to render next to the card's `/mo` suffix. `annualPrice` is the YEARLY total, so an
+ * annual card shows a twelfth of it, rounded to the cent.
+ */
+export function planCyclePricePerMonth(
+    plan: Pick<PlanPricing, 'monthlyPrice' | 'annualPrice'>,
+    cycle: PlanBillingCycle,
+): string {
+    if (planCheckoutInterval(plan, cycle) !== 'annual') return plan.monthlyPrice;
+    return String(Math.round((Number(plan.annualPrice) / 12) * 100) / 100);
+}
+
+/** Whether the card offers a Members count at checkout: a paid plan with an allowance and a seat price. */
+export function planSellsExtraSeats(plan: PlanPricing): boolean {
+    if (isFreePlan(plan)) return false;
+    if (typeof plan.seatsIncluded !== 'number' || plan.seatsIncluded <= 0) return false;
+    const seatPrice = Number(plan.seatMonthlyPrice ?? 0);
+    return Number.isFinite(seatPrice) && seatPrice > 0;
+}
+
+/** Seats billed beyond the allowance — the same rule as the server's `billableSeats`. */
+export function planExtraSeats(
+    plan: Pick<PlanPricing, 'seatsIncluded'>,
+    wantedSeats: number,
+): number {
+    if (typeof plan.seatsIncluded !== 'number') return 0;
+    if (!Number.isFinite(wantedSeats)) return 0;
+    return Math.max(0, Math.floor(wantedSeats) - plan.seatsIncluded);
+}
+
+/** One extra seat for the cycle: 12x the monthly rate on annual, no annual discount (server `seatAmountCents`). */
+export function planSeatPricePerCycle(plan: PlanPricing, cycle: PlanBillingCycle): number {
+    const monthly = Number(plan.seatMonthlyPrice ?? 0);
+    if (!Number.isFinite(monthly) || monthly <= 0) return 0;
+    return planCheckoutInterval(plan, cycle) === 'annual' ? monthly * 12 : monthly;
+}
+
+/**
+ * What one billing period of this checkout costs (plan + extra seats), in currency units, or null
+ * when the plan's price does not parse. Display only: the hosted checkout page is the real total.
+ */
+export function estimatePlanCheckoutTotal(
+    plan: PlanPricing,
+    cycle: PlanBillingCycle,
+    wantedSeats: number | null,
+): number | null {
+    const interval = planCheckoutInterval(plan, cycle);
+    const base = Number(interval === 'annual' ? plan.annualPrice : plan.monthlyPrice);
+    if (!Number.isFinite(base)) return null;
+    const extra =
+        wantedSeats === null || !planSellsExtraSeats(plan) ? 0 : planExtraSeats(plan, wantedSeats);
+    const total = base + extra * planSeatPricePerCycle(plan, cycle);
+    return Math.round(total * 100) / 100;
+}

@@ -19,6 +19,7 @@ jest.mock('@ever-works/agent/database', () => ({
     PluginUsageRepository: class {},
     AgentRepository: class {},
     ownershipScopeOf: () => ({ tenantId: null, organizationId: null }),
+    ownershipRelationScopeOf: () => undefined,
 }));
 jest.mock('@ever-works/agent/services', () => ({ DecisionConflictService: class {} }));
 jest.mock('@ever-works/agent/activity-log', () => ({ ActivityLogService: class {} }));

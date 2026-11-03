@@ -50,7 +50,8 @@ function Copyright() {
                 href={COMPANY_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary dark:text-primary-dark hover:underline transition-colors"
+                // Underlined, not told apart from the copyright text by colour alone (WCAG 1.4.1).
+                className="text-primary dark:text-primary-dark underline underline-offset-2 transition-colors"
                 aria-label={`Visit ${COMPANY_NAME} website`}
             >
                 {COMPANY_NAME}
@@ -111,7 +112,7 @@ function BuildVersion({ apiVersion }: { apiVersion?: ApiVersion | null }) {
 
     return (
         <div className="flex items-center gap-1.5 text-xs text-text-muted dark:text-text-muted-dark">
-            <span className="opacity-70">{t('build')}</span>
+            <span>{t('build')}</span>
             <VersionChip label={t('web')} info={web} />
             {apiVersion ? (
                 <>

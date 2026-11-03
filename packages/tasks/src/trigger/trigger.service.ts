@@ -119,6 +119,10 @@ import {
 } from '../tasks/trigger/app-blueprint-apply.task';
 import type { runPluginOperationTask } from '../tasks/trigger/run-plugin-operation.task';
 import { pluginOperationRunPayload } from './plugin-operation-run-payload';
+import {
+    appBlueprintApplyIdempotencyKey,
+    appUpstreamSyncIdempotencyKey,
+} from './app-job-idempotency-keys';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 // C10 — the readiness payload and dispatcher contract T23 declared (provisionally) in
 // `app-upstream-state.service.ts`, imported as a TYPE only: the service that produces the
@@ -1635,9 +1639,7 @@ export class TriggerService
                 payload,
                 this.stampTenantOptions({
                     tags: ['app-blueprint-apply', `work:${payload.workId}`, `mode:${payload.mode}`],
-                    idempotencyKey: `app-blueprint-apply:${payload.workId}:${payload.mode}:${payload.version}:${
-                        payload.requestedAt ?? ''
-                    }`,
+                    idempotencyKey: appBlueprintApplyIdempotencyKey(payload),
                     machine: this.machine() as any,
                     concurrencyKey: `app-blueprint-apply:${payload.workId}`,
                 }),
@@ -1651,18 +1653,9 @@ export class TriggerService
     }
 }
 
-/**
- * Plan §6.1:662 — `app-upstream-sync:<workId>:<trigger>:<minute bucket>`. The bucket is
- * the UTC minute (`YYYYMMDDHHmm`), so the key is stable for one minute and never longer.
- */
-export function appUpstreamSyncIdempotencyKey(
-    workId: string,
-    trigger: string,
-    now: Date = new Date(),
-): string {
-    const bucket = now.toISOString().slice(0, 16).replace(/[-:T]/g, '');
-    return `app-upstream-sync:${workId}:${trigger}:${bucket}`;
-}
+// Plan §6.1:662's key now lives in `./app-job-idempotency-keys` (C-8), shared with the
+// BYO mirror in `dispatchersFromTenantClient`; re-exported so its importers keep working.
+export { appUpstreamSyncIdempotencyKey };
 
 /**
  * A retrieved Trigger.dev run as the contract's {@link JobRunResult}: the

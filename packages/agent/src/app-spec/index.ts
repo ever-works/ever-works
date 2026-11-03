@@ -21,6 +21,8 @@
  *   the additive companions `isRequireHumanMergePath`, `GUARDED_SPEC_BLOCKS` and
  *   `HUMAN_REQUIRED_SPEC_BLOCKS`.
  * - `./app-spec.module` — `AppSpecModule`, what `apps/api`'s Works module imports.
+ * - `./app-spec-telemetry.port` — T49's `APP_SPEC_TELEMETRY_SINK` (bound by the API's
+ *   telemetry binding module), the plan §9.1 event names and `AppSpecTelemetry`.
  *
  * The `app.spec.applied` event itself lives in `@ever-works/agent/events`
  * (`packages/agent/src/events/app-spec-applied.event.ts`), where every other
@@ -32,3 +34,4 @@ export * from './app-spec.service';
 export * from './app-spec-hash';
 export * from './app-spec-guarded-blocks';
 export * from './app-spec.module';
+export * from './app-spec-telemetry.port';

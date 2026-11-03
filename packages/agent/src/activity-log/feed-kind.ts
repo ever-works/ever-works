@@ -213,6 +213,7 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.MISSION_FAILED]: 'problem',
     [ActivityActionType.MISSION_DELETED]: 'work',
     [ActivityActionType.MISSION_TICK_CAPPED]: 'problem',
+    [ActivityActionType.MISSION_NOTHING_TO_FILE]: 'work',
     [ActivityActionType.MISSION_TICK]: 'work',
 
     // Goals
@@ -438,6 +439,10 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // pull request reads as delivery, and a refused / failed / expired / withdrawn one is a problem
     // through the status rule (plan §3.4's per-event status table).
     [ActivityActionType.APP_UPSTREAM_PR]: 'deliveryWhenCompleted',
+    // APW-08 T21 — a merged change followed to live: `work` while it builds and deploys, a
+    // `delivery` once it is live (`app.change.live`, written COMPLETED), and a failed build or
+    // deployment is a `problem` through the failed-status rule.
+    [ActivityActionType.APP_CHANGE]: 'deliveryWhenCompleted',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

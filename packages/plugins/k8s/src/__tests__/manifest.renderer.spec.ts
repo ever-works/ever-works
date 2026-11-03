@@ -91,6 +91,53 @@ describe('buildDeployment', () => {
 		expect(container.readinessProbe.httpGet.path).toBe('/api/health');
 		expect(container.livenessProbe.httpGet.path).toBe('/api/health');
 	});
+
+	it('runs the site non-root as the given numeric user, with no SA token, capabilities or escalation', () => {
+		// A caller that knows the image's numeric user (none in production today; see buildDeployment).
+		const pod = (buildDeployment({ ...baseInput, runAsUser: 1000, runAsGroup: 1000 }) as Record<string, any>).spec
+			.template.spec;
+		expect(pod.automountServiceAccountToken).toBe(false);
+		expect(pod.securityContext).toEqual({
+			runAsNonRoot: true,
+			runAsUser: 1000,
+			runAsGroup: 1000,
+			seccompProfile: { type: 'RuntimeDefault' }
+		});
+		expect(pod.containers[0].securityContext).toEqual({
+			allowPrivilegeEscalation: false,
+			capabilities: { drop: ['ALL'] }
+		});
+	});
+
+	it('uses a caller-supplied numeric uid / gid for a different image; the gid defaults to the uid', () => {
+		const pod = (buildDeployment({ ...baseInput, runAsUser: 101, runAsGroup: 101 }) as Record<string, any>).spec
+			.template.spec;
+		expect(pod.securityContext.runAsNonRoot).toBe(true);
+		expect(pod.securityContext.runAsUser).toBe(101);
+		expect(pod.securityContext.runAsGroup).toBe(101);
+		const uidOnly = (buildDeployment({ ...baseInput, runAsUser: 101 }) as Record<string, any>).spec.template.spec;
+		expect(uidOnly.securityContext.runAsGroup).toBe(101);
+	});
+
+	// The minimal (Astro) templates run stock `nginx:<ver>-alpine`, whose master starts as root. Forced
+	// to uid 1000 it cannot write /var/cache/nginx or its pid file; as root with ALL capabilities
+	// dropped it cannot setuid its workers. Either way it crash-loops, so by default (every production
+	// deploy today) nothing is forced, and only the root-safe hardening stays.
+	it('by default forces no user or capability drop, keeping the root-safe hardening', () => {
+		const pod = (buildDeployment(baseInput) as Record<string, any>).spec.template.spec;
+		expect(pod.automountServiceAccountToken).toBe(false);
+		expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });
+		expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false });
+	});
+
+	it('never enforces non-root from a uid that is not a positive integer', () => {
+		for (const runAsUser of [0, -1, 1.5, Number.NaN]) {
+			const pod = (buildDeployment({ ...baseInput, runAsUser, runAsGroup: 1000 }) as Record<string, any>).spec
+				.template.spec;
+			expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });
+			expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false });
+		}
+	});
 });
 
 describe('buildService', () => {

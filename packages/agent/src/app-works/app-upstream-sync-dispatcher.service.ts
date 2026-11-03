@@ -23,6 +23,7 @@ import {
     type AppUpstreamSyncJobPayload,
 } from './app-upstream-state.service';
 import { computeNextUpstreamSync } from './upstream-schedule';
+import { APP_UPSTREAM_TELEMETRY_EVENTS, AppUpstreamTelemetry } from './app-upstream.telemetry';
 
 /**
  * APW-02 T28 — the `app-upstream-sync-dispatcher` tick (plan §6.6, `plan.md:800-816`).
@@ -160,6 +161,9 @@ export class AppUpstreamSyncDispatcherService {
         @Optional()
         @Inject(APP_FORK_READINESS_DISPATCHER)
         private readonly readinessDispatcher?: AppForkReadinessDispatcher,
+        // APW-02 T39 (Gauzy Ever Works #37) - `app_upstream.dispatch_tick`. Appended LAST and
+        // `@Optional()`: absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppUpstreamTelemetry,
     ) {}
 
     // ── §6.6 — the cron tick ─────────────────────────────────────────────────
@@ -204,6 +208,8 @@ export class AppUpstreamSyncDispatcherService {
                 `${counters.syncPullRequestChecked} sync pull requests checked, ` +
                 `${counters.skipped} skipped, ${counters.failed} failed.`,
         );
+        // APW-02 T39 - one tick, its counters only (plan 9.1).
+        this.telemetry?.track(APP_UPSTREAM_TELEMETRY_EVENTS.dispatchTick, { ...counters });
 
         return counters;
     }

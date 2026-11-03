@@ -193,6 +193,8 @@ export class GoalsController {
                 constraints: body.constraints,
                 // Required for a delivery Goal, optional seed for a metric one.
                 dodCriteria: body.dodCriteria,
+                // APW-08 T31 (FR-45) — checked for reachability by the service.
+                workId: body.workId,
             },
             this.scopeContext?.getScope(),
         );
@@ -307,6 +309,8 @@ export class GoalsController {
                 outcome: body.outcome,
                 criteria: body.criteria,
                 constraints: body.constraints,
+                // APW-08 T31 (FR-45) — `null` clears; 409 loopRunning while the loop runs.
+                workId: body.workId,
             },
             this.scopeContext?.getScope(),
         );

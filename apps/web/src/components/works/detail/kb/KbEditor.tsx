@@ -103,6 +103,15 @@ export function KbEditor({
                 // tiptap-markdown owns codeBlock serialisation; keep
                 // StarterKit's codeBlock node so the toolbar's parsing
                 // stays consistent.
+                // Tiptap 3's StarterKit also bundles Link, Underline,
+                // TrailingNode and ListKeymap: Link is configured on its own
+                // below, the rest stay off to keep the v2 behaviour
+                // (TrailingNode would add an empty paragraph after a closing
+                // heading or list that v2 never added; markdown has no underline).
+                link: false,
+                underline: false,
+                trailingNode: false,
+                listKeymap: false,
             }),
             Link.configure({
                 openOnClick: false,
@@ -352,7 +361,7 @@ export function KbEditor({
  * `Record<string, any>` upstream.
  */
 function readMarkdown(editor: Editor): string | undefined {
-    const storage = editor.storage as Record<string, { getMarkdown?: () => string }>;
+    const storage = editor.storage as unknown as Record<string, { getMarkdown?: () => string }>;
     return storage.markdown?.getMarkdown?.();
 }
 

@@ -110,6 +110,14 @@ export interface CreateTaskOptions {
      * which keep full control. Off with `TASK_RESERVED_LABELS_ENFORCED=false`.
      */
     readonly restrictReservedLabels?: ReservedLabelRestriction;
+    /**
+     * The ownership stamp the new Task is WRITTEN with, when it must differ from the LOOKUP scope
+     * (the third argument). A row that predates stamping (`{null,null}`) needs owner-only lookups
+     * — its raw stamp as a query scope means "legacy rows only" — yet its child must still carry
+     * that explicit legacy stamp rather than be filled from the request ALS by the scope
+     * subscriber (#2213 punch list). Absent = the lookup scope, as before.
+     */
+    readonly ownershipStamp?: OwnershipScope;
 }
 
 /** Options of {@link TasksService.update}. */
@@ -1002,7 +1010,7 @@ export class TasksService {
                 const row = await this.tasks.create(
                     {
                         userId,
-                        ...ownershipStamp(ownershipScope),
+                        ...ownershipStamp(options.ownershipStamp ?? ownershipScope),
                         slug,
                         title: input.title.trim(),
                         description: input.description ?? null,
@@ -1836,7 +1844,11 @@ export class TasksService {
     async runTask(
         userId: string,
         taskId: string,
-        opts: { agentId?: string | null } = {},
+        opts: {
+            agentId?: string | null;
+            /** APW-08 T35 (APW08-G15) — the run's own spend cap in cents. */
+            maxBudgetCents?: number;
+        } = {},
         ownershipScope?: OwnershipScope,
     ): Promise<RunTaskResult> {
         const task = await this.getOne(userId, taskId, ownershipScope);
@@ -1875,6 +1887,7 @@ export class TasksService {
         // key a status transition would use for the same pair.
         const dispatch = await this.transitions.dispatchAgentRun(task, agentId, {
             dedupKey: `${taskId}:${agentId}:manual:${Date.now()}`,
+            ...(opts.maxBudgetCents !== undefined ? { maxBudgetCents: opts.maxBudgetCents } : {}),
         });
 
         await this.logActivity({

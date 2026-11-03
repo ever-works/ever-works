@@ -530,6 +530,46 @@ export class PluginUsageRepository {
         }));
     }
 
+    /**
+     * APW-08 T56 (FR-73, FR-62) — one Work's costliest Tasks in a window: the rows the
+     * App Work overview links to each Task's own Cost section from. Same row filter as
+     * {@link getTotalSpendCents} (failed calls excluded, the budget's currency when given),
+     * plus `taskId IS NOT NULL`; one grouped query on the `(workId, occurredAt)` index,
+     * the `limit` costliest first. A row recorded outside any Task is in the Work total
+     * and in no line here.
+     */
+    async getSpendByTaskForWork(
+        workId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        opts: { currency?: string; limit?: number } = {},
+    ): Promise<Array<{ taskId: string; costCents: number }>> {
+        const limit = Math.max(1, Math.min(50, Math.trunc(opts.limit ?? 5)));
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .select('e.taskId', 'taskId')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .where('e.workId = :workId', { workId })
+            .andWhere('e.taskId IS NOT NULL')
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
+        if (opts.currency) {
+            qb.andWhere('e.currency = :currency', { currency: opts.currency });
+        }
+        const rows = await qb
+            .groupBy('e.taskId')
+            .orderBy('"costCents"', 'DESC')
+            .limit(limit)
+            .getRawMany<{ taskId: string | null; costCents: string }>();
+        return rows
+            .filter((row) => typeof row.taskId === 'string' && row.taskId.length > 0)
+            .map((row) => ({
+                taskId: row.taskId as string,
+                costCents: Number(row.costCents ?? 0),
+            }));
+    }
+
     /** Wave 13 — user's spend per `modelId` in the window (one query). */
     async getSpendByModelForUser(
         userId: string,

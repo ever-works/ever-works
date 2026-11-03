@@ -239,6 +239,20 @@ describe('KnowledgeBaseBufferExtractorService', () => {
             expect(result!.markdown).not.toContain('line1\nline2');
         });
 
+        it('escapes a backslash before a pipe, so the pipe cannot open a column', async () => {
+            const buffer = await buildXlsxBuffer([
+                {
+                    name: 'Tricky',
+                    rows: [['Col'], ['a\\|b'], ['ends\\']],
+                },
+            ]);
+
+            const result = await service.extract(buffer, XLSX_MIME);
+
+            expect(result!.markdown).toContain('a\\\\\\|b');
+            expect(result!.markdown).toContain('ends\\\\');
+        });
+
         it('emits an empty-sheet marker for sheets with no header row', async () => {
             const buffer = await buildXlsxBuffer([{ name: 'Blank', rows: [] }]);
             const result = await service.extract(buffer, XLSX_MIME);

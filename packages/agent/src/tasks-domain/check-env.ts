@@ -154,8 +154,13 @@ export const MAX_ENV_PASSTHROUGH = 32;
  * A URL carrying `user:password@` in its authority. Allowlisted values that
  * look like this (a credentialed proxy URL, typically) are dropped: the
  * variable is plumbing, the password inside it is not ours to hand over.
+ *
+ * No scheme in the pattern (any `://user:pass@` counts, which only widens what
+ * is dropped), and the user part stops at its first `:` (a password may hold
+ * more): every value the scheme-led spelling matched still matches, but no run
+ * is rescanned from every offset (CodeQL js/polynomial-redos).
  */
-const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
+const CREDENTIALED_URL_PATTERN = /:\/\/[^/\s@:]*:[^/\s@]+@/;
 
 /**
  * The switch that stops `cmd.exe` resolving a bare program name from the

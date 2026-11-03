@@ -73,6 +73,7 @@ export function ChatMessageContent({
                             state={part.state}
                             output={part.state === 'output-available' ? part.output : undefined}
                             errorText={errorText}
+                            input={'input' in part ? part.input : undefined}
                         />
                     );
                 }

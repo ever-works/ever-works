@@ -43,6 +43,11 @@ import {
 } from '../works-config/schema/app-spec.validate';
 import { hashAppSpec, appSpecHashesEqual } from './app-spec-hash';
 import { diffGuardedSpecBlocks } from './app-spec-guarded-blocks';
+import {
+    APP_SPEC_TELEMETRY_EVENTS,
+    AppSpecTelemetry,
+    appSpecDraftBytes,
+} from './app-spec-telemetry.port';
 
 /**
  * APW-03 T12 — `AppSpecService`: the App spec read true.
@@ -105,10 +110,12 @@ import { diffGuardedSpecBlocks } from './app-spec-guarded-blocks';
  *   path that writes would race the evaluation job's guarded write and could
  *   emit nothing useful. The column is refilled by the next evaluation, which
  *   always carries `effectiveSpec` when the head is valid.
- * - **It emits no telemetry.** Plan §9.1 declares `APP_SPEC_TELEMETRY_SINK` in
- *   `packages/agent/src/app-spec/app-spec-telemetry.port.ts`; that port is not in
- *   T12's file list (T49 binds it in `apps/api`), so `app.spec.evaluated` is not
- *   emitted yet. See this task's report — routed, not forgotten.
+ * - **It emits telemetry only through T49's port, and only after the fact.**
+ *   `app.spec.evaluated` (once per `evaluate` call, after the lock) and
+ *   `app.spec.draft_validated` (once per `validateDraft`) go to
+ *   `APP_SPEC_TELEMETRY_SINK` (`app-spec-telemetry.port.ts`, bound in `apps/api`)
+ *   through an `@Optional()` {@link AppSpecTelemetry}: counters, codes and the Work
+ *   id only, never a value of the spec, and never a reason for an evaluation to fail.
  * - **It does not touch the licence.** The licence-relevant-path fan-out
  *   (`getCompareDiff` → `APP_LICENSE_EVALUATE_DISPATCHER`, plan §2.3:185-186) is
  *   T22/T31's; the state row and the dispatcher it needs do not exist in this
@@ -404,6 +411,11 @@ export class AppSpecService {
         @Optional()
         @Inject(APP_SPEC_EVALUATE_DISPATCHER)
         private readonly dispatcher?: AppSpecEvaluateDispatcher,
+        /**
+         * APW-03 T49 — `app.spec.evaluated` / `app.spec.draft_validated`. Appended LAST and
+         * `@Optional()`: absent, nothing is emitted; present, it never throws.
+         */
+        @Optional() private readonly telemetry?: AppSpecTelemetry,
     ) {}
 
     // ────────────────────────────────────────────────────────────────────────
@@ -677,18 +689,46 @@ export class AppSpecService {
             // No lock service in this graph: evaluate anyway and report the absence
             // by the outcome the row carries, rather than refusing a read the user
             // asked for. The guarded write is what keeps two concurrent runs sane.
-            return run();
+            return this.observeEvaluation(await run());
         }
 
         const locked = await this.locks.runExclusive(appSpecEvaluateLockKey(workId), run);
         if (!locked.acquired) {
-            return this.baseOutcome(workId, {
-                status: 'locked',
-                error: 'Another evaluation of this App Work is in flight.',
-                durationMs: Math.max(0, now() - startedAtMs),
-            });
+            return this.observeEvaluation(
+                this.baseOutcome(workId, {
+                    status: 'locked',
+                    error: 'Another evaluation of this App Work is in flight.',
+                    durationMs: Math.max(0, now() - startedAtMs),
+                }),
+            );
         }
-        return locked.result;
+        return this.observeEvaluation(locked.result);
+    }
+
+    /**
+     * APW-03 T49 — `app.spec.evaluated`, once per `evaluate` call, AFTER the lock is
+     * released and the outcome is final. Returns the outcome unchanged; telemetry never
+     * fails or delays the evaluation (the sink is fire-and-forget and `track` never throws).
+     * The owner is the distinct id only when the outcome itself knows it — the evaluation
+     * makes no extra read for telemetry.
+     */
+    private observeEvaluation(outcome: AppSpecEvaluationOutcome): AppSpecEvaluationOutcome {
+        if (!this.telemetry) return outcome;
+        try {
+            this.telemetry.track(APP_SPEC_TELEMETRY_EVENTS.specEvaluated, {
+                workId: outcome.workId,
+                trigger: outcome.trigger ?? null,
+                status: outcome.validationStatus ?? outcome.status,
+                errorCount: outcome.errorCount,
+                warningCount: outcome.warningCount,
+                durationMs: outcome.durationMs,
+                coalesced: outcome.passes > 1,
+                superseded: outcome.superseded,
+            });
+        } catch {
+            // Never reached (`track` never throws); kept so a future sink cannot fail a read.
+        }
+        return outcome;
     }
 
     /**
@@ -706,12 +746,16 @@ export class AppSpecService {
         if (!state) {
             return { outcome: this.baseOutcome(workId, { status: 'no_state' }), again: null };
         }
+        // The trigger this pass serves, carried on every outcome below (and so into
+        // `app.spec.evaluated`, APW-03 T49) — the field existed and was always `null`.
+        const trigger = state.lastEvaluationTrigger ?? null;
 
         const context = await this.loadContext(workId, state);
         if (!context) {
             return {
                 outcome: this.baseOutcome(workId, {
                     status: 'work_missing',
+                    trigger,
                     error: 'The App Work row is gone, so there is nothing to evaluate.',
                 }),
                 again: null,
@@ -734,6 +778,7 @@ export class AppSpecService {
             return {
                 outcome: this.baseOutcome(workId, {
                     status: 'evaluated',
+                    trigger,
                     validationStatus: 'unreadable',
                     headCommitSha: head.commitSha ?? null,
                     effectiveCommitSha: state.effectiveCommitSha ?? null,
@@ -766,6 +811,7 @@ export class AppSpecService {
             return {
                 outcome: this.baseOutcome(workId, {
                     status: 'evaluated',
+                    trigger,
                     validationStatus: missing ? 'missing' : 'unreadable',
                     headCommitSha,
                     effectiveCommitSha: state.effectiveCommitSha ?? null,
@@ -806,6 +852,7 @@ export class AppSpecService {
             return {
                 outcome: this.baseOutcome(workId, {
                     status: 'evaluated',
+                    trigger,
                     validationStatus: 'unreadable',
                     headCommitSha,
                     effectiveCommitSha: state.effectiveCommitSha ?? null,
@@ -869,6 +916,7 @@ export class AppSpecService {
             return {
                 outcome: this.baseOutcome(workId, {
                     status: 'evaluated',
+                    trigger,
                     validationStatus: validation.status,
                     headCommitSha,
                     headSpecHash,
@@ -909,6 +957,7 @@ export class AppSpecService {
         return {
             outcome: this.baseOutcome(workId, {
                 status: 'evaluated',
+                trigger,
                 validationStatus: validation.status,
                 headCommitSha,
                 headSpecHash,
@@ -1245,6 +1294,14 @@ export class AppSpecService {
         // and the parsed document stays off the HTTP response (see
         // {@link AppSpecDraftParse}).
         const { spec: _spec, ...verdict } = await this.parseDraft(workId, text);
+        // APW-03 T49 — the editor's validation (not `parseDraft`, which APW-08's guard
+        // calls on every change): the status, the error count and the draft's SIZE.
+        this.telemetry?.track(APP_SPEC_TELEMETRY_EVENTS.draftValidated, {
+            workId,
+            status: verdict.status,
+            errorCount: verdict.errorCount,
+            bytes: appSpecDraftBytes(text),
+        });
         return verdict;
     }
 

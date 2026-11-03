@@ -102,6 +102,9 @@ on `develop` today (§2.3).
   request's `type-check` result is red, **then** the Task card shows a red gate chip, the Agent is sent back
   with the failing output (up to the Work's attempt budget), and the Task page says **"type-check failed —
   the agent is fixing it (attempt 2 of 3)."**
+  _Copy note (APW-08 T16, 2026-10-30):_ "of 3" illustrates the copy's shape with a Work whose gate-attempt
+  budget is 3. FR-17's default is **2**, and the copy is generated from the Work's actual budget
+  (`maxGateAttempts`, 1–5), never from this example.
 - **S4 — A protected path stops the pull request.** **Given** the App spec protects `apps/web/public/brand/**`,
   **when** the Agent's branch changes `apps/web/public/brand/logo.svg`, **then** no pull request is opened, the
   Task moves to _Blocked_ with **"This change edits a protected path: apps/web/public/brand/logo.svg. Protected
