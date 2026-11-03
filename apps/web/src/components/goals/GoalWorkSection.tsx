@@ -38,7 +38,7 @@ export function GoalWorkSection({
         startChange(async () => {
             try {
                 const updated = await updateGoalAction(goal.id, { workId: next });
-                // The PATCH answer carries no name; the refresh re-reads it.
+                // The PATCH answer names the Work (review of #3061); cleared, there is none.
                 onGoalChange({ ...updated, workName: next ? (updated.workName ?? null) : null });
                 toast.success(t('work.saved'));
                 router.refresh();

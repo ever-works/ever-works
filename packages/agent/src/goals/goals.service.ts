@@ -688,7 +688,7 @@ export class GoalsService {
             (key) => (input as Record<string, unknown>)[key] !== undefined,
         );
         const statusChanged = existing.status !== statusBefore;
-        return toGoalDto(
+        const dto = toGoalDto(
             await this.persist(existing, (publisher, manager, row) =>
                 publisher.changed(
                     manager,
@@ -704,6 +704,8 @@ export class GoalsService {
                 ),
             ),
         );
+        // Review of #3061 — the answer names the Work, like the single-Goal read.
+        return this.withWorkName(dto, userId);
     }
 
     async delete(
@@ -779,7 +781,7 @@ export class GoalsService {
         existing.status = GoalStatus.ACTIVE;
         existing.outcome = null;
         existing.nextCheckAt = new Date();
-        return toGoalDto(
+        const dto = toGoalDto(
             await this.persist(existing, (publisher, manager, row) =>
                 publisher.changed(manager, 'goal', row.id, 'goal.status_changed', {
                     changedFields: ['status', 'outcome'],
@@ -787,6 +789,8 @@ export class GoalsService {
                 }),
             ),
         );
+        // Review of #3061 — the answer names the Work, like the single-Goal read.
+        return this.withWorkName(dto, userId);
     }
 
     /** ACTIVE → PAUSED; clears `nextCheckAt` so the dispatcher skips it. */
@@ -799,7 +803,7 @@ export class GoalsService {
         }
         existing.status = GoalStatus.PAUSED;
         existing.nextCheckAt = null;
-        return toGoalDto(
+        const dto = toGoalDto(
             await this.persist(existing, (publisher, manager, row) =>
                 publisher.changed(manager, 'goal', row.id, 'goal.status_changed', {
                     changedFields: ['status'],
@@ -807,6 +811,8 @@ export class GoalsService {
                 }),
             ),
         );
+        // Review of #3061 — the answer names the Work, like the single-Goal read.
+        return this.withWorkName(dto, userId);
     }
 
     /**
@@ -830,7 +836,7 @@ export class GoalsService {
         }
         const entry = await this.evaluationService.evaluateOne(existing);
         const fresh = await this.findOrThrow(userId, goalId, scope);
-        return { entry, goal: toGoalDto(fresh) };
+        return { entry, goal: await this.withWorkName(toGoalDto(fresh), userId) };
     }
 
     // ─── Mission ↔ Goal links ───────────────────────────────────────

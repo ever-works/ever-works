@@ -1,7 +1,7 @@
 'use client';
 
 import { RecordVisibilityPanel } from '@/components/record-visibility';
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import {
     Activity,
     Archive,
@@ -143,7 +143,18 @@ export function GoalDetailClient({
     const t = useTranslations('dashboard.goalDetail');
     const router = useRouter();
 
-    const [goal, setGoal] = useState<Goal>(initial);
+    const [goal, setGoalState] = useState<Goal>(initial);
+    // APW-08 T33 (review of #3061) — an answer that carries no Work name (a loop control, a
+    // nudge, a DoD edit) keeps the name the page already shows for the same Work, so the Work
+    // link never falls back to "A Work you can no longer open" after an unrelated action.
+    const setGoal = useCallback((next: Goal) => {
+        setGoalState((prev) => ({
+            ...next,
+            workName:
+                next.workName ??
+                (next.workId && next.workId === prev.workId ? (prev.workName ?? null) : null),
+        }));
+    }, []);
     const [tab, setTab] = useState<GoalTab>('dod');
     const [limitsOpen, setLimitsOpen] = useState(false);
     const [nudgeOpen, setNudgeOpen] = useState(false);
