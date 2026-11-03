@@ -201,6 +201,10 @@ export class TerminalAttachController {
                 throw new ConflictException(
                     `AgentRun ${runId} has finished — a terminal session can only be started for a queued or running run.`,
                 );
+            case 'sessions-disabled':
+                throw new ServiceUnavailableException(
+                    'Terminal sessions are disabled on this install (TERMINAL_SESSIONS_ENABLED is not true).',
+                );
             case 'dispatcher-unavailable':
                 throw new ServiceUnavailableException(
                     'Terminal sessions are unavailable on this install — no background job runtime is wired.',
