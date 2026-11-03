@@ -717,7 +717,7 @@ export class RequestTaskDeliveryFollowUpDto {
     @ApiProperty({
         format: 'uuid',
         description:
-            "The open `delivery-failed` escalation (Inbox item) of THIS Task — consumed once; any other id answers 422 followUpLimit.",
+            'The open `delivery-failed` escalation (Inbox item) of THIS Task — consumed once; any other id answers 422 followUpLimit.',
     })
     @IsUUID()
     escalationId: string;

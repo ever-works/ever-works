@@ -679,11 +679,36 @@ describe('isolated-run admission — the predicate and its facts', () => {
             // Ids deliberately ordered AGAINST the statuses, so neither the input order nor the id
             // order alone yields the expected sequence.
             nodes: [
-                { id: 'node-a-enrolling', userId: OWNER, status: 'enrolling', capabilities: ['git-push'] },
-                { id: 'node-e-online', userId: OWNER, status: 'online', capabilities: ['git-push'] },
-                { id: 'node-b-paused', userId: OWNER, status: 'paused', capabilities: ['git-push'] },
-                { id: 'node-d-offline', userId: OWNER, status: 'offline', capabilities: ['git-push'] },
-                { id: 'node-c-online', userId: OWNER, status: 'online', capabilities: ['git-push'] },
+                {
+                    id: 'node-a-enrolling',
+                    userId: OWNER,
+                    status: 'enrolling',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-e-online',
+                    userId: OWNER,
+                    status: 'online',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-b-paused',
+                    userId: OWNER,
+                    status: 'paused',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-d-offline',
+                    userId: OWNER,
+                    status: 'offline',
+                    capabilities: ['git-push'],
+                },
+                {
+                    id: 'node-c-online',
+                    userId: OWNER,
+                    status: 'online',
+                    capabilities: ['git-push'],
+                },
             ],
             reports: {},
         });

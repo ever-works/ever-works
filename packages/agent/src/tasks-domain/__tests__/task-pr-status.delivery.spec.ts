@@ -58,7 +58,9 @@ describe('TaskPrStatusService — delivery merge hook (APW-08 T22)', () => {
     let transitions: { transition: jest.Mock };
     let tracker: { isDeliveryTracked: jest.Mock; recordMerge: jest.Mock };
 
-    function service(bound: { tracker: TaskDeliveryTracker | undefined } = { tracker: tracker as never }) {
+    function service(
+        bound: { tracker: TaskDeliveryTracker | undefined } = { tracker: tracker as never },
+    ) {
         const withTracker = bound.tracker;
         return new TaskPrStatusService(
             tasks as unknown as TaskRepository,
@@ -155,7 +157,11 @@ describe('TaskPrStatusService — delivery merge hook (APW-08 T22)', () => {
     });
 
     it('an open pull request never reaches the hook', async () => {
-        git.getPullRequestStatus.mockResolvedValue({ ...mergedStatus, state: 'open', merged: false });
+        git.getPullRequestStatus.mockResolvedValue({
+            ...mergedStatus,
+            state: 'open',
+            merged: false,
+        });
         await service().syncDuePrStatuses();
         expect(tracker.isDeliveryTracked).not.toHaveBeenCalled();
     });
@@ -164,7 +170,10 @@ describe('TaskPrStatusService — delivery merge hook (APW-08 T22)', () => {
         const svc = service();
         const result = await (
             svc as unknown as {
-                refreshTask: (task: Task, userId: string) => Promise<{ task: Task; status: unknown }>;
+                refreshTask: (
+                    task: Task,
+                    userId: string,
+                ) => Promise<{ task: Task; status: unknown }>;
             }
         ).refreshTask(makeTask(), 'user-1');
         expect(result.task).toMatchObject({ id: 'task-1', prState: 'merged' });
@@ -175,7 +184,10 @@ describe('TaskPrStatusService — delivery merge hook (APW-08 T22)', () => {
         git.getPullRequestStatus.mockResolvedValue(null);
         const result = await (
             service() as unknown as {
-                refreshTask: (task: Task, userId: string) => Promise<{ task: Task; status: unknown }>;
+                refreshTask: (
+                    task: Task,
+                    userId: string,
+                ) => Promise<{ task: Task; status: unknown }>;
             }
         ).refreshTask(makeTask(), 'user-1');
         expect(result.status).toBeNull();
