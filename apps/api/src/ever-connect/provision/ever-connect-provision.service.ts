@@ -93,6 +93,7 @@ export interface ProvisionDisplay {
 
 /** `POST /api/ever-connect/provision`. */
 export interface ProvisionIntakeResponse {
+    jti: string;
     provisionTxn: string;
     display: ProvisionDisplay;
     capabilities: {
@@ -105,6 +106,7 @@ export interface ProvisionIntakeResponse {
 
 /** `POST /api/ever-connect/provision/summary`. */
 export interface ProvisionSummaryResponse {
+    jti: string;
     display: ProvisionDisplay;
     capabilities: { provisionHandoff: boolean; provisionCompany: boolean };
     /** The company this step already created, when there is one. */
@@ -203,6 +205,7 @@ export class EverConnectProvisionService {
         this.logger.log(`ever_connect.provision.received ${claims.jti}`);
 
         return {
+            jti: claims.jti,
             provisionTxn: this.seal.seal('provision', { jti: claims.jti }),
             display: displayOf(claims),
             capabilities: {
@@ -316,9 +319,10 @@ export class EverConnectProvisionService {
 
     /** What the confirmation page shows (no side effect). */
     async summary(userId: string, provisionTxn: unknown): Promise<ProvisionSummaryResponse> {
-        const { claims } = await this.resolve(userId, provisionTxn);
+        const { jti, claims } = await this.resolve(userId, provisionTxn);
         const record = await this.store.byKey(claims.idempotency_key);
         return {
+            jti,
             display: displayOf(claims),
             capabilities: provisionCapabilities(),
             existing:

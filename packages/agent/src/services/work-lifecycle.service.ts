@@ -15,7 +15,6 @@ import {
     DomainEventPublisher,
     recordAfterWrite,
 } from '../domain-events/domain-event-publisher.service';
-import type { EntityManager } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import { WorkRepository } from '@src/database/repositories/work.repository';
