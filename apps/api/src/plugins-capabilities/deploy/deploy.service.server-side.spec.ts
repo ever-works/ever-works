@@ -67,10 +67,6 @@ import { DeployService } from './deploy.service';
 describe('DeployService — server-side deploy for managed cluster tiers', () => {
     const buildService = (overrides: {
         plugin: Record<string, unknown>;
-        /** What `websiteTemplateResolver.resolveForWork` answers. Defaults to `{ branch: 'main' }`. */
-        template?: Record<string, unknown>;
-        /** What `gitFacade.getFileContent` answers for the website repo's Dockerfile. */
-        dockerfile?: { content: string; encoding: string } | null | Error;
         token?: string;
         settings?: Record<string, unknown>;
         settingSources?: Record<string, string>;
@@ -124,10 +120,6 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
 
         const gitFacade = {
             getAccessToken: jest.fn().mockResolvedValue('gh-token'),
-            getFileContent:
-                overrides.dockerfile instanceof Error
-                    ? jest.fn().mockRejectedValue(overrides.dockerfile)
-                    : jest.fn().mockResolvedValue(overrides.dockerfile ?? null),
         };
 
         const workRepository = {
@@ -164,7 +156,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         };
 
         const websiteTemplateResolver = {
-            resolveForWork: jest.fn().mockResolvedValue(overrides.template ?? { branch: 'main' }),
+            resolveForWork: jest.fn().mockResolvedValue({ branch: 'main' }),
         };
 
         const eventEmitter = {
@@ -406,165 +398,6 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         const runtimeEnv = config.options.runtimeEnv as Record<string, string>;
         expect(runtimeEnv.TENANT_ID).toBe('work-1');
         expect(runtimeEnv.STRIPE_SECRET_KEY).toBeUndefined();
-    });
-
-    const NODE_DOCKERFILE = 'FROM node:26-alpine AS runner\nUSER node\nCMD ["node", "server.js"]\n';
-    const NGINX_DOCKERFILE =
-        'FROM nginx:1.27-alpine AS runner\nCMD ["nginx", "-g", "daemon off;"]\n';
-
-    it.each([
-        ['ever-works', 'directory-web-template'],
-        ['ever-works', 'web-template'],
-    ])(
-        'managed tier → a Work on %s/%s whose Dockerfile runs as node deploys with non-root enforced as 1000:1000',
-        async (owner, repo) => {
-            const plugin = managedPlugin();
-            const { service, gitFacade } = buildService({
-                plugin,
-                settings: { clusterSource: 'k8s-works-shared' },
-                template: { branch: 'main', owner, repo },
-                dockerfile: { content: NODE_DOCKERFILE, encoding: 'utf-8' },
-            });
-
-            await service.deploy('work-1', 'user-1');
-
-            // The Work's OWN Dockerfile, on the branch being deployed.
-            expect(gitFacade.getFileContent).toHaveBeenCalledWith(
-                'acme',
-                'acme-site',
-                'Dockerfile',
-                expect.objectContaining({ providerId: 'github', token: 'gh-token' }),
-                'main',
-            );
-            const [config] = plugin.deploy.mock.calls[0];
-            expect(config.options.runAsUser).toBe(1000);
-            expect(config.options.runAsGroup).toBe(1000);
-            // Only a proposal: the plugin enforces it after confirming the rendered image.
-            expect(typeof config.options.confirmImageUser).toBe('function');
-        },
-    );
-
-    // The Dockerfile is the branch's CURRENT one; the alias the deploy pulls moves only when
-    // k8s-build finishes. So the plugin asks about the exact image it renders, and the answer
-    // comes from that image's registry config `User`, read with the deploy's own pull credential.
-    it.each([
-        ['node', true],
-        ['1000:1000', true],
-        ['', false], // the previous, root image is still behind the alias
-        ['nginx', false],
-    ])(
-        'managed tier → confirmImageUser answers from the image config User %j → %s',
-        async (user, expected) => {
-            const plugin = managedPlugin();
-            const { service } = buildService({
-                plugin,
-                settings: { clusterSource: 'k8s-works-shared' },
-                template: { branch: 'main', owner: 'ever-works', repo: 'directory-web-template' },
-                dockerfile: { content: NODE_DOCKERFILE, encoding: 'utf-8' },
-            });
-            const readUser = jest.fn().mockResolvedValue({ status: 'read', user });
-            (service as any).imageUserInspector = { readUser };
-
-            await service.deploy('work-1', 'user-1');
-
-            const pull = { server: 'ghcr.io', username: 'x', password: 'y' };
-            const confirm = plugin.deploy.mock.calls[0][0].options.confirmImageUser;
-            await expect(confirm({ reference: 'ghcr.io/acme/acme-site:prod', pull })).resolves.toBe(
-                expected,
-            );
-            expect(readUser).toHaveBeenCalledWith({
-                reference: 'ghcr.io/acme/acme-site:prod',
-                pull,
-            });
-        },
-    );
-
-    it('managed tier → an unreadable image config confirms nothing', async () => {
-        const plugin = managedPlugin();
-        const { service } = buildService({
-            plugin,
-            settings: { clusterSource: 'k8s-works-shared' },
-            template: { branch: 'main', owner: 'ever-works', repo: 'directory-web-template' },
-            dockerfile: { content: NODE_DOCKERFILE, encoding: 'utf-8' },
-        });
-        (service as any).imageUserInspector = {
-            readUser: jest.fn().mockResolvedValue({ status: 'unavailable', reason: '401' }),
-        };
-
-        await service.deploy('work-1', 'user-1');
-
-        const confirm = plugin.deploy.mock.calls[0][0].options.confirmImageUser;
-        await expect(
-            confirm({ reference: 'ghcr.io/acme/acme-site:prod', pull: null }),
-        ).resolves.toBe(false);
-    });
-
-    it('managed tier → a base64-encoded Dockerfile is decoded before it is checked', async () => {
-        const plugin = managedPlugin();
-        const { service } = buildService({
-            plugin,
-            settings: { clusterSource: 'k8s-works-shared' },
-            template: { branch: 'main', owner: 'ever-works', repo: 'directory-web-template' },
-            dockerfile: {
-                content: Buffer.from(NODE_DOCKERFILE, 'utf-8').toString('base64'),
-                encoding: 'base64',
-            },
-        });
-
-        await service.deploy('work-1', 'user-1');
-
-        expect(plugin.deploy.mock.calls[0][0].options.runAsUser).toBe(1000);
-    });
-
-    // A node template is only what the repo STARTED from: its own Dockerfile may have diverged.
-    it.each([
-        ['an nginx runner', { content: NGINX_DOCKERFILE, encoding: 'utf-8' }],
-        ['no Dockerfile', null],
-        ['a failed read', new Error('GitHub 502')],
-    ])(
-        'managed tier → a node-template Work whose Dockerfile has %s deploys with no forced user',
-        async (_label, dockerfile) => {
-            const plugin = managedPlugin();
-            const { service } = buildService({
-                plugin,
-                settings: { clusterSource: 'k8s-works-shared' },
-                template: { branch: 'main', owner: 'ever-works', repo: 'directory-web-template' },
-                dockerfile,
-            });
-
-            const result = await service.deploy('work-1', 'user-1');
-
-            // Never blocks the deploy.
-            expect(result.dispatched).toBe(true);
-            const [config] = plugin.deploy.mock.calls[0];
-            expect(config.options).not.toHaveProperty('runAsUser');
-            expect(config.options).not.toHaveProperty('runAsGroup');
-            expect(config.options).not.toHaveProperty('confirmImageUser');
-        },
-    );
-
-    // Stock nginx (the minimal Astro templates) starts as root and crash-loops under a forced uid
-    // or with ALL capabilities dropped, so the plugin must not be told any user for it.
-    it.each([
-        ['ever-works', 'directory-web-minimal-template'],
-        ['ever-works', 'web-minimal-template'],
-        ['someone-else', 'custom-template'],
-    ])('managed tier → a Work on %s/%s deploys with no forced user', async (owner, repo) => {
-        const plugin = managedPlugin();
-        const { service, gitFacade } = buildService({
-            plugin,
-            settings: { clusterSource: 'k8s-works-shared' },
-            template: { branch: 'main', owner, repo },
-            dockerfile: { content: NODE_DOCKERFILE, encoding: 'utf-8' },
-        });
-
-        await service.deploy('work-1', 'user-1');
-
-        expect(gitFacade.getFileContent).not.toHaveBeenCalled();
-        const [config] = plugin.deploy.mock.calls[0];
-        expect(config.options).not.toHaveProperty('runAsUser');
-        expect(config.options).not.toHaveProperty('runAsGroup');
-        expect(config.options).not.toHaveProperty('confirmImageUser');
     });
 
     it('managed tier → branch alias image tag (main → prod)', async () => {

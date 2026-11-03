@@ -33,14 +33,15 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 	const labels = COMMON_LABELS(input.workId, input.workSlug);
 	const selector = SELECTOR_LABELS(input.workSlug);
 
-	// Non-root is enforced ONLY when the caller knows the image's numeric user (the Next.js
-	// templates end in `USER node` = 1000:1000; the deploy service passes that). The minimal (Astro)
-	// templates serve with stock `nginx:<ver>-alpine`, whose master runs as root: forced to a uid
-	// it cannot write /var/cache/nginx or its pid file, and with ALL capabilities dropped a root
-	// master cannot setuid its workers - either way the pod crash-loops. And every existing Work
-	// repo carries its own copy of the Dockerfile, so a template fix cannot reach them. Such images
-	// keep the parts that are safe for a root process: no SA token, RuntimeDefault seccomp and no
-	// privilege escalation (no_new_privs does not stop a root master's setuid to its workers).
+	// Every site gets the parts that are safe for a process that starts as root: no SA token,
+	// RuntimeDefault seccomp and no privilege escalation (no_new_privs does not stop a root nginx
+	// master's setuid to its workers). Non-root + drop ALL is a SEAM: enforced only when a caller
+	// passes the image's numeric `runAsUser`, and no production caller does today. Forcing a uid
+	// from what a deploy believes about an image is unsafe while the image is a MUTABLE branch alias:
+	// the minimal (Astro) templates serve stock `nginx:<ver>-alpine` as root, which crash-loops under
+	// a forced uid (no write to /var/cache/nginx or its pid file) or with ALL capabilities dropped (no
+	// setuid to its workers), and every Work repo carries its own Dockerfile copy. Enforcing it needs
+	// digest-pinned deploys plus templates with a numeric USER first.
 	const runAsUser = nonRootId(input.runAsUser);
 	const runAsGroup = runAsUser === undefined ? undefined : (nonRootId(input.runAsGroup) ?? runAsUser);
 	const podSecurityContext: Record<string, unknown> =

@@ -203,12 +203,12 @@ export interface ManifestRenderInputs {
 	/** Defaults to 'Always'; only side-loaded (kind) images should use 'IfNotPresent'. */
 	imagePullPolicy?: 'Always' | 'IfNotPresent' | 'Never';
 	/**
-	 * The image's own NUMERIC uid / gid, when the caller knows it (the Next.js templates' `USER node`
-	 * = 1000:1000). Set: the pod enforces `runAsNonRoot` as that uid / gid and drops ALL capabilities.
-	 * Unset (or not a positive integer): no user is forced, so an image whose process starts as root
-	 * (the minimal templates' stock nginx) still boots; it keeps no SA token, RuntimeDefault seccomp
-	 * and no privilege escalation. Numeric because `runAsNonRoot` cannot verify a named user.
-	 * `runAsGroup` defaults to `runAsUser`.
+	 * The image's own NUMERIC uid / gid. Set: the pod enforces `runAsNonRoot` as that uid / gid and
+	 * drops ALL capabilities. Unset (or not a positive integer): no user is forced, so an image whose
+	 * process starts as root (the minimal templates' stock nginx) still boots; it keeps no SA token,
+	 * RuntimeDefault seccomp and no privilege escalation. No production deploy sets it today (see
+	 * `buildDeployment`); the kind e2e does. Numeric because `runAsNonRoot` cannot verify a named
+	 * user. `runAsGroup` defaults to `runAsUser`.
 	 */
 	runAsUser?: number;
 	runAsGroup?: number;

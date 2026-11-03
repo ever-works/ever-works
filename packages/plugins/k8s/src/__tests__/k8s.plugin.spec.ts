@@ -1501,12 +1501,7 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 					websiteRepoIsPrivate: false,
 					// The pod annotation is otherwise `t<Date.now()>`; pinning it keeps this
 					// snapshot a statement about what `deploy()` renders, not about the clock.
-					revision: 'rev-abc1234',
-					// What the platform passes for a Work built from a Next.js template (`USER node`),
-					// once the image behind the alias is confirmed to run as that user.
-					runAsUser: 1000,
-					runAsGroup: 1000,
-					confirmImageUser: async () => true
+					revision: 'rev-abc1234'
 				}
 			},
 			VALID
@@ -1601,11 +1596,6 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			              },
 			              "securityContext": {
 			                "allowPrivilegeEscalation": false,
-			                "capabilities": {
-			                  "drop": [
-			                    "ALL",
-			                  ],
-			                },
 			              },
 			              "startupProbe": {
 			                "failureThreshold": 30,
@@ -1619,9 +1609,6 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			            },
 			          ],
 			          "securityContext": {
-			            "runAsGroup": 1000,
-			            "runAsNonRoot": true,
-			            "runAsUser": 1000,
 			            "seccompProfile": {
 			              "type": "RuntimeDefault",
 			            },
@@ -1723,92 +1710,5 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 			  },
 			}
 		`);
-	});
-
-	// The minimal (Astro) templates' stock nginx starts as root: the platform passes no user for
-	// them, and the rendered pod must then force none (no runAsNonRoot / uid, no capability drop),
-	// while keeping what is safe for a root process.
-	it('forces no user or capability drop when the deploy does not name the image user', async () => {
-		const api = makeMockApi();
-		const plugin = new KubernetesPlugin({ api });
-		await plugin.onLoad(
-			createMockContext({
-				kubeconfig: VALID,
-				namespace: 'ever-works',
-				ingressHost: 'work-1.example.com',
-				registry: { kind: 'github', visibility: 'auto' }
-			})
-		);
-
-		const result = await plugin.deploy(
-			{
-				projectName: 'work-1',
-				sourceDir: '.',
-				options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: false }
-			},
-			VALID
-		);
-
-		expect(result.status).toBe('deploying');
-		const pod = (vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>).spec.template.spec;
-		expect(pod.automountServiceAccountToken).toBe(false);
-		expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });
-		expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false });
-	});
-
-	// The caller's knowledge (template, Dockerfile) can be ahead of the image behind the mutable
-	// alias, so the uid is enforced only when the EXACT rendered image is confirmed to run as it.
-	describe('runAsUser is gated on confirming the rendered image', () => {
-		const deployWith = async (options: Record<string, unknown>) => {
-			const api = makeMockApi();
-			const plugin = new KubernetesPlugin({ api });
-			await plugin.onLoad(
-				createMockContext({
-					kubeconfig: VALID,
-					namespace: 'ever-works',
-					ingressHost: 'work-1.example.com',
-					registry: { kind: 'github', visibility: 'auto' }
-				})
-			);
-			const result = await plugin.deploy(
-				{
-					projectName: 'work-1',
-					sourceDir: '.',
-					options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: false, ...options }
-				},
-				VALID
-			);
-			expect(result.status).toBe('deploying');
-			return (vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>).spec.template.spec;
-		};
-
-		it('asks about the exact image reference it renders, and enforces the uid on a yes', async () => {
-			const confirmImageUser = vi.fn(async () => true);
-			const pod = await deployWith({ runAsUser: 1000, runAsGroup: 1000, confirmImageUser });
-
-			expect(confirmImageUser).toHaveBeenCalledWith({ reference: pod.containers[0].image, pull: null });
-			expect(pod.containers[0].image).toBe('ghcr.io/acme/work-1:abc1234');
-			expect(pod.securityContext.runAsNonRoot).toBe(true);
-			expect(pod.securityContext.runAsUser).toBe(1000);
-			expect(pod.containers[0].securityContext.capabilities).toEqual({ drop: ['ALL'] });
-		});
-
-		it.each([
-			['answers false', { confirmImageUser: async () => false }],
-			[
-				'throws',
-				{
-					confirmImageUser: async () => {
-						throw new Error('registry down');
-					}
-				}
-			],
-			['is missing', {}]
-		])('forces no user when the confirmation %s', async (_label, options) => {
-			const pod = await deployWith({ runAsUser: 1000, runAsGroup: 1000, ...options });
-
-			expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });
-			expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false });
-		});
 	});
 });

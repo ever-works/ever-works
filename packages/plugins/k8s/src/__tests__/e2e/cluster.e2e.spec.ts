@@ -98,8 +98,8 @@ describeE2E('k8s plugin e2e — against real cluster', () => {
 			// there is no registry to pull from, so it opts back out explicitly.
 			imagePullPolicy: 'IfNotPresent',
 			// nginx-unprivileged runs as uid / gid 101 (a numeric USER in its image). Naming it
-			// exercises the enforced path (runAsNonRoot as 101, ALL capabilities dropped) against a
-			// real kubelet; without a user the renderer would force none.
+			// exercises the renderer's enforced seam (runAsNonRoot as 101, ALL capabilities dropped)
+			// against a real kubelet; production deploys pass no user, so it forces none there.
 			runAsUser: 101,
 			runAsGroup: 101
 		});

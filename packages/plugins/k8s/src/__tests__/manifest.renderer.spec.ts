@@ -93,7 +93,7 @@ describe('buildDeployment', () => {
 	});
 
 	it('runs the site non-root as the given numeric user, with no SA token, capabilities or escalation', () => {
-		// What the platform passes for a Work built from a Next.js template (`USER node` = 1000:1000).
+		// A caller that knows the image's numeric user (none in production today; see buildDeployment).
 		const pod = (buildDeployment({ ...baseInput, runAsUser: 1000, runAsGroup: 1000 }) as Record<string, any>).spec
 			.template.spec;
 		expect(pod.automountServiceAccountToken).toBe(false);
@@ -121,9 +121,9 @@ describe('buildDeployment', () => {
 
 	// The minimal (Astro) templates run stock `nginx:<ver>-alpine`, whose master starts as root. Forced
 	// to uid 1000 it cannot write /var/cache/nginx or its pid file; as root with ALL capabilities
-	// dropped it cannot setuid its workers. Either way it crash-loops, so with no known user nothing
-	// is forced, and only the root-safe hardening stays.
-	it('forces no user or capability drop when the image user is unknown (root nginx images)', () => {
+	// dropped it cannot setuid its workers. Either way it crash-loops, so by default (every production
+	// deploy today) nothing is forced, and only the root-safe hardening stays.
+	it('by default forces no user or capability drop, keeping the root-safe hardening', () => {
 		const pod = (buildDeployment(baseInput) as Record<string, any>).spec.template.spec;
 		expect(pod.automountServiceAccountToken).toBe(false);
 		expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });

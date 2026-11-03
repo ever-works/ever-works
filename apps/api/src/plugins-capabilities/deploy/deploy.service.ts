@@ -49,9 +49,6 @@ import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import {
     AppDeployRequestService,
     type AppDeployRequestResult,
-    type AppImagePullAuth,
-    type AppImageUserInspector,
-    RegistryAppImageUserInspector,
 } from '@ever-works/agent/app-runtime';
 import type {
     DeploymentConfig,
@@ -60,7 +57,6 @@ import type {
     SettingSource,
 } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
-import { isNodeUserSpec, isNodeUserTemplate, resolveWebsiteImageUser } from './website-image-user';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
@@ -115,12 +111,6 @@ export interface DeployResult {
 @Injectable()
 export class DeployService {
     private readonly logger = new Logger(DeployService.name);
-
-    /**
-     * Reads an image config's `User` from its registry (the App Works pre-check's reader). Created on
-     * first use; a field so a spec can replace it.
-     */
-    private imageUserInspector?: AppImageUserInspector;
     private readonly CRON_SECRET_LENGTH = 32;
 
     constructor(
@@ -464,7 +454,6 @@ export class DeployService {
                   kubeContextOverride: effectiveContext.lookupContext?.kubeContextOverride ?? null,
                   deploymentId: deployment.id,
                   targetBranch,
-                  template,
               })
             : await this.dispatchWithRetry(
                   work,
@@ -1277,8 +1266,6 @@ export class DeployService {
         deploymentId: string;
         targetBranch: string;
         revision?: string;
-        /** The Work's resolved website template: decides whether a non-root user can be enforced. */
-        template?: { owner?: string | null; repo?: string | null } | null;
     }): Promise<boolean> {
         const {
             work,
@@ -1291,7 +1278,6 @@ export class DeployService {
             deploymentId,
             targetBranch,
             revision,
-            template,
         } = args;
         try {
             // ALWAYS the branch alias — never a commit SHA. `k8s-build.yml`
@@ -1324,27 +1310,6 @@ export class DeployService {
 
             const ghcrReadToken = await this.resolveGhcrReadToken(work, userId, gitToken);
             const runtimeEnv = await this.collectServerSideRuntimeEnv(work, hosts[0], gitToken);
-
-            // The Dockerfile is read only for a template known to run as `node`; the
-            // user is enforced only when the Work's OWN copy still agrees (see
-            // website-image-user.ts). Unreadable or diverged -> no forced user.
-            const dockerfile = isNodeUserTemplate(template)
-                ? await this.readWebsiteDockerfile(work, userId, gitToken, targetBranch)
-                : null;
-            const imageUser = resolveWebsiteImageUser(template, dockerfile);
-            // Only a proposal: the Dockerfile is the branch's CURRENT one, and the alias the
-            // deploy pulls moves only when k8s-build finishes. The plugin enforces the user only
-            // after `confirmImageUser` has read the `User` of the EXACT image it renders.
-            const imageUserOptions = imageUser
-                ? {
-                      runAsUser: imageUser.uid,
-                      runAsGroup: imageUser.gid,
-                      confirmImageUser: (image: {
-                          reference: string;
-                          pull: AppImagePullAuth | null;
-                      }) => this.imageRunsAsNodeUser(image),
-                  }
-                : {};
 
             const namespace =
                 typeof deploySettings.namespace === 'string' && deploySettings.namespace.trim()
@@ -1399,12 +1364,6 @@ export class DeployService {
                         // unscoped, so getSettings() resolves admin -> env ->
                         // schema default and silently discards what the Work set.
                         settingsOverride: deploySettings,
-                        // Enforce non-root (+ drop ALL capabilities) ONLY when the template is
-                        // one that runs as `USER node` AND the Work's own Dockerfile still does.
-                        // The minimal (Astro) templates serve with stock nginx, which starts as
-                        // root and crash-loops under a forced uid; each Work repo has its own
-                        // Dockerfile copy, so a template fix cannot reach existing Works.
-                        ...imageUserOptions,
                     },
                 },
                 kubeconfig,
@@ -1904,64 +1863,6 @@ export class DeployService {
             this.logger.debug(
                 `Pushed ${pushed.length} per-Work runtime env secret(s) for work ${work.id} to ${ctx.owner}/${ctx.repo}: ${pushed.join(', ')}`,
             );
-        }
-    }
-
-    /**
-     * The Work website repo's root `Dockerfile` on the deploy branch (the file
-     * k8s-build.yml builds the image from), or null when it cannot be read. A
-     * failed read must never block the deploy: null only means no user is forced.
-     */
-    /**
-     * Whether the image the k8s plugin is about to apply runs as `node` (1000:1000), read from its
-     * registry config with the deploy's own pull credential. An unreadable image answers false:
-     * no user is forced, and the deploy goes on.
-     */
-    private async imageRunsAsNodeUser(image: {
-        reference: string;
-        pull: AppImagePullAuth | null;
-    }): Promise<boolean> {
-        this.imageUserInspector ??= new RegistryAppImageUserInspector();
-        const read = await this.imageUserInspector.readUser({
-            reference: image.reference,
-            pull: image.pull,
-        });
-        if (read.status !== 'read') {
-            this.logger.warn(
-                `Could not read the USER of ${image.reference}; deploying with no forced user: ${read.reason}`,
-            );
-            return false;
-        }
-        return isNodeUserSpec(read.user);
-    }
-
-    private async readWebsiteDockerfile(
-        work: Work,
-        userId: string,
-        gitToken: string,
-        branch: string,
-    ): Promise<string | null> {
-        const owner = work.getRepoOwner('website');
-        const repo = work.getWebsiteRepo();
-        try {
-            const file = await this.gitFacade.getFileContent(
-                owner,
-                repo,
-                'Dockerfile',
-                { providerId: work.gitProvider, token: gitToken, userId, workId: work.id },
-                branch,
-            );
-            if (!file) return null;
-            return file.encoding === 'base64'
-                ? Buffer.from(file.content, 'base64').toString('utf-8')
-                : file.content;
-        } catch (error) {
-            this.logger.warn(
-                `Could not read Dockerfile of ${owner}/${repo}@${branch}; deploying with no forced user: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-            );
-            return null;
         }
     }
 
