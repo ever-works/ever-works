@@ -49,6 +49,9 @@ import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import {
     AppDeployRequestService,
     type AppDeployRequestResult,
+    type AppImagePullAuth,
+    type AppImageUserInspector,
+    RegistryAppImageUserInspector,
 } from '@ever-works/agent/app-runtime';
 import type {
     DeploymentConfig,
@@ -57,7 +60,7 @@ import type {
     SettingSource,
 } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
-import { isNodeUserTemplate, resolveWebsiteImageUser } from './website-image-user';
+import { isNodeUserSpec, isNodeUserTemplate, resolveWebsiteImageUser } from './website-image-user';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
@@ -112,6 +115,12 @@ export interface DeployResult {
 @Injectable()
 export class DeployService {
     private readonly logger = new Logger(DeployService.name);
+
+    /**
+     * Reads an image config's `User` from its registry (the App Works pre-check's reader). Created on
+     * first use; a field so a spec can replace it.
+     */
+    private imageUserInspector?: AppImageUserInspector;
     private readonly CRON_SECRET_LENGTH = 32;
 
     constructor(
@@ -1323,8 +1332,18 @@ export class DeployService {
                 ? await this.readWebsiteDockerfile(work, userId, gitToken, targetBranch)
                 : null;
             const imageUser = resolveWebsiteImageUser(template, dockerfile);
+            // Only a proposal: the Dockerfile is the branch's CURRENT one, and the alias the
+            // deploy pulls moves only when k8s-build finishes. The plugin enforces the user only
+            // after `confirmImageUser` has read the `User` of the EXACT image it renders.
             const imageUserOptions = imageUser
-                ? { runAsUser: imageUser.uid, runAsGroup: imageUser.gid }
+                ? {
+                      runAsUser: imageUser.uid,
+                      runAsGroup: imageUser.gid,
+                      confirmImageUser: (image: {
+                          reference: string;
+                          pull: AppImagePullAuth | null;
+                      }) => this.imageRunsAsNodeUser(image),
+                  }
                 : {};
 
             const namespace =
@@ -1893,6 +1912,29 @@ export class DeployService {
      * k8s-build.yml builds the image from), or null when it cannot be read. A
      * failed read must never block the deploy: null only means no user is forced.
      */
+    /**
+     * Whether the image the k8s plugin is about to apply runs as `node` (1000:1000), read from its
+     * registry config with the deploy's own pull credential. An unreadable image answers false:
+     * no user is forced, and the deploy goes on.
+     */
+    private async imageRunsAsNodeUser(image: {
+        reference: string;
+        pull: AppImagePullAuth | null;
+    }): Promise<boolean> {
+        this.imageUserInspector ??= new RegistryAppImageUserInspector();
+        const read = await this.imageUserInspector.readUser({
+            reference: image.reference,
+            pull: image.pull,
+        });
+        if (read.status !== 'read') {
+            this.logger.warn(
+                `Could not read the USER of ${image.reference}; deploying with no forced user: ${read.reason}`,
+            );
+            return false;
+        }
+        return isNodeUserSpec(read.user);
+    }
+
     private async readWebsiteDockerfile(
         work: Work,
         userId: string,

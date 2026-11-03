@@ -1,5 +1,7 @@
 import {
     dockerfileRunsAsNodeUser,
+    heredocDelimiters,
+    isNodeUserSpec,
     isNodeUserTemplate,
     parseFinalStage,
     resolveWebsiteImageUser,
@@ -42,10 +44,12 @@ describe('parseFinalStage', () => {
         expect(parseFinalStage(NEXT_DOCKERFILE)).toEqual({
             base: 'node:${NODE_VERSION}',
             user: 'node',
+            accountsEdited: false,
         });
         expect(parseFinalStage(NGINX_DOCKERFILE)).toEqual({
             base: 'nginx:${NGINX_VERSION}',
             user: null,
+            accountsEdited: false,
         });
     });
 
@@ -55,7 +59,40 @@ RUN cat > /etc/nginx/nginx.conf <<EOF
 user node;
 EOF
 `;
-        expect(parseFinalStage(dockerfile)).toEqual({ base: 'nginx:1.27-alpine', user: null });
+        expect(parseFinalStage(dockerfile)).toEqual({
+            base: 'nginx:1.27-alpine',
+            user: null,
+            accountsEdited: false,
+        });
+    });
+
+    // `<<` inside quotes is text: treating it as a heredoc would skip the rest of the file, and a
+    // later `USER root` would never be read (CodeRabbit on #3049).
+    it('does not treat quoted `<<WORD` text as a heredoc', () => {
+        const dockerfile = `FROM node:26-alpine
+USER node
+RUN echo '<<EOF'
+RUN echo "<<EOF" && echo \\<<EOF
+USER root
+`;
+        expect(parseFinalStage(dockerfile)).toEqual({
+            base: 'node:26-alpine',
+            user: 'root',
+            accountsEdited: false,
+        });
+        expect(dockerfileRunsAsNodeUser(dockerfile)).toBe(false);
+    });
+
+    it('skips every body of an instruction that opens two heredocs, then reads on', () => {
+        const dockerfile = `FROM node:26-alpine
+COPY <<A <<"B" /app/
+USER root
+A
+USER root
+B
+USER node
+`;
+        expect(parseFinalStage(dockerfile)?.user).toBe('node');
     });
 
     it('skips --platform flags and comments, joins continuations, is case-insensitive', () => {
@@ -65,12 +102,81 @@ RUN echo a \\
     && echo b
 user node
 `;
-        expect(parseFinalStage(dockerfile)).toEqual({ base: 'node:26-alpine', user: 'node' });
+        expect(parseFinalStage(dockerfile)).toEqual({
+            base: 'node:26-alpine',
+            user: 'node',
+            accountsEdited: false,
+        });
+    });
+
+    // `usermod -u 1001 node` keeps `USER node` while the image no longer runs as 1000.
+    it.each([
+        ['usermod', 'RUN usermod -u 1001 node'],
+        ['groupmod via sbin path', 'RUN /usr/sbin/groupmod -g 1001 node'],
+        ['an alpine adduser', 'RUN deluser node && adduser -D -u 1001 node'],
+        ['a write to /etc/passwd', "RUN sed -i 's/1000/1001/' /etc/passwd"],
+        ['a COPY over /etc/passwd', 'COPY passwd /etc/passwd'],
+        ['an ADD into /etc', 'ADD rootfs.tar /etc/'],
+        ['usermod inside a RUN heredoc', 'RUN <<SH\nset -e\nusermod -u 1001 node\nSH'],
+    ])('marks a final stage with %s as editing accounts', (_label, step) => {
+        const dockerfile = `FROM node:26-alpine\n${step}\nUSER node\n`;
+        expect(parseFinalStage(dockerfile)?.accountsEdited).toBe(true);
+        expect(dockerfileRunsAsNodeUser(dockerfile)).toBe(false);
+    });
+
+    it('ignores account edits of an EARLIER stage, and chown of files', () => {
+        const dockerfile = `FROM node:26-alpine AS build
+RUN usermod -u 1001 node
+FROM node:26-alpine AS runner
+RUN mkdir -p /app && chown -R node:node /app
+USER node
+`;
+        expect(parseFinalStage(dockerfile)?.accountsEdited).toBe(false);
+        expect(dockerfileRunsAsNodeUser(dockerfile)).toBe(true);
     });
 
     it('answers null with no FROM at all', () => {
         expect(parseFinalStage('')).toBeNull();
         expect(parseFinalStage('# nothing here\n')).toBeNull();
+    });
+});
+
+describe('heredocDelimiters', () => {
+    it.each([
+        ['cat > f <<EOF', ['EOF']],
+        ["cat > f <<'EOF'", ['EOF']],
+        ['cat > f <<-"END"', ['END']],
+        ['<<A <<B /app/', ['A', 'B']],
+        ["echo '<<EOF'", []],
+        ['echo "<<EOF"', []],
+        ['echo \\<<EOF', []],
+        ['cat <<< "here-string"', []],
+        ['echo $((1<<2))', []],
+    ])('%s → %j', (text, expected) => {
+        expect(heredocDelimiters(text)).toEqual(expected);
+    });
+});
+
+describe('isNodeUserSpec', () => {
+    it.each([
+        ['node', true],
+        ['1000', true],
+        ['1000:1000', true],
+        ['node:node', true],
+        [' node ', true],
+        ['', false],
+        ['0', false],
+        ['root', false],
+        ['1001', false],
+        ['node:root', false],
+        ['1000:1000:x', false],
+    ])('%j → %s', (user, expected) => {
+        expect(isNodeUserSpec(user)).toBe(expected);
+    });
+
+    it('rejects a missing user', () => {
+        expect(isNodeUserSpec(null)).toBe(false);
+        expect(isNodeUserSpec(undefined)).toBe(false);
     });
 });
 

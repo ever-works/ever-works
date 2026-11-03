@@ -439,8 +439,65 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
             const [config] = plugin.deploy.mock.calls[0];
             expect(config.options.runAsUser).toBe(1000);
             expect(config.options.runAsGroup).toBe(1000);
+            // Only a proposal: the plugin enforces it after confirming the rendered image.
+            expect(typeof config.options.confirmImageUser).toBe('function');
         },
     );
+
+    // The Dockerfile is the branch's CURRENT one; the alias the deploy pulls moves only when
+    // k8s-build finishes. So the plugin asks about the exact image it renders, and the answer
+    // comes from that image's registry config `User`, read with the deploy's own pull credential.
+    it.each([
+        ['node', true],
+        ['1000:1000', true],
+        ['', false], // the previous, root image is still behind the alias
+        ['nginx', false],
+    ])(
+        'managed tier → confirmImageUser answers from the image config User %j → %s',
+        async (user, expected) => {
+            const plugin = managedPlugin();
+            const { service } = buildService({
+                plugin,
+                settings: { clusterSource: 'k8s-works-shared' },
+                template: { branch: 'main', owner: 'ever-works', repo: 'directory-web-template' },
+                dockerfile: { content: NODE_DOCKERFILE, encoding: 'utf-8' },
+            });
+            const readUser = jest.fn().mockResolvedValue({ status: 'read', user });
+            (service as any).imageUserInspector = { readUser };
+
+            await service.deploy('work-1', 'user-1');
+
+            const pull = { server: 'ghcr.io', username: 'x', password: 'y' };
+            const confirm = plugin.deploy.mock.calls[0][0].options.confirmImageUser;
+            await expect(confirm({ reference: 'ghcr.io/acme/acme-site:prod', pull })).resolves.toBe(
+                expected,
+            );
+            expect(readUser).toHaveBeenCalledWith({
+                reference: 'ghcr.io/acme/acme-site:prod',
+                pull,
+            });
+        },
+    );
+
+    it('managed tier → an unreadable image config confirms nothing', async () => {
+        const plugin = managedPlugin();
+        const { service } = buildService({
+            plugin,
+            settings: { clusterSource: 'k8s-works-shared' },
+            template: { branch: 'main', owner: 'ever-works', repo: 'directory-web-template' },
+            dockerfile: { content: NODE_DOCKERFILE, encoding: 'utf-8' },
+        });
+        (service as any).imageUserInspector = {
+            readUser: jest.fn().mockResolvedValue({ status: 'unavailable', reason: '401' }),
+        };
+
+        await service.deploy('work-1', 'user-1');
+
+        const confirm = plugin.deploy.mock.calls[0][0].options.confirmImageUser;
+        await expect(
+            confirm({ reference: 'ghcr.io/acme/acme-site:prod', pull: null }),
+        ).resolves.toBe(false);
+    });
 
     it('managed tier → a base64-encoded Dockerfile is decoded before it is checked', async () => {
         const plugin = managedPlugin();
@@ -482,6 +539,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
             const [config] = plugin.deploy.mock.calls[0];
             expect(config.options).not.toHaveProperty('runAsUser');
             expect(config.options).not.toHaveProperty('runAsGroup');
+            expect(config.options).not.toHaveProperty('confirmImageUser');
         },
     );
 
@@ -506,6 +564,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         const [config] = plugin.deploy.mock.calls[0];
         expect(config.options).not.toHaveProperty('runAsUser');
         expect(config.options).not.toHaveProperty('runAsGroup');
+        expect(config.options).not.toHaveProperty('confirmImageUser');
     });
 
     it('managed tier → branch alias image tag (main → prod)', async () => {

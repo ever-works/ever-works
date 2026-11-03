@@ -1502,9 +1502,11 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 					// The pod annotation is otherwise `t<Date.now()>`; pinning it keeps this
 					// snapshot a statement about what `deploy()` renders, not about the clock.
 					revision: 'rev-abc1234',
-					// What the platform passes for a Work built from a Next.js template (`USER node`).
+					// What the platform passes for a Work built from a Next.js template (`USER node`),
+					// once the image behind the alias is confirmed to run as that user.
 					runAsUser: 1000,
-					runAsGroup: 1000
+					runAsGroup: 1000,
+					confirmImageUser: async () => true
 				}
 			},
 			VALID
@@ -1752,5 +1754,61 @@ describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
 		expect(pod.automountServiceAccountToken).toBe(false);
 		expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });
 		expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false });
+	});
+
+	// The caller's knowledge (template, Dockerfile) can be ahead of the image behind the mutable
+	// alias, so the uid is enforced only when the EXACT rendered image is confirmed to run as it.
+	describe('runAsUser is gated on confirming the rendered image', () => {
+		const deployWith = async (options: Record<string, unknown>) => {
+			const api = makeMockApi();
+			const plugin = new KubernetesPlugin({ api });
+			await plugin.onLoad(
+				createMockContext({
+					kubeconfig: VALID,
+					namespace: 'ever-works',
+					ingressHost: 'work-1.example.com',
+					registry: { kind: 'github', visibility: 'auto' }
+				})
+			);
+			const result = await plugin.deploy(
+				{
+					projectName: 'work-1',
+					sourceDir: '.',
+					options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: false, ...options }
+				},
+				VALID
+			);
+			expect(result.status).toBe('deploying');
+			return (vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>).spec.template.spec;
+		};
+
+		it('asks about the exact image reference it renders, and enforces the uid on a yes', async () => {
+			const confirmImageUser = vi.fn(async () => true);
+			const pod = await deployWith({ runAsUser: 1000, runAsGroup: 1000, confirmImageUser });
+
+			expect(confirmImageUser).toHaveBeenCalledWith({ reference: pod.containers[0].image, pull: null });
+			expect(pod.containers[0].image).toBe('ghcr.io/acme/work-1:abc1234');
+			expect(pod.securityContext.runAsNonRoot).toBe(true);
+			expect(pod.securityContext.runAsUser).toBe(1000);
+			expect(pod.containers[0].securityContext.capabilities).toEqual({ drop: ['ALL'] });
+		});
+
+		it.each([
+			['answers false', { confirmImageUser: async () => false }],
+			[
+				'throws',
+				{
+					confirmImageUser: async () => {
+						throw new Error('registry down');
+					}
+				}
+			],
+			['is missing', {}]
+		])('forces no user when the confirmation %s', async (_label, options) => {
+			const pod = await deployWith({ runAsUser: 1000, runAsGroup: 1000, ...options });
+
+			expect(pod.securityContext).toEqual({ seccompProfile: { type: 'RuntimeDefault' } });
+			expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false });
+		});
 	});
 });

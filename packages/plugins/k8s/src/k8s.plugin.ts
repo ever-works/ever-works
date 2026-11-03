@@ -324,6 +324,21 @@ interface DeployOptions {
 	 */
 	runAsUser?: number;
 	runAsGroup?: number;
+	/**
+	 * Confirms that the EXACT image this deploy renders (its reference, and the pull credential this
+	 * deploy uses for it) runs as `runAsUser`. `runAsUser` / `runAsGroup` are enforced ONLY when it
+	 * answers true: what the caller knows (the template, the repo's Dockerfile) can be ahead of the
+	 * image behind a mutable branch alias, and a forced uid on a root image crash-loops it. A missing
+	 * callback (e.g. lost across a process boundary), a `false` or a throw forces no user.
+	 */
+	confirmImageUser?: (image: { reference: string; pull: ImagePullAuth | null }) => Promise<boolean>;
+}
+
+/** The pull credential a deploy uses for its image; only ever handed to `confirmImageUser`. */
+interface ImagePullAuth {
+	server: string;
+	username: string;
+	password: string;
 }
 
 const REGISTRY_SCHEMA: JsonSchema = {
@@ -1189,6 +1204,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		// Pull-secret credentials when needed.
 		const pullCreds = provider.pullSecretCredentials(registry, registryCtx, visibility);
 		let pullSecretName: string | undefined;
+		let imagePullAuth: ImagePullAuth | null = null;
 
 		try {
 			// Resolve request and limit as a pair before the first write. A legacy
@@ -1210,6 +1226,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 					);
 				}
 				pullSecretName = pullSecretNameFor(slug);
+				imagePullAuth = { server: pullCreds.server, username: pullCreds.username, password };
 				const secret = buildImagePullSecret({
 					name: pullSecretName,
 					namespace,
@@ -1249,8 +1266,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				pullSecretName,
 				envFromSecretName: runtimeEnvSecretName,
 				imagePullPolicy: opts.imagePullPolicy,
-				runAsUser: opts.runAsUser,
-				runAsGroup: opts.runAsGroup,
+				...(await this.confirmedRunAs(opts, image, imagePullAuth)),
 				// Per-Work sizing, resolved through the same settings merge as the
 				// rest (settingsOverride layers the work tier over the plugin's own).
 				cpuRequest: settings.cpuRequest,
@@ -2081,6 +2097,27 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			out.registry = reg as RegistryConfig;
 		}
 		return out;
+	}
+
+	/**
+	 * `runAsUser` / `runAsGroup` for the render inputs, ONLY when `confirmImageUser` confirms the
+	 * image that is about to be applied runs as that user (see `DeployOptions.confirmImageUser`).
+	 * Anything else forces no user: the renderer then keeps only the root-safe hardening.
+	 */
+	private async confirmedRunAs(
+		opts: DeployOptions,
+		image: string,
+		pull: ImagePullAuth | null
+	): Promise<{ runAsUser?: number; runAsGroup?: number }> {
+		if (opts.runAsUser === undefined || typeof opts.confirmImageUser !== 'function') return {};
+		try {
+			if ((await opts.confirmImageUser({ reference: image, pull })) === true) {
+				return { runAsUser: opts.runAsUser, runAsGroup: opts.runAsGroup };
+			}
+		} catch {
+			// A failed confirmation is no confirmation; never fail the deploy over it.
+		}
+		return {};
 	}
 
 	private collectHosts(settings: KubernetesSettings, opts: DeployOptions): string[] {
