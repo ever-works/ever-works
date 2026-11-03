@@ -51,7 +51,25 @@ export type TerminalSessionRefusal =
     | 'not-persistent'
     | 'run-not-live'
     | 'session-already-live'
+    | 'sessions-disabled'
     | 'dispatcher-unavailable';
+
+/**
+ * Terminal sessions are OFF unless an operator opts in with
+ * `TERMINAL_SESSIONS_ENABLED=true` (same rule as the API's
+ * `POST …/terminal/start` and the worker's `terminal-session` task).
+ *
+ * Checked here as well, before the slot is claimed, because the automatic
+ * callers (run steering on resume, task transitions) never pass through the
+ * API route: without it they would mark the run's terminal `starting`, the
+ * worker would skip the job, and the pane would sit on "Connecting…" until
+ * the sweeper gave up on it.
+ */
+export const TERMINAL_SESSIONS_ENABLED_ENV = 'TERMINAL_SESSIONS_ENABLED';
+
+export function terminalSessionsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+    return (env[TERMINAL_SESSIONS_ENABLED_ENV] ?? '').trim().toLowerCase() === 'true';
+}
 
 export type StartTerminalSessionOutcome =
     | { started: true; runId: string; jobRunId: string }
@@ -122,6 +140,10 @@ export class TerminalSessionLauncher {
         // dispatcher; the CAS below is what actually makes it safe.
         if (run.terminalState && LIVE_TERMINAL_STATES.has(run.terminalState)) {
             return { started: false, reason: 'session-already-live' };
+        }
+
+        if (!terminalSessionsEnabled()) {
+            return { started: false, reason: 'sessions-disabled' };
         }
 
         if (!this.dispatcher) {
