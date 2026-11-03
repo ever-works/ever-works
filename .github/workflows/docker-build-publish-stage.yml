@@ -94,7 +94,7 @@ jobs:
           docker push registry.digitalocean.com/ever/ever-works-api-stage:latest
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -105,7 +105,7 @@ jobs:
           docker push ghcr.io/ever-works/ever-works-api-stage:latest
 
       - name: Login to CW Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         continue-on-error: true
         with:
           registry: ${{ secrets.CW_DOCKER_REGISTRY }}
@@ -200,7 +200,7 @@ jobs:
           docker push registry.digitalocean.com/ever/ever-works-web-stage:latest
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -211,7 +211,7 @@ jobs:
           docker push ghcr.io/ever-works/ever-works-web-stage:latest
 
       - name: Login to CW Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         continue-on-error: true
         with:
           registry: ${{ secrets.CW_DOCKER_REGISTRY }}
