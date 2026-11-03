@@ -743,4 +743,64 @@ describe('MissionsService — output mode (APW-08 T34)', () => {
         const reset = await service.update('u1', created.id, { taskOutput: null });
         expect(reset.taskOutput).toEqual({ tasksPerTick: 1, openTasksCap: 3 });
     });
+
+    // Review of #3061 — the Output card sends only the two bounds; a save must keep the Agent.
+    describe('the Task output’s Agent', () => {
+        const AGENT = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+        const FOREIGN = 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+        const agentsRepo = {
+            findOne: jest.fn(async (opts: { where: { id: string; userId?: string } }) =>
+                opts.where.id === AGENT && opts.where.userId === 'u1' ? { id: AGENT } : null,
+            ),
+        };
+        const withAgents = () =>
+            new MissionsService(
+                repo as unknown as Repository<Mission>,
+                new TitlerService(),
+                undefined, // tickService
+                undefined, // missionAttachments
+                undefined, // uploadsRepo
+                relationsOf([{ relation: 'improves', workKind: 'app' }]) as never,
+                undefined, // worksRepo
+                undefined, // activityLog
+                undefined, // accessPolicy
+                undefined, // domainEvents
+                undefined, // recordVisibility
+                agentsRepo as never,
+            );
+
+        beforeEach(() => agentsRepo.findOne.mockClear());
+
+        it('merges a partial save over the stored output, so the Agent survives', async () => {
+            const service = withAgents();
+            const created = await service.create('u1', {
+                ...base,
+                taskOutput: { tasksPerTick: 1, openTasksCap: 3, agentId: AGENT },
+            });
+            const saved = await service.update('u1', created.id, {
+                taskOutput: { tasksPerTick: 2, openTasksCap: 5 },
+            });
+            expect(saved.taskOutput).toEqual({ tasksPerTick: 2, openTasksCap: 5, agentId: AGENT });
+            // The unchanged Agent is not re-checked on every save.
+            expect(agentsRepo.findOne).toHaveBeenCalledTimes(1);
+            // An omitted bound keeps its stored value; `agentId: null` clears the Agent.
+            const cleared = await service.update('u1', created.id, {
+                taskOutput: { openTasksCap: 7, agentId: null },
+            });
+            expect(cleared.taskOutput).toEqual({ tasksPerTick: 2, openTasksCap: 7 });
+        });
+
+        it('refuses an Agent the caller cannot use (400), on create and on update', async () => {
+            const service = withAgents();
+            await expect(
+                service.create('u1', { ...base, taskOutput: { agentId: FOREIGN } }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(repo._rows).toHaveLength(0);
+            const created = await service.create('u1', base);
+            await expect(
+                service.update('u1', created.id, { taskOutput: { agentId: FOREIGN } }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(repo._rows[0].taskOutput).toBeNull();
+        });
+    });
 });

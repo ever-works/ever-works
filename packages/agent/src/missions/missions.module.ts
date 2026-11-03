@@ -20,6 +20,7 @@ import { MissionTemplateManifestService } from './mission-template-manifest.serv
 import { MissionsService } from './missions.service';
 import { MissionTickService } from './mission-tick.service';
 import { Task } from '../entities/task.entity';
+import { Agent } from '../entities/agent.entity';
 import { FacadesModule } from '../facades/facades.module';
 import { MissionTaskPlannerService } from './mission-task-planner.service';
 
@@ -59,6 +60,9 @@ import { MissionTaskPlannerService } from './mission-task-planner.service';
             // titles, duplicates). Injected `@Optional()`, so it MUST be registered here or it
             // silently resolves to undefined (pinned by missions.module.task-output.spec).
             Task,
+            // APW-08 T34 (review of #3061) — MissionsService checks a Task output's `agentId` is an
+            // Agent the caller may use; injected `@Optional()`, so it MUST be registered here.
+            Agent,
         ]),
         TitlerModule,
         // Provides ActivityLogService so MissionTickService can emit

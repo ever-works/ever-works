@@ -12,6 +12,7 @@ jest.mock('../../user-research/user-research.module', () => ({
 }));
 jest.mock('../../facades/facades.module', () => ({ FacadesModule: class FacadesModule {} }));
 
+import { Agent } from '../../entities/agent.entity';
 import { Task } from '../../entities/task.entity';
 import { MissionTaskPlannerService } from '../mission-task-planner.service';
 import { MissionsModule } from '../missions.module';
@@ -32,6 +33,8 @@ describe('MissionsModule — the Task branch is wired (APW-08 T35)', () => {
             Array.isArray(entry?.providers) ? entry.providers.map((p) => p?.provide) : [],
         );
         expect(tokens).toContain(getRepositoryToken(Task));
+        // Review of #3061 — MissionsService checks a Task output's Agent through it.
+        expect(tokens).toContain(getRepositoryToken(Agent));
     });
 
     it('provides the planner', () => {
