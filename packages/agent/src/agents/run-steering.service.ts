@@ -819,7 +819,9 @@ export class RunSteeringService implements RunSteeringPort {
                     requirePersistent: true,
                 });
                 if (outcome.started === false) {
-                    this.logger.warn(
+                    // Sessions off is the install's default, not a problem with this run.
+                    const log = outcome.reason === 'sessions-disabled' ? 'debug' : 'warn';
+                    this.logger[log](
                         `Run ${next.id}: terminal not restarted on resume (${outcome.reason}).`,
                     );
                 }
