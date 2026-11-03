@@ -49,7 +49,9 @@ describe('API route prefix convention', () => {
      */
     it('declares every controller under api/ (or a deliberate exception)', () => {
         // Routes that are intentionally NOT part of the public `/api` surface.
-        const EXEMPT = new Set(['internal/trigger']);
+        // `.well-known` (Ever Connect, RFC 8615): a well-known URI lives at the origin root by
+        // definition, never under `/api`.
+        const EXEMPT = new Set(['internal/trigger', '.well-known']);
 
         const srcRoot = join(__dirname, '..');
         const offenders: string[] = [];

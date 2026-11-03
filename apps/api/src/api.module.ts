@@ -141,6 +141,7 @@ import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requ
 // Anonymous usage statistics — imported only when EVER_STATS_ENABLED is `true`
 // (off by default); with it off the module is absent (no route, no timer, no request).
 import { instanceStatsModuleImports } from './instance-stats';
+import { everConnectModuleImports } from './ever-connect';
 import { AccountDeletionModule } from './account-deletion/account-deletion.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -525,6 +526,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // in the graph only when EVER_STATS_ENABLED is `true` (off by default;
         // read once, here, at boot). Nothing above moves.
         ...instanceStatsModuleImports(),
+        // Ever Connect (Sign in with Ever ID and people's data requests for an
+        // installation connected to Ever Platform) — additive and conditional: in
+        // the graph only when EVER_CONNECT_ENABLED is `true` (off by default).
+        ...everConnectModuleImports(),
         // EW-P1-2 — Integration API v1 (`/api/integrations/v1/*`), the stable
         // contract integrations such as Ever Gauzy code against. Additive;
         // reachable only with an `ew_int_` integration key.

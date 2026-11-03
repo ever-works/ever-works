@@ -1,6 +1,7 @@
 import type { IPlugin } from '../plugin.interface.js';
 import type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
 import type { ValidationResult } from '../../settings/validation.types.js';
+import type { SettingSource } from '../../settings/settings.types.js';
 import type { PluginIcon } from '../plugin-manifest.types.js';
 import type { FormSchemaProvidersType } from '../provider-categories.js';
 
@@ -122,6 +123,6 @@ export interface ProviderModelSummary {
 	key: string;
 	label: string;
 	value: string;
-	source?: 'default' | 'env' | 'admin' | 'work' | 'user';
+	source?: SettingSource;
 	isWorkOverride?: boolean;
 }

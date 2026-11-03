@@ -4279,6 +4279,7 @@
                         "title": "Waar elke waarde vandaan komt",
                         "admin": "Plugin-instellingen",
                         "env": "Omgeving",
+                        "platform": "Ever Platform",
                         "default": "Standaard",
                         "unset": "Niet ingesteld"
                     },

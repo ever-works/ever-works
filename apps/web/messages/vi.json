@@ -4279,6 +4279,7 @@
                         "title": "Nguồn của từng giá trị",
                         "admin": "Cài đặt plugin",
                         "env": "Môi trường",
+                        "platform": "Ever Platform",
                         "default": "Mặc định",
                         "unset": "Chưa đặt"
                     },

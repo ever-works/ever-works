@@ -5,6 +5,7 @@ import * as https from 'https';
 import * as net from 'net';
 import * as tls from 'tls';
 import { Global, Module, type INestApplication } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule, getDataSourceToken } from '@nestjs/typeorm';
 import * as request from 'supertest';
@@ -22,6 +23,8 @@ import { FacadesModule, StatsSinkFacadeService } from '@ever-works/agent/facades
 import type { PluginRegistryService } from '@ever-works/agent/plugins';
 import EverStatsSinkPlugin from '@ever-works/ever-stats-sink-plugin';
 import { InstanceStatsModule, instanceStatsModuleImports } from '../instance-stats';
+import { EverConnectModule, everConnectModuleImports } from '../ever-connect';
+import { EVER_CONNECT_CONFIG, readEverConnectConfig } from '../ever-connect/ever-connect.config';
 import { InstanceStatsSenderService } from '../instance-stats/instance-stats-sender.service';
 import {
     INSTANCE_STATS_CLOCK,
@@ -147,6 +150,31 @@ async function boot(
         .useValue(readEverStatsConfig({ NODE_ENV: 'test', ...env }))
         .overrideProvider(INSTANCE_STATS_CLOCK)
         .useValue(() => clock.now)
+        .compile();
+    const app = moduleRef.createNestApplication({ logger: false });
+    await app.init();
+    return app;
+}
+
+/** The Ever Connect module as `ApiModule` gets it (or forced into the graph). */
+async function bootEverConnect(
+    env: Record<string, string | undefined>,
+    options: { forceModule?: boolean } = {},
+): Promise<INestApplication> {
+    @Module({
+        imports: options.forceModule ? [EverConnectModule] : [...everConnectModuleImports(env)],
+    })
+    class ConnectRoot {}
+
+    const moduleRef = await Test.createTestingModule({
+        imports: [EventEmitterModule.forRoot(), ConnectRoot],
+    })
+        .overrideModule(DatabaseModule)
+        .useModule(TestDatabaseModule)
+        .overrideModule(ActivityLogModule)
+        .useModule(TestActivityLogModule)
+        .overrideProvider(EVER_CONNECT_CONFIG)
+        .useValue(readEverConnectConfig(env))
         .compile();
     const app = moduleRef.createNestApplication({ logger: false });
     await app.init();
@@ -355,6 +383,43 @@ describe('Ever modules off — 30 s boot without an outbound call', () => {
             await request(app.getHttpServer()).get('/api/instance-stats/status').expect(404);
             await request(app.getHttpServer()).put('/api/instance-stats/toggle').expect(404);
             expect(await dataSource.getRepository(EverInstance).count()).toBe(0);
+        } finally {
+            await app.close();
+        }
+    });
+
+    it('EVER_CONNECT_ENABLED unset (the default): Ever Connect is not booted, nothing goes out, its routes are 404', async () => {
+        const env = { EVER_PLATFORM_API_URL: 'https://platform.example.test' };
+        expect(everConnectModuleImports(env)).toEqual([]);
+        expect(everConnectModuleImports({ ...env, EVER_CONNECT_ENABLED: 'false' })).toEqual([]);
+        const app = await bootEverConnect(env);
+        try {
+            await run30s({ now: new Date() });
+            expect(outbound()).toEqual([]);
+            jest.useRealTimers();
+            await request(app.getHttpServer()).get('/api/ever-connect/status').expect(404);
+            await request(app.getHttpServer()).get('/.well-known/ever-connect').expect(404);
+        } finally {
+            await app.close();
+        }
+    });
+
+    it('EVER_CONNECT_ENABLED=true, not connected: the module stays silent for 30 s and makes no connect key', async () => {
+        const env = {
+            EVER_CONNECT_ENABLED: 'true',
+            EVER_PLATFORM_API_URL: 'https://platform.example.test',
+        };
+        expect(everConnectModuleImports(env)).toEqual([EverConnectModule]);
+        const app = await bootEverConnect(env);
+        try {
+            await run30s({ now: new Date() });
+            expect(outbound()).toEqual([]);
+            const dataSource = app.get<DataSource>(getDataSourceToken());
+            expect(await dataSource.getRepository(EverInstance).count()).toBe(0);
+            jest.useRealTimers();
+            // No address check is pending: the statement is not served.
+            await request(app.getHttpServer()).get('/.well-known/ever-connect').expect(404);
+            expect(outbound()).toEqual([]);
         } finally {
             await app.close();
         }

@@ -4348,6 +4348,7 @@
                         "title": "מאיפה מגיע כל ערך",
                         "admin": "הגדרות התוסף",
                         "env": "סביבה",
+                        "platform": "Ever Platform",
                         "default": "ברירת מחדל",
                         "unset": "לא מוגדר"
                     },
