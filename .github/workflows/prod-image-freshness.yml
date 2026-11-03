@@ -1,0 +1,444 @@
+# ---------------------------------------------------------------------------
+# Prod image freshness — is the tip of `main` actually SERVING in production?
+#
+# WHY THIS EXISTS (EW-758)
+# ------------------------
+# Twice in two days the production image lane died silently and both times it
+# was found BY HAND, hours later:
+#
+#   * 2026-08-23/24 — `k8s-build` ran with `cancel-in-progress: true` on a
+#     saturated ARC pool. 28 of 30 runs were cancelled by their successor
+#     before a runner ever reached them. The SeatsService DI fix sat on `main`
+#     looking merged and shipped while `/api/billing/seats` returned 404 in
+#     production.
+#   * 2026-08-24 11:30Z — after `cancel-in-progress: false` landed, run
+#     32721436120 was STILL cancelled the same second a newer run appeared,
+#     with all four jobs at `runner_name = ""`. A pending run is superseded
+#     regardless of that setting.
+#
+# Every existing signal was blind to this:
+#
+#   * `ci.yml` is green — the code compiles and its tests pass. It says nothing
+#     about whether an image was built.
+#   * `smoke-deployed.yml` is triggered `on: workflow_run: [k8s-build]
+#     types: [completed]`. When no `k8s-build` run ever COMPLETES, the smoke
+#     never fires. It is structurally incapable of reporting this failure.
+#   * `external-uptime-monitor.yml` probes whether production ANSWERS. During
+#     both incidents production answered perfectly — it was just serving an
+#     old image.
+#
+# So this workflow asks the one question none of the others can: does the
+# commit at the tip of `main` match the commit production is running?
+#
+# ===========================================================================
+# 🛑 DO NOT CHANGE `runs-on: ubuntu-latest` TO A SELF-HOSTED / ARC RUNNER. 🛑
+#
+# This repo has a standing "self-hosted runners only" CI policy
+# (`RUNNER_LINUX_X64_4` / `RUNNER_LINUX_X64_8`). THIS WORKFLOW IS A DELIBERATE,
+# DOCUMENTED EXCEPTION, for the same reason as `external-uptime-monitor.yml`
+# and one more that is specific to it:
+#
+#   A monitor whose job is to detect ARC-pool starvation must not QUEUE BEHIND
+#   THE STARVED POOL. On the pool this workflow watches, jobs sat pending for
+#   90+ minutes and were then discarded — i.e. moving this onto the ARC runners
+#   would silence it in exactly the scenario it exists for.
+#
+# Cost is not a factor: `ever-works/ever-works` is a PUBLIC repository, and
+# GitHub-hosted minutes are free and unlimited on public repos.
+# ===========================================================================
+#
+# NO NEW SECRETS ARE REQUIRED. The automatic `GITHUB_TOKEN` is the only
+# credential used, scoped to `issues: write` + `contents: read` +
+# `actions: read`.
+#
+# Scheduled workflows only run from the DEFAULT branch (`develop`), which is
+# why this file checks `main` explicitly rather than `github.ref`.
+# ---------------------------------------------------------------------------
+name: Prod Image Freshness
+
+on:
+  schedule:
+    # Hourly. A main build takes ~20-45 min on a healthy pool, so anything
+    # finer than this just re-reports the same in-flight rollout.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      max_unshipped_hours:
+        description: 'Hours a main commit may sit unshipped before this alerts'
+        required: false
+        default: ''
+        type: string
+
+# Least privilege: read the repo + Actions history, and file/annotate/close the
+# alert issue. Nothing else.
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+# Never let two checks race on the alert issue (create/comment/close).
+concurrency:
+  group: prod-image-freshness
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Is production serving the tip of main?
+    # See the banner above before touching this line.
+    runs-on: ubuntu-latest
+    # Keeps forks that enable Actions from probing our hosts and filing issues.
+    if: github.repository == 'ever-works/ever-works'
+    timeout-minutes: 10
+
+    steps:
+      # No `actions/checkout` on purpose: every signal comes from the GitHub API
+      # and one public HTTP endpoint, so each run is a handful of seconds.
+      - name: Collect signals
+        id: signals
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DEPLOY_BRANCH: main
+          PROD_VERSION_URL: https://api.ever.works/api/version
+          PROBE_UA: 'Mozilla/5.0 (compatible; ever-works-prod-image-freshness; +https://github.com/ever-works/ever-works)'
+        run: |
+          set -uo pipefail
+
+          # 🛑 Every capture below carries `|| true`, and that is load-bearing
+          # rather than defensive style. GitHub runs `run:` steps under
+          # `bash -e`; `set -uo pipefail` ADDS flags, it does not clear `-e`.
+          # Without it a single 5xx from the API would kill this STEP, every
+          # later `if:` carries an implicit `success()`, and the monitor would
+          # go SILENT in precisely the scenario it exists for. Missing signals
+          # must reach the verdict step as EMPTY STRINGS, not as a dead job.
+
+          # --- Where is `main`? ---------------------------------------------
+          TIP_JSON="$(gh api "repos/${GH_REPO}/commits/${DEPLOY_BRANCH}" \
+                        --jq '{sha: .sha, date: .commit.committer.date}' 2>/dev/null || true)"
+          TIP_SHA="$(printf '%s' "${TIP_JSON}" | jq -r '.sha // empty' 2>/dev/null || true)"
+          TIP_TIME="$(printf '%s' "${TIP_JSON}" | jq -r '.date // empty' 2>/dev/null || true)"
+
+          # --- What is production actually running? -------------------------
+          # `/api/version` is baked at image build time from the `GIT_SHA`
+          # build-arg in `k8s-build.yml`, so it reports the COMMIT INSIDE THE
+          # IMAGE. That is the only signal that spans build + registry + ArgoCD
+          # + rollout in one value. api.ever.works is deliberately not behind
+          # the Basic auth that fronts the other prod hosts.
+          VERSION_JSON="$(curl -sS -L --connect-timeout 8 --max-time 20 \
+                            -A "${PROBE_UA}" "${PROD_VERSION_URL}" 2>/dev/null || true)"
+          PROD_SHA="$(printf '%s' "${VERSION_JSON}" | jq -r '.gitSha // empty' 2>/dev/null || true)"
+          PROD_REF="$(printf '%s' "${VERSION_JSON}" | jq -r '.gitRef // empty' 2>/dev/null || true)"
+          PROD_BUILD_TIME="$(printf '%s' "${VERSION_JSON}" | jq -r '.buildTime // empty' 2>/dev/null || true)"
+
+          # --- What has the lane itself been doing? -------------------------
+          # Context for the alert body, and the count that names the EW-758
+          # signature: runs created after the last success that were discarded
+          # rather than built.
+          RUNS_JSON="$(gh api "repos/${GH_REPO}/actions/workflows/k8s-build.yml/runs?branch=${DEPLOY_BRANCH}&per_page=100" \
+                        --jq '[.workflow_runs[] | {id, conclusion, status, created_at, head_sha}]' 2>/dev/null || true)"
+          [ -n "${RUNS_JSON}" ] || RUNS_JSON='[]'
+
+          LAST_SUCCESS_AT="$(printf '%s' "${RUNS_JSON}" \
+                              | jq -r '[.[] | select(.conclusion == "success")] | sort_by(.created_at) | last | .created_at // empty' 2>/dev/null || true)"
+          LAST_SUCCESS_SHA="$(printf '%s' "${RUNS_JSON}" \
+                               | jq -r '[.[] | select(.conclusion == "success")] | sort_by(.created_at) | last | .head_sha // empty' 2>/dev/null || true)"
+          DISCARDED="$(printf '%s' "${RUNS_JSON}" \
+                        | jq -r --arg since "${LAST_SUCCESS_AT}" '[.[] | select(.conclusion == "cancelled" or .conclusion == "failure") | select($since == "" or .created_at > $since)] | length' 2>/dev/null || true)"
+          IN_FLIGHT="$(printf '%s' "${RUNS_JSON}" \
+                        | jq -r '[.[] | select(.status != "completed")] | length' 2>/dev/null || true)"
+
+          # 🛑 Sanitise before these reach `$GITHUB_OUTPUT`. An embedded newline
+          # (a CDN error page, a captive portal, a truncated response) would
+          # inject extra `key=value` records or break the parse outright, which
+          # fails this step — and a failed step means a SILENT monitor. Accept
+          # something that looks like the value, or nothing at all.
+          scrub() { printf '%s' "${1:-}" | tr -d '\n\r' | tr -cd 'A-Za-z0-9:+._/-' | cut -c1-200; }
+
+          {
+            echo "tip_sha=$(scrub "${TIP_SHA}")"
+            echo "tip_time=$(scrub "${TIP_TIME}")"
+            echo "prod_sha=$(scrub "${PROD_SHA}")"
+            echo "prod_ref=$(scrub "${PROD_REF}")"
+            echo "prod_build_time=$(scrub "${PROD_BUILD_TIME}")"
+            echo "last_success_at=$(scrub "${LAST_SUCCESS_AT}")"
+            echo "last_success_sha=$(scrub "${LAST_SUCCESS_SHA}")"
+            echo "discarded=$(scrub "${DISCARDED}")"
+            echo "in_flight=$(scrub "${IN_FLIGHT}")"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Decide the verdict
+        id: verdict
+        env:
+          TIP_SHA: ${{ steps.signals.outputs.tip_sha }}
+          TIP_TIME: ${{ steps.signals.outputs.tip_time }}
+          PROD_SHA: ${{ steps.signals.outputs.prod_sha }}
+          PROD_REF: ${{ steps.signals.outputs.prod_ref }}
+          PROD_BUILD_TIME: ${{ steps.signals.outputs.prod_build_time }}
+          LAST_SUCCESS_AT: ${{ steps.signals.outputs.last_success_at }}
+          LAST_SUCCESS_SHA: ${{ steps.signals.outputs.last_success_sha }}
+          DISCARDED: ${{ steps.signals.outputs.discarded }}
+          IN_FLIGHT: ${{ steps.signals.outputs.in_flight }}
+          # Repo variable wins over the built-in default; a manual dispatch wins
+          # over both.
+          MAX_UNSHIPPED_HOURS: ${{ inputs.max_unshipped_hours || vars.PROD_IMAGE_MAX_UNSHIPPED_HOURS || '' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # >>> BEGIN verdict contract block >>>
+          # Everything between these markers is a PURE function of the env vars
+          # above plus `RUNNER_TEMP`/`GITHUB_OUTPUT`, and is executed verbatim by
+          # `apps/node/src/core/prod-image-freshness.contract.spec.ts`. Keep it
+          # free of `gh`, `curl` and step context so the contract keeps working.
+          set -uo pipefail
+
+          # Hours a commit may sit on `main` without production serving it.
+          # Generous ON PURPOSE: a healthy main build measured 18-42 min
+          # (runs 33903625426, 33861283944, 33745565311), a jammed one 4h46m
+          # (run 32786060643), and ArgoCD still has to roll the pods afterwards.
+          # A monitor that fires inside the normal window gets muted, and being
+          # muted is the failure this ticket is about.
+          HOURS="${MAX_UNSHIPPED_HOURS:-}"
+          case "${HOURS}" in
+            '' | *[!0-9]*) HOURS=6 ;;
+          esac
+          [ "${HOURS}" -gt 0 ] 2>/dev/null || HOURS=6
+
+          NOW_EPOCH="$(date -u +%s 2>/dev/null || echo 0)"
+          if [ -n "${NOW_OVERRIDE:-}" ]; then
+            NOW_EPOCH="$(date -u -d "${NOW_OVERRIDE}" +%s 2>/dev/null || echo 0)"
+          fi
+
+          TIP_EPOCH=0
+          if [ -n "${TIP_TIME:-}" ]; then
+            TIP_EPOCH="$(date -u -d "${TIP_TIME}" +%s 2>/dev/null || echo 0)"
+          fi
+
+          AGE_MINUTES=-1
+          if [ "${TIP_EPOCH}" -gt 0 ] && [ "${NOW_EPOCH}" -gt 0 ]; then
+            AGE_MINUTES=$(( (NOW_EPOCH - TIP_EPOCH) / 60 ))
+            # Clock skew must not read as "shipped ages ago".
+            [ "${AGE_MINUTES}" -ge 0 ] || AGE_MINUTES=0
+          fi
+
+          DISCARDED_COUNT="${DISCARDED:-}"
+          case "${DISCARDED_COUNT}" in
+            '' | *[!0-9]*) DISCARDED_COUNT=0 ;;
+          esac
+
+          # 🛑 FAIL OPEN, NEVER CRY WOLF. `unknown` is not `alert`: an
+          # unreachable API or an unparseable answer says nothing about whether
+          # production is stale, and a monitor that alerts on its own transport
+          # faults is one people mute. It annotates the run and stops there.
+          #
+          # 🛑 And `ok` is NOT "a build happened recently". It is "the commit in
+          # the production image IS the tip of main". Age alone would fire every
+          # quiet weekend and stay silent through a lane death that happened to
+          # follow a recent build.
+          STATUS=unknown
+          if [ "${NOW_EPOCH}" -le 0 ]; then
+            REASON="the runner clock could not be read; no verdict"
+          elif [ -z "${TIP_SHA:-}" ] || [ -z "${PROD_SHA:-}" ]; then
+            REASON="signal unavailable (main tip='${TIP_SHA:-none}', prod gitSha='${PROD_SHA:-none}'); no verdict"
+          elif [ "${TIP_SHA}" = "${PROD_SHA}" ]; then
+            STATUS=ok
+            REASON="production is serving the current main tip ${TIP_SHA}"
+          elif [ "${AGE_MINUTES}" -lt 0 ]; then
+            REASON="main tip ${TIP_SHA} is not deployed, but its commit time '${TIP_TIME:-none}' could not be parsed; no verdict"
+          elif [ "${AGE_MINUTES}" -gt $(( HOURS * 60 )) ]; then
+            STATUS=alert
+            REASON="main tip ${TIP_SHA} has not reached production for ${AGE_MINUTES}m (limit ${HOURS}h); production is on ${PROD_SHA}"
+          else
+            STATUS=pending
+            REASON="main tip ${TIP_SHA} is ${AGE_MINUTES}m old and not deployed yet, within the ${HOURS}h rollout window"
+          fi
+
+          if [ "${STATUS}" = "alert" ] && [ "${DISCARDED_COUNT}" -gt 0 ]; then
+            HEADLINE="main unshipped ${AGE_MINUTES}m, ${DISCARDED_COUNT} discarded k8s-build run(s)"
+          elif [ "${STATUS}" = "alert" ]; then
+            HEADLINE="main unshipped ${AGE_MINUTES}m"
+          else
+            HEADLINE="${REASON}"
+          fi
+
+          REPORT="${RUNNER_TEMP}/prod-image-freshness.md"
+          {
+            case "${STATUS}" in
+              ok) echo "## ✅ Production is serving the tip of \`main\`" ;;
+              alert) echo "## 🚨 The production image lane is stale — \`main\` is not in production" ;;
+              pending) echo "## ⏳ A newer \`main\` commit is still rolling out" ;;
+              *) echo "## ❔ Prod image freshness could not be determined" ;;
+            esac
+            echo
+            echo "${REASON}"
+            echo
+            echo "| Signal | Value |"
+            echo "|---|---|"
+            echo "| Tip of \`main\` | \`${TIP_SHA:-unknown}\` |"
+            echo "| Tip committed at | \`${TIP_TIME:-unknown}\` |"
+            echo "| Commit in the prod image (\`/api/version\`) | \`${PROD_SHA:-unknown}\` |"
+            echo "| Prod image ref / build time | \`${PROD_REF:-unknown}\` / \`${PROD_BUILD_TIME:-unknown}\` |"
+            echo "| Last successful \`k8s-build\` on main | \`${LAST_SUCCESS_SHA:-none}\` at \`${LAST_SUCCESS_AT:-never}\` |"
+            echo "| Discarded main runs since then | \`${DISCARDED_COUNT}\` |"
+            echo "| Main runs not yet completed | \`${IN_FLIGHT:-unknown}\` |"
+            echo "| Unshipped for | \`${AGE_MINUTES}\` minutes (limit \`${HOURS}\`h) |"
+            echo
+            if [ "${STATUS}" = "alert" ]; then
+              echo "### What to check, in order"
+              echo
+              echo "1. \`gh run list --workflow k8s-build.yml --branch main --limit 20\` — a run whose jobs report"
+              echo "   \`runner_name = \"\"\` and \`cancelled\` never started: it was superseded while PENDING, which"
+              echo "   \`cancel-in-progress: false\` does not prevent. Protected refs get a per-commit concurrency"
+              echo "   group precisely to stop that (EW-758)."
+              echo "2. If runs are queued but never start, the ARC pool is starved — check the runner pods for"
+              echo "   \`Pending\`, \`Evicted\` or \`OOMKilled\` rather than assuming the label is wrong."
+              echo "3. If a build SUCCEEDED but production still lags, the gap is delivery, not build: check that"
+              echo "   the run reached its \`Promote the moving tag only from the current branch tip\` step, then"
+              echo "   check ArgoCD."
+              echo
+              echo "🛑 Do NOT \`workflow_dispatch\` \`k8s-build\` on main to force a build without first checking for"
+              echo "a queued run for a DIFFERENT commit — a dispatch for the same commit shares its group."
+            fi
+            echo
+            echo "- Checked at \`$(date -u '+%Y-%m-%dT%H:%M:%SZ')\` (UTC) from a GitHub-hosted runner."
+            echo "- Run: ${RUN_URL:-n/a}"
+          } > "${REPORT}"
+
+          {
+            echo "status=${STATUS}"
+            echo "age_minutes=${AGE_MINUTES}"
+            echo "threshold_hours=${HOURS}"
+            echo "discarded=${DISCARDED_COUNT}"
+            echo "headline=${HEADLINE}"
+            echo "report_path=${REPORT}"
+          } >> "${GITHUB_OUTPUT}"
+          # <<< END verdict contract block <<<
+
+      - name: Publish the verdict to the run summary
+        run: cat "${{ steps.verdict.outputs.report_path }}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Annotate an undetermined check
+        if: steps.verdict.outputs.status == 'unknown'
+        run: |
+          echo "::warning::Prod image freshness could not be determined: ${{ steps.verdict.outputs.headline }}"
+
+      - name: Open or update the alert issue
+        if: steps.verdict.outputs.status == 'alert'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REPORT_PATH: ${{ steps.verdict.outputs.report_path }}
+          HEADLINE: ${{ steps.verdict.outputs.headline }}
+          ALERT_LABEL: prod-image-alert
+          # Stable substring used ONLY to re-find the issue when the label
+          # lookup misses. The visible title carries live numbers, so it must
+          # never be matched exactly.
+          ALERT_TITLE_SEARCH: 'Prod image lane:'
+        run: |
+          set -uo pipefail
+
+          # Idempotent — the label may not exist yet.
+          gh label create "${ALERT_LABEL}" \
+            --color 'B60205' \
+            --description 'Production image lane is stale (prod-image-freshness)' \
+            >/dev/null 2>&1 || true
+
+          # Reuse the single open alert issue. Issue spam is the #1 reason
+          # monitors like this get muted, so we NEVER open a second one.
+          #
+          # 🛑 `|| true` here would collapse "the API errored" and "there is no
+          # open alert" into the same empty string, so a transient rate-limit
+          # DURING a real incident would open a brand-new duplicate issue every
+          # hour — precisely the spam this design exists to prevent.
+          if ! EXISTING="$(gh issue list --label "${ALERT_LABEL}" --state open --limit 1 \
+                             --json number --jq '.[0].number // empty')"; then
+            echo "::error::Could not query existing ${ALERT_LABEL} issues. Refusing to create one, as it would likely be a duplicate."
+            exit 1
+          fi
+          if [ -z "${EXISTING}" ]; then
+            # Fallback for a previous run that created the issue but could not label it.
+            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE_SEARCH}\" in:title" --limit 1 \
+                          --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          fi
+
+          ALERT_TITLE="🚨 Prod image lane: ${HEADLINE}"
+
+          if [ -z "${EXISTING}" ]; then
+            echo "No open alert issue — creating one."
+            if ! gh issue create --title "${ALERT_TITLE}" \
+                                 --label "${ALERT_LABEL}" \
+                                 --assignee evereq \
+                                 --body-file "${REPORT_PATH}"; then
+              # Labels/assignees can fail where the token cannot set them. Retry
+              # bare so the alert still lands...
+              NEW_URL="$(gh issue create --title "${ALERT_TITLE}" --body-file "${REPORT_PATH}")"
+              echo "${NEW_URL}"
+              # ...then try hard to attach the label anyway, or the dedup lookup
+              # above misses this issue on every later run.
+              gh issue edit "${NEW_URL##*/}" --add-label "${ALERT_LABEL}" >/dev/null 2>&1 || true
+            fi
+            exit 0
+          fi
+
+          echo "Reusing open alert issue #${EXISTING}."
+
+          # Keep the title current: "unshipped 7h" escalating to "unshipped 30h,
+          # 12 discarded runs" has to change the words at the top, not just add
+          # to the bottom.
+          CURRENT_TITLE="$(gh issue view "${EXISTING}" --json title --jq '.title' 2>/dev/null || true)"
+          if [ -n "${CURRENT_TITLE}" ] && [ "${CURRENT_TITLE}" != "${ALERT_TITLE}" ]; then
+            gh issue edit "${EXISTING}" --title "${ALERT_TITLE}" >/dev/null 2>&1 \
+              || echo "::warning::Could not retitle #${EXISTING}; the comment below still records the change."
+          fi
+
+          # Throttle: one comment per 6h while the situation is unchanged.
+          # Without it a multi-day stall produces 24 comments a day and the
+          # issue becomes unreadable.
+          LAST_AT="$(gh issue view "${EXISTING}" --json createdAt,comments \
+                       --jq '.comments[-1].createdAt // .createdAt // empty' 2>/dev/null || true)"
+          SHOULD_COMMENT=1
+          if [ -n "${LAST_AT}" ]; then
+            LAST_EPOCH="$(date -u -d "${LAST_AT}" +%s 2>/dev/null || echo 0)"
+            NOW_EPOCH="$(date -u +%s)"
+            AGE=$(( NOW_EPOCH - LAST_EPOCH ))
+            if [ "${LAST_EPOCH}" -gt 0 ] && [ "${AGE}" -lt 21600 ]; then
+              SHOULD_COMMENT=0
+              echo "Last update was $(( AGE / 60 ))m ago — staying quiet to avoid issue spam."
+            fi
+          fi
+
+          if [ "${SHOULD_COMMENT}" -eq 1 ]; then
+            gh issue comment "${EXISTING}" --body-file "${REPORT_PATH}"
+          fi
+
+      - name: Close the alert issue on recovery
+        if: steps.verdict.outputs.status == 'ok'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REPORT_PATH: ${{ steps.verdict.outputs.report_path }}
+          ALERT_LABEL: prod-image-alert
+          ALERT_TITLE_SEARCH: 'Prod image lane:'
+        run: |
+          set -uo pipefail
+
+          EXISTING="$(gh issue list --label "${ALERT_LABEL}" --state open --limit 1 \
+                        --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -z "${EXISTING}" ]; then
+            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE_SEARCH}\" in:title" --limit 1 \
+                          --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          fi
+
+          if [ -z "${EXISTING}" ]; then
+            echo "Production is on the main tip and no alert issue is open — nothing to do."
+            exit 0
+          fi
+
+          echo "Recovered — commenting on and closing issue #${EXISTING}."
+          printf '\n%s\n' "_Recovered — closing automatically. The next stall opens a fresh issue._" >> "${REPORT_PATH}"
+          gh issue comment "${EXISTING}" --body-file "${REPORT_PATH}"
+          gh issue close "${EXISTING}" --reason completed
+
+      - name: Fail the run when production is stale
+        if: steps.verdict.outputs.status == 'alert'
+        run: |
+          echo "::error::${{ steps.verdict.outputs.headline }} — see the job summary and the open 'prod-image-alert' issue."
+          exit 1

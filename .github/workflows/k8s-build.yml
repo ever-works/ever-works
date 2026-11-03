@@ -4,7 +4,42 @@ on:
   push:
     branches: [develop, stage, main, master]
 concurrency:
-  group: k8s-build-${{ github.ref }}
+  # 🛑 PROTECTED REFS GET A PER-COMMIT GROUP. This is not a style choice — it is
+  # the other half of the fix below, and without it that comment is aspirational.
+  #
+  # `cancel-in-progress: false` only governs runs that are ALREADY IN PROGRESS.
+  # GitHub keeps a single PENDING run per concurrency group, and a newer pending
+  # run supersedes the older one regardless of that setting. Observed live on
+  # this repo (EW-758):
+  #
+  #   11:21:24Z run 32721436120 created for main 4c00e87f6 (cancel-in-progress
+  #             already false)
+  #   11:29:43Z run 32722136353 created for main a7b419f24
+  #   11:30:28Z run 32721436120 CANCELLED — its four jobs report
+  #             runner_name = "" and never reached in_progress
+  #
+  # Still reproducing on develop after all three earlier PRs: runs 33962301778,
+  # 33948716657, 33895823888, 33870037204 and 33869641889 were each cancelled
+  # seconds-to-minutes after creation by the next push, every one of them with
+  # ZERO jobs. Nothing was killed mid-build; the build never started. main has
+  # simply not been slow enough to hit it since 2026-08-24 — it is mitigated by
+  # throughput, not fixed by policy.
+  #
+  # Two commits on a protected ref must therefore land in DIFFERENT groups, so
+  # neither can supersede the other at any stage of its life. `develop` keeps
+  # ONE shared group on purpose: it pushes far more often, and there the
+  # self-throttling is the point rather than a bug. Re-triggering the SAME
+  # protected commit still de-duplicates, because the group keys on the SHA and
+  # not the run id — so a workflow_dispatch for a different commit no longer
+  # cancels a queued push run, while one for the same commit still joins it
+  # (the images would be byte-identical).
+  #
+  # Cost, stated honestly: a burst of promotions to main can now run several
+  # builds concurrently instead of one. That is the intended trade — the
+  # alternative is a promoted commit with no image, which is the outage this
+  # ticket is about. Ordering is unaffected: the moving tag is still emitted
+  # only by the build that is the branch tip (see the promote step below).
+  group: k8s-build-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage') && github.sha || 'shared' }}
   # 🛑 Every ref that can trigger this workflow is deploy-bearing and QUEUES.
   #
   # This workflow is the ONLY one that publishes the tags the clusters pull

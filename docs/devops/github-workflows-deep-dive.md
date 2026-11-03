@@ -36,6 +36,7 @@ image builds, Kubernetes deployments, CLI publishing, and Trigger.dev deployment
 | `release-trigger-stage.yml`                     | Deploy to Trigger.dev Stage           | After CI on stage               | Deploy Trigger.dev staging                            |
 | `release-trigger-prod.yml`                      | Deploy to Trigger.dev Prod            | After CI on main                | Deploy Trigger.dev prod                               |
 | `publish-cli.yml`                               | Build and Publish CLIs                | Push to main, tags, manual      | Publish CLI packages                                  |
+| `prod-image-freshness.yml`                      | Prod Image Freshness                  | Hourly cron, manual             | **Alarm** — is prod serving the tip of `main`?        |
 
 ## Pipeline Flow
 
@@ -58,6 +59,95 @@ flowchart LR
         publish["publish-cli.yml (on tags)"]
     end
 ```
+
+## Production Image Lane Guarantees
+
+`k8s-build.yml` is the only workflow that publishes the tags the clusters pull (`:dev` / `:stage` / `:prod`
+plus an immutable `:sha-<sha>`). A cancelled run here is therefore not lost CI signal — it is a merged fix
+that never reaches an environment. The lane died silently twice in August 2026, so it now carries four
+separate guarantees. Change any of them only with the incident that motivated it in view.
+
+### 1. A promoted commit is never discarded — not even while pending
+
+```yaml
+concurrency:
+    group: k8s-build-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' || ...) && github.sha || 'shared' }}
+    cancel-in-progress: false
+```
+
+`cancel-in-progress: false` alone is **not** enough, and this is the part that keeps catching people out.
+It only governs runs that are already _in progress_. GitHub keeps a single **pending** run per concurrency
+group, and a newer pending run supersedes the older one regardless of that setting. Observed live on this
+repo: run `32721436120` (main `4c00e87f6`, `cancel-in-progress` already `false`) was cancelled the same
+second run `32722136353` was created, with all four of its jobs still at `runner_name = ""`.
+
+So `main`, `master` and `stage` get a **per-commit** group: two commits on a protected ref can never
+contend, at any stage of their life. `develop` deliberately keeps one shared group — it pushes far more
+often, and there self-throttling is the point rather than a bug. Re-triggering the _same_ protected commit
+still de-duplicates, because the group includes the SHA rather than the run id.
+
+> A `workflow_dispatch` for a **different** commit no longer cancels a queued push run. One for the _same_
+> commit still joins its group, which is correct: the images would be byte-identical.
+
+### 2. The newest commit always wins the moving tag
+
+Queueing instead of cancelling introduced a hazard of its own: two builds for one branch can be in flight
+together, and the older one finishing second would pin `:prod` to an earlier commit — a silent production
+rollback, strictly worse than a build that never ran. The build steps therefore publish only
+`:sha-<sha>`, and a final step re-reads the branch tip with `git ls-remote` **after** the build and emits
+the moving tag only when this build is still the tip. A superseded build keeps its immutable tag and stays
+deployable by digest.
+
+| Situation                 | Tags published        |
+| ------------------------- | --------------------- |
+| This build is the tip     | `sha-aaa` and `:prod` |
+| Branch advanced meanwhile | `sha-aaa` only        |
+| Tip cannot be resolved    | `sha-aaa`, job fails  |
+
+### 3. The pool has to be able to schedule
+
+`runs-on` resolves `RUNNER_LINUX_X64_8 || RUNNER_LINUX_X64_4 || ubuntu-latest`. The x64-16 pool was
+_unschedulable_ (all five pods `Pending` on `Insufficient cpu/memory` for hours), which is a different
+failure from _busy_: queueing behind runners that cycle resolves, waiting on pods that never schedule does
+not. Diagnose with the pods, never by assuming the runner label is wrong — a queued job that reports its
+labels correctly proves the label resolved.
+
+### 4. The lane's own death is now alarmed (`prod-image-freshness.yml`)
+
+Every other signal was blind to a dead lane:
+
+- `ci.yml` is green — the code compiles. It says nothing about whether an image was built.
+- `smoke-deployed.yml` runs `on: workflow_run: [k8s-build] types: [completed]`. When no run ever
+  _completes_, the smoke never fires; it is structurally incapable of reporting this.
+- `external-uptime-monitor.yml` asks whether production answers. During both incidents it answered
+  perfectly — it was just serving an old image.
+
+`prod-image-freshness.yml` asks the one question none of them can: **does the commit inside the production
+image match the tip of `main`?** It compares `gh api repos/.../commits/main` against `gitSha` from
+`https://api.ever.works/api/version` (baked at image build time from the `GIT_SHA` build-arg), and files a
+single deduplicated `prod-image-alert` issue when a commit has been unshipped past the window.
+
+| Verdict   | Meaning                                     | Action                  |
+| --------- | ------------------------------------------- | ----------------------- |
+| `ok`      | prod is serving the tip of `main`           | closes any open alert   |
+| `pending` | a newer commit is inside the rollout window | nothing                 |
+| `alert`   | unshipped longer than the window            | opens/updates the issue |
+| `unknown` | a signal was unavailable                    | `::warning::` only      |
+
+Two design rules make it trustworthy, and both are enforced by
+`apps/node/src/core/prod-image-freshness.contract.spec.ts`:
+
+- **It never alerts on its own transport faults.** An unreachable endpoint yields `unknown`, not `alert`.
+  A monitor that cries wolf gets muted, and being muted is the failure this alarm exists to prevent.
+- **It keys on identity, not age.** "No build for N hours" would fire every quiet weekend and stay silent
+  through a lane death that happened to follow a recent build.
+
+The window defaults to **6 hours** (a healthy main build takes 18-42 min, a jammed one measured 4h46m, and
+ArgoCD still has to roll the pods). Override it with the repo variable `PROD_IMAGE_MAX_UNSHIPPED_HOURS`, or
+per-run through the `max_unshipped_hours` dispatch input.
+
+Like `external-uptime-monitor.yml`, it runs on `ubuntu-latest` **on purpose**: a monitor that detects ARC
+pool starvation must not queue behind the starved pool.
 
 ## CI Workflow (`ci.yml`)
 
@@ -350,3 +440,5 @@ flowchart LR
 | `.github/workflows/release-trigger-stage.yml`      | Trigger.dev (stage)   |
 | `.github/workflows/release-trigger-prod.yml`       | Trigger.dev (prod)    |
 | `.github/workflows/publish-cli.yml`                | CLI build and publish |
+| `.github/workflows/k8s-build.yml`                  | **Live** image build  |
+| `.github/workflows/prod-image-freshness.yml`       | Prod staleness alarm  |
