@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ConnectionStatusView } from './ipc-contract';
+import { IDLE_WORKER_STATUS, type ConnectionStatusView } from './ipc-contract';
 import { describeStatus, formatSince, isLive, statusTone } from './status-label';
 
 function status(overrides: Partial<ConnectionStatusView> = {}): ConnectionStatusView {
@@ -10,6 +10,7 @@ function status(overrides: Partial<ConnectionStatusView> = {}): ConnectionStatus
 		nextAttemptInMs: null,
 		lastError: null,
 		platformStatus: null,
+		worker: IDLE_WORKER_STATUS,
 		...overrides
 	};
 }
