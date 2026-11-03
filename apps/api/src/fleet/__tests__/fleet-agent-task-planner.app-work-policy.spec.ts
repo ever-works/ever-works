@@ -1,6 +1,7 @@
 import { PromptAssemblerService } from '@ever-works/agent/agents';
 import type { Agent, Task } from '@ever-works/agent/entities';
 import { TaskStatus } from '@ever-works/agent/tasks-domain';
+import { FLEET_AGENT_EXECUTION_MAX_BUDGET_USD } from '@ever-works/contracts';
 import { FleetAgentTaskPlannerService, runBudgetCapUsd } from '../fleet-agent-task-planner.service';
 
 /**
@@ -322,6 +323,14 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
             expect(plan!.execution.maxBudgetUsd).toBe(15.99);
         });
 
+        // Review of #3061 — a Mission may allow up to 1,000,000 cents per run; the node refuses
+        // any maxBudgetUsd above FLEET_AGENT_EXECUTION_MAX_BUDGET_USD, so the plan clamps to it.
+        it('clamps a cap above the node maximum to that maximum', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const plan = await withRun(1_000_000).plan(payload);
+            expect(plan!.execution.maxBudgetUsd).toBe(FLEET_AGENT_EXECUTION_MAX_BUDGET_USD);
+        });
+
         it('no cap on the run leaves the plan as it was', async () => {
             tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
             const plan = await withRun(null).plan(payload);
@@ -332,6 +341,8 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
     it('runBudgetCapUsd never raises a cap and ignores nonsense', () => {
         expect(runBudgetCapUsd(1500)).toBe(15);
         expect(runBudgetCapUsd(1599.9)).toBe(15.99);
+        expect(runBudgetCapUsd(50_001)).toBe(FLEET_AGENT_EXECUTION_MAX_BUDGET_USD);
+        expect(runBudgetCapUsd(0.5)).toBeNull();
         for (const raw of [0, -1, null, undefined, Number.NaN, '1500']) {
             expect(runBudgetCapUsd(raw)).toBeNull();
         }

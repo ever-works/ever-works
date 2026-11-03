@@ -568,7 +568,17 @@ export class AgentRun {
      * the Agent's own settings — every run before APW-08 P2). Set at dispatch (a Mission-filed
      * Task's run carries the Mission's `maxBudgetCentsPerRun`) and kept on the row, so a parked,
      * drained or resumed run keeps it. On the Fleet path it becomes `execution.maxBudgetUsd`,
-     * rounded DOWN and never above the Agent's own cap. Migration 1792370000000-AddAgentRunBudgetCap.
+     * rounded DOWN, never above the Agent's own cap and never above the node's maximum
+     * (`FLEET_AGENT_EXECUTION_MAX_BUDGET_USD`). Migration 1792370000000-AddAgentRunBudgetCap.
+     *
+     * Resolved for EVERY run of a Mission's Task (review of #3061): `dispatchAgentRun` and the
+     * Task chat's mention runs read the Mission's cap themselves, and a resume carries it over.
+     *
+     * Follow-up (review of #3061): the in-process (non-Fleet) executor does NOT enforce this cap
+     * yet. Its only spend control is the per-Agent period budget checked before the run starts
+     * (`AgentRunService.checkBudget`); the tool loop has no per-run spend hook to stop a run
+     * mid-way, so honouring the cap there needs one (tracked as an APW-08 follow-up, not built
+     * here).
      */
     @Column({ type: 'int', nullable: true })
     budgetCapCents?: number | null;

@@ -7,6 +7,10 @@ import {
     Logger,
     Optional,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Mission } from '../entities/mission.entity';
+import { resolveTaskRunBudgetCapCents } from './run-budget-cap';
 import { TaskStatus } from '../entities/task.entity';
 import type { Task, TaskActorType } from '../entities/task.entity';
 import {
@@ -306,13 +310,9 @@ export function withAgentFanOutSuppressed(
     return { ...opts, suppressAgentFanOut: true };
 }
 
-/**
- * APW-08 T35 (APW08-G15) — a per-run cap is a positive whole number of cents; anything else is
- * no cap (never a zero cap that would stop every run before it starts).
- */
-export function runBudgetCapCents(raw: unknown): number | null {
-    return typeof raw === 'number' && Number.isInteger(raw) && raw > 0 ? raw : null;
-}
+// APW-08 T35 (APW08-G15) — moved to `run-budget-cap.ts` (shared with the Task chat's runs);
+// re-exported so existing imports keep working.
+export { runBudgetCapCents } from './run-budget-cap';
 
 @Injectable()
 export class TaskTransitionService {
@@ -388,6 +388,14 @@ export class TaskTransitionService {
         @Optional()
         @Inject(APP_WORK_RUN_ADMISSION)
         private readonly appWorkRunAdmission?: AppWorkRunAdmissionGate,
+        // APW-08 T35 (FR-53, review of #3061) — the Missions table, read in `dispatchAgentRun` for
+        // a Task with a `missionId`, so EVERY run of a Mission's Task carries the Mission's
+        // per-run cap (board drag, Run, retry, review, recurrence, Goal, delegation — not only the
+        // tick's own run). `Mission` is in TasksDomainModule's `forFeature`. Appended LAST +
+        // @Optional (positional-spec arity rule); absent, only an explicit `maxBudgetCents` caps.
+        @Optional()
+        @InjectRepository(Mission)
+        private readonly missionRows?: Repository<Mission>,
     ) {}
 
     /**
@@ -1587,7 +1595,10 @@ export class TaskTransitionService {
             seedPendingInput?: string[];
             /**
              * APW-08 T35 (FR-53, APW08-G15) — this run's own spend cap in cents (a positive
-             * integer), stored on the run row. Omitted = no cap beyond the Agent's settings.
+             * integer), stored on the run row. A Task with a `missionId` is ALSO capped by its
+             * Mission's `guardrailsOverride.maxBudgetCentsPerRun`, resolved here for every caller
+             * (see {@link resolveTaskRunBudgetCapCents}); with both, the lower one wins. Omitted, and
+             * no Mission cap = no cap beyond the Agent's settings.
              */
             maxBudgetCents?: number;
             /**
@@ -1718,6 +1729,12 @@ export class TaskTransitionService {
                 // Handed to the gate as the `reserve` half of admission so
                 // the count and this insert are one critical section under
                 // the advisory lock (no-op off Postgres).
+                const budgetCapCents = await resolveTaskRunBudgetCapCents(
+                    this.missionRows,
+                    task,
+                    opts.maxBudgetCents,
+                    this.logger,
+                );
                 const reserve = async (verdict: {
                     admitted: boolean;
                     queuedReason?: string;
@@ -1735,9 +1752,7 @@ export class TaskTransitionService {
                                   ? null
                                   : (verdict.queuedReason ?? 'concurrency-limit'),
                               delegationScope: opts.delegationScope ?? null,
-                              ...(runBudgetCapCents(opts.maxBudgetCents) !== null
-                                  ? { budgetCapCents: runBudgetCapCents(opts.maxBudgetCents) }
-                                  : {}),
+                              ...(budgetCapCents !== null ? { budgetCapCents } : {}),
                           })
                         : null;
                 };

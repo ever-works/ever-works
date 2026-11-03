@@ -471,11 +471,16 @@ export { FleetAgentTaskPlanError, FleetDelegationScopeRefusedError };
  */
 /**
  * APW-08 T35 (APW08-G15) — a run's own cap in USD for the node: whole cents only, rounded DOWN
- * (`floor(cents) / 100`), so a conversion can never raise the cap; no cap = `null`.
+ * (`floor(cents) / 100`), so a conversion can never raise the cap; no cap = `null`. Clamped to
+ * {@link FLEET_AGENT_EXECUTION_MAX_BUDGET_USD} (review of #3061): a Mission may allow up to
+ * 1,000,000 cents per run, but the node refuses any `maxBudgetUsd` above that maximum, so an
+ * unclamped cap above it would make every capped run fail on the node.
  */
 export function runBudgetCapUsd(cents: unknown): number | null {
     if (typeof cents !== 'number' || !Number.isFinite(cents) || cents <= 0) return null;
-    return Math.floor(cents) / 100;
+    const usd = Math.floor(cents) / 100;
+    if (usd <= 0) return null;
+    return Math.min(usd, FLEET_AGENT_EXECUTION_MAX_BUDGET_USD);
 }
 
 @Injectable()
