@@ -4348,6 +4348,7 @@
                         "title": "Woher jeder Wert stammt",
                         "admin": "Plugin-Einstellungen",
                         "env": "Umgebung",
+                        "platform": "Ever Platform",
                         "default": "Standard",
                         "unset": "Nicht festgelegt"
                     },

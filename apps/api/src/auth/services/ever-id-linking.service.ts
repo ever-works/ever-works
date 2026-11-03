@@ -17,7 +17,11 @@ import {
     UserRepository,
 } from '@ever-works/agent/database';
 import { AuthAccount, User, type ExternalIdentity } from '@ever-works/agent/entities';
-import { EverIdIdentityLinkedEvent, EverIdIdentityUnlinkedEvent } from '@ever-works/agent/events';
+import {
+    EverIdIdentityLinkedEvent,
+    EverIdIdentityUnlinkedEvent,
+    EverIdSignedInEvent,
+} from '@ever-works/agent/events';
 import { IdentityProviderFacadeService } from '@ever-works/agent/facades';
 import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
 import { AuthProvider } from '../providers/auth-provider.abstract';
@@ -182,6 +186,10 @@ export class EverIdLinkingService {
             );
             await this.recordSignIn(identity.id, user.id);
             this.activity.signedIn(user.id, identity.id, displayName, ctx);
+            this.events.emit(
+                EverIdSignedInEvent.EVENT_NAME,
+                new EverIdSignedInEvent({ identityId: identity.id, userId: user.id }),
+            );
             return {
                 outcome: 'signedIn',
                 access_token: token.access_token,

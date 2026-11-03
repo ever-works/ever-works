@@ -25,6 +25,7 @@ import { PluginClassValidatorService } from './services/plugin-class-validator.s
 import { PluginLifecycleManagerService } from './services/plugin-lifecycle-manager.service';
 import { PluginSettingsService } from './services/plugin-settings.service';
 import { PluginSecretEncService } from './services/plugin-secret-enc.service';
+import { PluginPlatformSettingsService } from './services/plugin-platform-settings.service';
 import { SettingsSchemaValidatorService } from './services/settings-schema-validator.service';
 import { PluginContextFactoryService } from './services/plugin-context-factory.service';
 import { CustomCapabilityRegistryService } from './services/custom-capability-registry.service';
@@ -85,6 +86,7 @@ const PROVIDERS = [
     // Lifecycle and settings
     PluginLifecycleManagerService,
     PluginSecretEncService, // C-08: must register before PluginSettingsService (optional injection)
+    PluginPlatformSettingsService, // the Ever Platform level of the settings cascade (optional injection)
     PluginSettingsService,
     // Context and capabilities
     PluginContextFactoryService,
@@ -127,6 +129,7 @@ const EXPORTS = [
     PluginLoaderService,
     PluginLifecycleManagerService,
     PluginSecretEncService, // C-08
+    PluginPlatformSettingsService,
     PluginSettingsService,
     PluginContextFactoryService,
     CustomCapabilityRegistryService,

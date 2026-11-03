@@ -4348,6 +4348,7 @@
                         "title": "مصدر كل قيمة",
                         "admin": "إعدادات الإضافة",
                         "env": "البيئة",
+                        "platform": "Ever Platform",
                         "default": "افتراضي",
                         "unset": "غير مُعيّن"
                     },
