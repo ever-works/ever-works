@@ -314,6 +314,13 @@ export function withAgentFanOutSuppressed(
 // re-exported so existing imports keep working.
 export { runBudgetCapCents } from './run-budget-cap';
 
+/**
+ * Review of #3061 — the dispatch error for an Agent-session schedule fire that must be capped:
+ * an Agent session has no platform-set spend limit, so it is refused instead of started uncapped.
+ */
+export const TASK_SESSION_BUDGET_CAP_UNSUPPORTED =
+    'session-budget-cap-unsupported: an Agent session cannot be held to a per-run budget, so this capped run was not started';
+
 @Injectable()
 export class TaskTransitionService {
     private readonly logger = new Logger(TaskTransitionService.name);
@@ -1598,7 +1605,9 @@ export class TaskTransitionService {
              * integer), stored on the run row. A Task with a `missionId` is ALSO capped by its
              * Mission's `guardrailsOverride.maxBudgetCentsPerRun`, resolved here for every caller
              * (see {@link resolveTaskRunBudgetCapCents}); with both, the lower one wins. Omitted, and
-             * no Mission cap = no cap beyond the Agent's settings.
+             * no Mission cap = no cap beyond the Agent's settings. An Agent-session schedule fire
+             * that would be capped is refused ({@link TASK_SESSION_BUDGET_CAP_UNSUPPORTED}): a
+             * session has no platform-set spend limit.
              */
             maxBudgetCents?: number;
             /**
@@ -1699,12 +1708,28 @@ export class TaskTransitionService {
         // may not commit; T12 reads the Work once (shared) when its port is bound.
         // FR-9 refuses App Work Tasks only (it fails open). The paused switch and
         // T12 fail CLOSED: a Task whose Work is unreadable is refused.
+        // APW-08 T35 (FR-53, review of #3061) — the run's spend cap, resolved ONCE here, before
+        // any branch can start anything, so no path skips it.
+        const budgetCapCents = await resolveTaskRunBudgetCapCents(
+            this.missionRows,
+            task,
+            opts.maxBudgetCents,
+            this.logger,
+        );
         if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
             // Review of #3053 — the session path starts the Fleet session at once and has no run
             // row to park, so while App changes are paused the fire is refused, as before T49's
             // park (a recurring schedule fires again once changes resume).
             if (appChangesPaused) {
                 const error = describeAppChangesPaused();
+                this.logger.warn(`Task ${task.id}: no session started — ${error}`);
+                return { runId: null, dispatched: false, parked: false, error };
+            }
+            // Review of #3061 — an Agent session runs on its computer's own CLI with no spend
+            // limit the platform can set, so a fire that must be capped (a Mission's per-run
+            // budget, or the caller's) is refused rather than started uncapped.
+            if (budgetCapCents !== null) {
+                const error = TASK_SESSION_BUDGET_CAP_UNSUPPORTED;
                 this.logger.warn(`Task ${task.id}: no session started — ${error}`);
                 return { runId: null, dispatched: false, parked: false, error };
             }
@@ -1729,12 +1754,6 @@ export class TaskTransitionService {
                 // Handed to the gate as the `reserve` half of admission so
                 // the count and this insert are one critical section under
                 // the advisory lock (no-op off Postgres).
-                const budgetCapCents = await resolveTaskRunBudgetCapCents(
-                    this.missionRows,
-                    task,
-                    opts.maxBudgetCents,
-                    this.logger,
-                );
                 const reserve = async (verdict: {
                     admitted: boolean;
                     queuedReason?: string;

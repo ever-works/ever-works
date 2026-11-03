@@ -1,5 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { TaskTransitionService } from '../task-transition.service';
+import {
+    TASK_SESSION_BUDGET_CAP_UNSUPPORTED,
+    TaskTransitionService,
+} from '../task-transition.service';
 import { TaskStatus, TaskPriority } from '../../entities/task.entity';
 import type { Task } from '../../entities/task.entity';
 import { FLEET_SESSION_SCHEDULE_LABEL } from '../task-session-schedule.port';
@@ -497,5 +500,38 @@ describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on a
             'agent-a',
         );
         expect(sessionSchedules.dispatch).toHaveBeenCalledTimes(2);
+    });
+
+    // Review of #3061 — an Agent session has no platform-set spend limit, so a fire that must be
+    // capped is refused, never started uncapped; an uncapped Mission's fire still starts.
+    it('refuses an Agent-session schedule fire that carries a Mission per-run cap', async () => {
+        const sessionSchedules = { dispatch: jest.fn().mockResolvedValue({ dispatched: true }) };
+        const capped = {
+            findOne: jest.fn(async () => ({
+                id: 'm1',
+                guardrailsOverride: { maxBudgetCentsPerRun: 2500 },
+            })),
+        };
+        const result = await makeSvc(
+            { canCommitToRepo: true },
+            { sessionSchedules, missionRows: capped },
+        ).dispatchAgentRun(
+            makeTask({ workId: 'w-site', missionId: 'm1', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+        expect(result).toMatchObject({ dispatched: false, runId: null });
+        expect(result.error).toBe(TASK_SESSION_BUDGET_CAP_UNSUPPORTED);
+        expect(sessionSchedules.dispatch).not.toHaveBeenCalled();
+        expect(runs.createQueued).not.toHaveBeenCalled();
+
+        const uncapped = { findOne: jest.fn(async () => ({ id: 'm1', guardrailsOverride: null })) };
+        await makeSvc(
+            { canCommitToRepo: true },
+            { sessionSchedules, missionRows: uncapped },
+        ).dispatchAgentRun(
+            makeTask({ workId: 'w-site', missionId: 'm1', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+        expect(sessionSchedules.dispatch).toHaveBeenCalledTimes(1);
     });
 });

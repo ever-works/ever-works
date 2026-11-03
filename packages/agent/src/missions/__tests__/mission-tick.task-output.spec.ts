@@ -76,6 +76,12 @@ function build(
                 leaseWrites.push({ set: { ...state.set }, params: { ...state.params } });
                 const held = (mission as unknown as Row).taskOutputLeaseUntil as Date | null;
                 const next = state.set.taskOutputLeaseUntil as Date | null;
+                if (next instanceof Date && 'held' in state.params) {
+                    // A renewal: only the instant this tick last set.
+                    if (!held || held.getTime() !== state.params.held) return { affected: 0 };
+                    (mission as unknown as Row).taskOutputLeaseUntil = next;
+                    return { affected: 1 };
+                }
                 if (next instanceof Date) {
                     const now = state.params.now as number;
                     if (held && held.getTime() >= now) return { affected: 0 };
@@ -157,6 +163,13 @@ function build(
     const moduleRef = { get: jest.fn(() => tasksService) };
     const sink = { track: jest.fn() };
     const missionWorks = { listForMissionWithWork: jest.fn(async () => relations) };
+    // The Agents the Mission's owner can still use (review of #3061).
+    const reachableAgents = new Set<string>(['aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee']);
+    const agentRows = {
+        findOne: jest.fn(async (opts: { where: { id: string } }) =>
+            reachableAgents.has(opts.where.id) ? { id: opts.where.id } : null,
+        ),
+    };
 
     const service = new (MissionTickService as unknown as new (
         ...args: unknown[]
@@ -174,6 +187,7 @@ function build(
         taskRepo,
         moduleRef,
         sink,
+        agentRows,
     );
     return {
         service,
@@ -188,6 +202,7 @@ function build(
         missionWorks,
         taskRepo,
         leaseWrites,
+        reachableAgents,
     };
 }
 
@@ -318,12 +333,84 @@ describe('MissionTickService — Task output (APW-08 T35)', () => {
     it('holds the Mission’s lease while it files and gives it back after', async () => {
         const t = build();
         await t.service.runOnce('m1', 'u1');
-        expect(t.leaseWrites).toHaveLength(2);
+        // Claim, renew before the Work's planner call, renew before filing, release.
+        expect(t.leaseWrites).toHaveLength(4);
         expect(t.leaseWrites[0].set.taskOutputLeaseUntil).toBeInstanceOf(Date);
+        expect(t.leaseWrites[0].params).toHaveProperty('now');
+        expect(t.leaseWrites[1].params).toHaveProperty('held');
+        expect(t.leaseWrites[2].params).toHaveProperty('held');
         // A tick is not an edit: `updatedAt` keeps its value.
-        expect(typeof t.leaseWrites[0].set.updatedAt).toBe('function');
-        expect(t.leaseWrites[1].set.taskOutputLeaseUntil).toBeNull();
+        for (const write of t.leaseWrites) expect(typeof write.set.updatedAt).toBe('function');
+        expect(t.leaseWrites[3].set.taskOutputLeaseUntil).toBeNull();
         expect((t.mission as unknown as Row).taskOutputLeaseUntil).toBeNull();
+    });
+
+    it('a lease taken over while the planner ran files nothing (review of #3061)', async () => {
+        const t = build({}, [
+            { workId: 'w-1', relation: 'improves', workKind: 'app' },
+            { workId: 'w-2', relation: 'improves', workKind: 'app' },
+        ]);
+        t.planner.plan.mockImplementationOnce(
+            async (input: { count: number; work: { id: string } }) => {
+                // The planner outlived the lease and another tick claimed it.
+                (t.mission as unknown as Row).taskOutputLeaseUntil = new Date(Date.now() + 1);
+                return [{ title: `Improve ${input.work.id}`, description: '' }];
+            },
+        );
+        const result = await t.service.runOnce('m1', 'u1');
+        expect(t.tasksService.create).not.toHaveBeenCalled();
+        // The remaining Works wait for the next tick; no "nothing to file" notice either.
+        expect(t.planner.plan).toHaveBeenCalledTimes(1);
+        expect(result.message).toContain('lease-lost');
+        expect(nothingToFile(t.activityLog)).toHaveLength(0);
+    });
+
+    it('a Work detached while the planner ran gets no Task (review of #3061)', async () => {
+        const t = build();
+        t.planner.plan.mockImplementationOnce(async () => {
+            t.missionWorks.listForMissionWithWork.mockResolvedValue([]);
+            return [{ title: 'Add a waitlist', description: '' }];
+        });
+        await t.service.runOnce('m1', 'u1');
+        expect(t.tasksService.create).not.toHaveBeenCalled();
+    });
+
+    it('an Agent the owner can no longer use falls back to the Work’s default (review of #3061)', async () => {
+        const gone = 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+        const t = build({
+            taskOutput: { tasksPerTick: 1, openTasksCap: 3, agentId: gone },
+        } as Partial<Mission>);
+        await t.service.runOnce('m1', 'u1');
+        expect(t.tasksService.create).toHaveBeenCalledTimes(1);
+        expect(t.tasksService.create.mock.calls[0][1]).not.toHaveProperty('agentId');
+        expect(t.tasksService.runTask).toHaveBeenCalledWith(
+            'u1',
+            't-1',
+            { agentId: null },
+            undefined,
+        );
+
+        const kept = build({
+            taskOutput: {
+                tasksPerTick: 1,
+                openTasksCap: 3,
+                agentId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+            },
+        } as Partial<Mission>);
+        await kept.service.runOnce('m1', 'u1');
+        expect(kept.tasksService.create.mock.calls[0][1]).toMatchObject({
+            agentId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        });
+    });
+
+    it('a failed notice write leaves the day unstamped, so the next tick records it (review of #3061)', async () => {
+        const t = build({}, [{ workId: 'w-site', relation: 'improves', workKind: 'directory' }]);
+        t.activityLog.log.mockRejectedValueOnce(new Error('db down'));
+        await t.service.runOnce('m1', 'u1');
+        expect(t.mission.taskOutputNoticeAt).toBeNull();
+        await t.service.runOnce('m1', 'u1');
+        expect(nothingToFile(t.activityLog)).toHaveLength(2);
+        expect(t.mission.taskOutputNoticeAt).toEqual(NOW_DAY_1);
     });
 
     it('a tick that finds the lease held files nothing and asks no planner', async () => {

@@ -28,8 +28,10 @@ import { MissionWorkRepository } from '../database/repositories/mission-work.rep
 import {
     ownershipRelationScopeOf,
     ownershipScopeOf,
+    ownershipWhere,
     type OwnershipScope,
 } from '../database/ownership-scope';
+import { Agent } from '../entities/agent.entity';
 import { AppChangeTelemetry } from '../app-works/app-change.telemetry';
 import { readAppWorkSwitches } from '../app-works/app-work-switches';
 import type { ListTasksFilter } from '../database/repositories/task.repository';
@@ -83,6 +85,15 @@ export function combineBothOutcomes(
         `tasks: ${tasks.message ?? tasks.outcome}`,
     ].join('; ');
     return { ...ideas, outcome, tasksFiled, message };
+}
+
+/**
+ * Review of #3061 — the lease one tick holds on a Mission's Task branch: the instant it holds it
+ * until, kept current by every renewal so the release clears exactly what this tick last set.
+ */
+interface TaskOutputLease {
+    missionId: string;
+    heldUntilMs: number;
 }
 
 /** The Task statuses that count as open (everything but Done and Cancelled). */
@@ -235,6 +246,11 @@ export class MissionTickService {
         @Optional()
         @Inject(APP_WORKS_TELEMETRY_SINK)
         private readonly appWorksSink?: AppWorksTelemetrySink,
+        // Review of #3061 — the Task output's stored Agent is re-checked once per tick, so a
+        // deleted (or no longer reachable) Agent falls back to the Work's default instead of
+        // failing every Task on every Work. `Agent` is in MissionsModule's `forFeature`.
+        // TRAILING + @Optional(): absent, the stored Agent is used as before.
+        @Optional() @InjectRepository(Agent) private readonly agentRows?: Repository<Agent>,
     ) {}
 
     /**
@@ -678,14 +694,49 @@ export class MissionTickService {
         }
         // Review of #3061 — a scheduled tick and a Run now (or two pods) must not both count the
         // open Tasks, wait on the planner, then both file up to the cap: one holds the lease.
-        const lease = await this.claimTaskOutputLease(mission.id);
-        if (lease === null) {
+        const heldUntilMs = await this.claimTaskOutputLease(mission.id);
+        if (heldUntilMs === null) {
             return { outcome: 'no-tasks', tasksFiled: 0, message: 'task-output-busy' };
         }
+        const lease: TaskOutputLease = { missionId: mission.id, heldUntilMs };
         try {
-            return await this.fileTaskOutput(mission, now, tasksService);
+            return await this.fileTaskOutput(mission, now, tasksService, lease);
         } finally {
-            await this.releaseTaskOutputLease(mission.id, lease);
+            await this.releaseTaskOutputLease(lease.missionId, lease.heldUntilMs);
+        }
+    }
+
+    /**
+     * Review of #3061 — extend the lease this tick holds (compare-and-set on the instant it last
+     * set), before each Work's planner call and again before that Work's Tasks are filed, so a
+     * slow planner never lets a second tick claim an expired lease and file up to the same cap.
+     * `false` = the lease is no longer this tick's (another tick took it over after it expired,
+     * or the write failed): the caller files nothing more.
+     */
+    private async renewTaskOutputLease(lease: TaskOutputLease): Promise<boolean> {
+        const untilMs = Date.now() + MISSION_TASK_OUTPUT_LEASE_MS;
+        try {
+            const driver = this.missions.manager.connection.driver;
+            const keepUpdatedAt = driver.escape('updatedAt');
+            const result = await this.missions
+                .createQueryBuilder()
+                .update(Mission)
+                .set({ taskOutputLeaseUntil: new Date(untilMs), updatedAt: () => keepUpdatedAt })
+                .where('id = :id', { id: lease.missionId })
+                .andWhere(`${driver.escape('taskOutputLeaseUntil')} = :held`, {
+                    held: lease.heldUntilMs,
+                })
+                .execute();
+            if ((result.affected ?? 0) !== 1) return false;
+            lease.heldUntilMs = untilMs;
+            return true;
+        } catch (err) {
+            this.logger.warn(
+                `Mission ${lease.missionId}: the Task-output lease could not be renewed (${
+                    err instanceof Error ? err.message : String(err)
+                }); nothing more is filed this tick.`,
+            );
+            return false;
         }
     }
 
@@ -751,6 +802,7 @@ export class MissionTickService {
         mission: Mission,
         now: Date,
         tasksService: TasksService,
+        lease: TaskOutputLease,
     ): Promise<MissionTickOutcome> {
         const scope = ownershipRelationScopeOf(mission) ?? undefined;
         let relations: Awaited<ReturnType<MissionWorkRepository['listForMissionWithWork']>> = [];
@@ -786,11 +838,16 @@ export class MissionTickService {
             return { outcome: 'no-tasks', tasksFiled: 0, message: 'no-app-work' };
         }
 
-        const output = normalizeMissionTaskOutput(mission.taskOutput);
+        const output = await this.withReachableAgent(
+            mission,
+            normalizeMissionTaskOutput(mission.taskOutput),
+            scope,
+        );
         const requireApproval = mission.guardrailsOverride?.requireApprovalBeforeCreate === true;
         let tasksFiled = 0;
         let skippedCap = 0;
         let skippedDuplicate = 0;
+        let leaseLost = false;
         for (const target of eligible) {
             try {
                 const result = await this.fileOnWork(
@@ -800,10 +857,18 @@ export class MissionTickService {
                     requireApproval,
                     scope,
                     tasksService,
+                    lease,
                 );
                 tasksFiled += result.filed;
                 skippedCap += result.cappedOut ? 1 : 0;
                 skippedDuplicate += result.duplicates;
+                if (result.leaseLost) {
+                    leaseLost = true;
+                    this.logger.warn(
+                        `Mission ${mission.id}: the Task-output lease was lost mid-tick; the remaining Works wait for the next tick.`,
+                    );
+                    break;
+                }
             } catch (err) {
                 this.logger.warn(
                     `Mission ${mission.id}: Task output on Work ${target.workId} failed (${
@@ -823,12 +888,76 @@ export class MissionTickService {
             },
             mission.userId,
         );
-        if (tasksFiled === 0) await this.recordNothingToFile(mission, now, 'nothing-new');
+        if (tasksFiled === 0 && !leaseLost) {
+            await this.recordNothingToFile(mission, now, 'nothing-new');
+        }
         return {
             outcome: tasksFiled > 0 ? 'tasks-filed' : 'no-tasks',
             tasksFiled,
-            message: `works=${eligible.length} filed=${tasksFiled} capped=${skippedCap} duplicates=${skippedDuplicate}`,
+            message: `works=${eligible.length} filed=${tasksFiled} capped=${skippedCap} duplicates=${skippedDuplicate}${
+                leaseLost ? ' lease-lost' : ''
+            }`,
         };
+    }
+
+    /**
+     * Review of #3061 — the Task output's stored Agent, if the Mission's owner can still use it in
+     * the Mission's scope; otherwise it is dropped for this tick (logged), so the filed Tasks fall
+     * back to the Work's default Agent instead of `TasksService.create` refusing every one of
+     * them. A failed read keeps the stored Agent (the create then decides, as before).
+     */
+    private async withReachableAgent(
+        mission: Mission,
+        output: MissionTaskOutput,
+        scope: OwnershipScope | undefined,
+    ): Promise<MissionTaskOutput> {
+        const agentId = output.agentId;
+        if (!agentId || !this.agentRows) return output;
+        try {
+            const agent = await this.agentRows.findOne({
+                where: scope
+                    ? ownershipWhere<Agent>(mission.userId, scope).map((branch) => ({
+                          ...branch,
+                          id: agentId,
+                      }))
+                    : { id: agentId, userId: mission.userId },
+                select: ['id'],
+            });
+            if (agent) return output;
+        } catch (err) {
+            this.logger.warn(
+                `Mission ${mission.id}: its Task output Agent could not be read (${
+                    err instanceof Error ? err.message : String(err)
+                }); keeping it.`,
+            );
+            return output;
+        }
+        this.logger.warn(
+            `Mission ${mission.id}: its Task output Agent ${agentId} is no longer reachable; filing with each Work's default Agent.`,
+        );
+        return { tasksPerTick: output.tasksPerTick, openTasksCap: output.openTasksCap };
+    }
+
+    /** Is the Work still attached to the Mission as Improves or Operates (review of #3061)? */
+    private async stillAttached(
+        mission: Mission,
+        workId: string,
+        scope: OwnershipScope | undefined,
+    ): Promise<boolean> {
+        try {
+            const relations = await this.missionWorks!.listForMissionWithWork(
+                mission.id,
+                mission.userId,
+                scope,
+            );
+            return relations.some(
+                (row) =>
+                    row.workId === workId &&
+                    (MISSION_TASK_OUTPUT_RELATIONS as readonly string[]).includes(row.relation),
+            );
+        } catch {
+            return false;
+        }
     }
 
     /** One Work's share of a tick (see {@link runTaskOutput}). */
@@ -839,7 +968,13 @@ export class MissionTickService {
         requireApproval: boolean,
         scope: OwnershipScope | undefined,
         tasksService: TasksService,
-    ): Promise<{ filed: number; cappedOut: boolean; duplicates: number }> {
+        lease: TaskOutputLease,
+    ): Promise<{ filed: number; cappedOut: boolean; duplicates: number; leaseLost?: boolean }> {
+        // Review of #3061 — the lease is renewed before this Work's planner call, so the count
+        // below cannot be taken by a second tick while this one waits on the planner.
+        if (!(await this.renewTaskOutputLease(lease))) {
+            return { filed: 0, cappedOut: false, duplicates: 0, leaseLost: true };
+        }
         // Review of #3061 — the cap counts this Mission's open Tasks on the Work in SQL (a count
         // carries no title, so it needs no visibility filter).
         const openForMission = await this.taskRows!.count({
@@ -879,6 +1014,17 @@ export class MissionTickService {
             recentTaskTitles: recent.map((task) => task.title),
             count,
         });
+        // Review of #3061 — the planner call can be slow: before anything is filed, this tick must
+        // still hold the lease (renewed again here), and the Work must still be attached.
+        if (!(await this.renewTaskOutputLease(lease))) {
+            return { filed: 0, cappedOut: false, duplicates: 0, leaseLost: true };
+        }
+        if (!(await this.stillAttached(mission, target.workId, scope))) {
+            this.logger.warn(
+                `Mission ${mission.id}: Work ${target.workId} was detached while the planner ran; nothing filed on it.`,
+            );
+            return { filed: 0, cappedOut: false, duplicates: 0 };
+        }
         const openTitles = new Set(open.map((task) => normalizeTaskTitle(task.title)));
         let filed = 0;
         let duplicates = 0;
@@ -958,14 +1104,11 @@ export class MissionTickService {
     ): Promise<void> {
         const last = mission.taskOutputNoticeAt ? new Date(mission.taskOutputNoticeAt) : null;
         if (last && last.toISOString().slice(0, 10) === now.toISOString().slice(0, 10)) return;
-        try {
-            await this.missions.update({ id: mission.id }, { taskOutputNoticeAt: now });
-            mission.taskOutputNoticeAt = now;
-        } catch (err) {
-            this.logger.warn(`Mission ${mission.id}: the notice stamp failed (${err}).`);
-            return;
-        }
-        await this.recordActivity(
+        // Review of #3061 — the Activity entry first, the day's stamp only once it is written: a
+        // failed insert leaves the day unstamped, so the next tick tries again instead of the
+        // day's notice being lost. (A stamp that fails after the entry can repeat it once; the
+        // tick's lease keeps two ticks from racing here.)
+        const written = await this.recordActivity(
             mission,
             ActivityActionType.MISSION_NOTHING_TO_FILE,
             'nothing-to-file',
@@ -977,6 +1120,13 @@ export class MissionTickService {
                         : 'Nothing new to file on the attached App Works.',
             },
         );
+        if (!written) return;
+        try {
+            await this.missions.update({ id: mission.id }, { taskOutputNoticeAt: now });
+            mission.taskOutputNoticeAt = now;
+        } catch (err) {
+            this.logger.warn(`Mission ${mission.id}: the notice stamp failed (${err}).`);
+        }
         this.telemetry().track(
             'mission.task_output.nothing_to_file',
             { missionId: mission.id },
@@ -1003,8 +1153,9 @@ export class MissionTickService {
         actionType: ActivityActionType,
         action: string,
         details: Record<string, unknown>,
-    ): Promise<void> {
-        if (!this.activityLog) return;
+    ): Promise<boolean> {
+        // `false` only when a write was attempted and failed (nothing bound = nothing to write).
+        if (!this.activityLog) return true;
         try {
             await this.activityLog.log({
                 userId: mission.userId,
@@ -1014,12 +1165,14 @@ export class MissionTickService {
                 summary: `Mission ${action}: ${mission.title}`,
                 details: { missionId: mission.id, ...details } as Record<string, any>,
             });
+            return true;
         } catch (error) {
             this.logger.warn(
                 `Mission ${mission.id}: activity write failed (${actionType}): ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
+            return false;
         }
     }
 }
