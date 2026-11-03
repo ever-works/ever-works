@@ -541,7 +541,7 @@ function TaskCard({ task, scope }: { task: Task; scope?: TaskScopeRef }) {
                     {task.description}
                 </p>
             ) : (
-                <p className="text-xs text-text-muted/70 dark:text-text-muted-dark/70 mt-1 italic">
+                <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1 italic">
                     {t('list.noDescription')}
                 </p>
             )}
