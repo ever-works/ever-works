@@ -240,7 +240,7 @@ export function ProvisionConfirmClient({
                 </Button>
                 <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     onClick={decline}
                     disabled={isSending}
                     fullWidth

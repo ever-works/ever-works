@@ -7,8 +7,23 @@ export function readProvisionFragment(hash: string): string | null {
     return match ? match[1] : null;
 }
 
+export type ProvisionFailureKey =
+    | 'failure.incomplete'
+    | 'failure.invalid'
+    | 'failure.expired'
+    | 'failure.used'
+    | 'failure.unavailable'
+    | 'failure.rateLimited'
+    | 'failure.mismatch'
+    | 'failure.tenantLinked'
+    | 'failure.organizationLinked'
+    | 'failure.inProgress'
+    | 'failure.invalidValue'
+    | 'failure.unreachable'
+    | 'failure.failed';
+
 /** The translation key of a failure, under `everConnect.provision`. */
-export function everConnectProvisionFailureKey(failure: string): string {
+export function everConnectProvisionFailureKey(failure: string): ProvisionFailureKey {
     switch (failure) {
         case 'incomplete':
             return 'failure.incomplete';
