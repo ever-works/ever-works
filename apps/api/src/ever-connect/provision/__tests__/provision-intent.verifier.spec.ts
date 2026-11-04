@@ -143,6 +143,16 @@ describe('verifyProvisionIntent', () => {
         );
     });
 
+    it('takes the consent Ever Platform holds for the hand-off, and refuses a malformed one', async () => {
+        const consent = '01K9A0000000000000000000CN';
+        const claims = await verify(jwsOf({ ...golden(), consent_id: consent }));
+        expect(claims.consent_id).toBe(consent);
+        expect(await reasonOf(jwsOf({ ...golden(), consent_id: 'a@example.test' }))).toBe(
+            'schema_violation',
+        );
+        expect(await reasonOf(jwsOf({ ...golden(), consent_id: 42 }))).toBe('schema_violation');
+    });
+
     it('refuses a key of another purpose, the only one with that id', async () => {
         expect(await reasonOf(jwsOf(golden()), source(keySet({ purpose: 'entitlement' })))).toBe(
             'unknown_kid',
