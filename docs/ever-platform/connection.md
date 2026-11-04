@@ -109,3 +109,9 @@ Every request goes to `EVER_PLATFORM_API_URL`, with the installation's token:
 | Linked accounts                  | `POST /v1/instances/me/person-links`, `DELETE /v1/instances/me/person-links/{ref}`     |
 | Answers to requests              | `POST /v1/instances/me/ack`                                                            |
 | Disconnect                       | `POST /v1/instances/me/disconnect`                                                     |
+
+## Creating a company from Ever Platform
+
+Off by default (`EVER_CONNECT_PROVISIONING_ENABLED`, and `EVER_CONNECT_PROVISION_STAFFING_ENABLED` for starter staff and the first Mission). A person who starts a company on app.ever.co and chooses Ever Works arrives at `/ever-connect/provision` with a signed request in the URL fragment, signs in with Ever ID and confirms once. Works then creates the Company Work, the Organization (slug = the Ever handle, or `handle-2` when it is taken) and its link, and tells Ever Platform (`POST /v1/provision-intents/{jti}/complete`: the tenant, the Organization's slug, the owner's account id and the company's address; no name, no e-mail), retrying within a day.
+
+The same request again answers the same company. A stopped creation is finished by its retry, also under a new request for the same step. A failed staffing or Mission step leaves the company in place (`partial`). Requests are kept until a day after they end, records 30 days.
