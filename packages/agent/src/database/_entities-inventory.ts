@@ -231,6 +231,10 @@ import { EverConnectConnection } from '../entities/ever-connect-connection.entit
 import { EverConnectIntegration } from '../entities/ever-connect-integration.entity';
 import { EverConnectOutbox } from '../entities/ever-connect-outbox.entity';
 import { EverConnectLease } from '../entities/ever-connect-lease.entity';
+import { EverConnectProvisionIntent } from '../entities/ever-connect-provision-intent.entity';
+import { EverConnectProvisionRecord } from '../entities/ever-connect-provision-record.entity';
+import { EverConnectLink } from '../entities/ever-connect-link.entity';
+import { OrganizationCompanyImport } from '../entities/organization-company-import.entity';
 
 import {
     PluginEntity,
@@ -608,4 +612,11 @@ export const ENTITIES = [
     EverConnectIntegration,
     EverConnectOutbox,
     EverConnectLease,
+    // Ever Connect — companies created from Ever Platform: the signed requests
+    // received, one record per creation, the Organization's link to its Ever
+    // organization, and the keyed import of a company template.
+    EverConnectProvisionIntent,
+    EverConnectProvisionRecord,
+    EverConnectLink,
+    OrganizationCompanyImport,
 ];

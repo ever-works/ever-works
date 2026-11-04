@@ -103,8 +103,12 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'EverConnectConnection',
     'EverConnectIntegration',
     'EverConnectLease',
+    'EverConnectLink',
     'EverConnectOutbox',
     'EverConnectPersonRequest',
+    'EverConnectProvisionIntent',
+    'EverConnectProvisionRecord',
+    'OrganizationCompanyImport',
     // Anonymous usage statistics — the one instance row (identity + statistics
     // key), the last 12 send attempts, and the one schedule/lease row.
     'EverInstance',
