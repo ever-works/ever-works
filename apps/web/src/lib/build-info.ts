@@ -13,7 +13,7 @@
  */
 
 const REPO_URL = (
-    process.env.NEXT_PUBLIC_GITHUB_REPO_URL || 'https://github.com/ever-works/ever-works'
+    process.env.NEXT_PUBLIC_GITHUB_REPO_URL || 'https://github.com/ever-co/ever-works'
 ).replace(/\/+$/, '');
 
 export interface WebBuildInfo {

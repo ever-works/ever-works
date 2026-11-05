@@ -8396,7 +8396,7 @@
                 "formTitle": "Work ใหม่ — รีโพซิทอรี",
                 "formSubtitle": "ลงทะเบียนรีโพซิทอรีโค้ดที่มีอยู่แล้วเป็น Work ไม่มีการสร้างหรือดีพลอยใด ๆ — งาน เป้าหมาย และการรันของฟลีตจะทำงานในรีโพซิทอรีนั้นโดยตรง",
                 "urlLabel": "URL ของรีโพซิทอรี",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "รีโพซิทอรี GitHub ที่คุณเข้าถึงได้ จะกลายเป็นรีโพซิทอรีข้อมูลของ Work ตามเดิม",
                 "nameLabel": "ชื่อ Work",
                 "slugLabel": "สลักของ Work",

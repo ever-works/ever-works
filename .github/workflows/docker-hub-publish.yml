@@ -29,7 +29,7 @@ name: Publish Images to Docker Hub
 # a failed copy, a digest mismatch and a repository that is not publicly
 # pullable are all hard errors here.
 #
-# Credentials — repository secrets on ever-works/ever-works. Keep them
+# Credentials — repository secrets on ever-co/ever-works. Keep them
 # REPO-scoped, not org-scoped: Work repos generated from
 # directory-web-template carry Docker Hub steps that switch on as soon as these
 # secrets are visible to them, and those sites are private.
@@ -84,6 +84,10 @@ concurrency:
 
 env:
   DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'everco' }}
+  # Owner of the GHCR source images. Pinned, not derived from the repository:
+  # the repo moved to ever-co/ever-works on 2026-11-05 but k8s-build.yml keeps
+  # publishing to ghcr.io/ever-works/*. Keep this in step with k8s-build.yml.
+  IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}
 
 jobs:
   resolve:
@@ -238,7 +242,7 @@ jobs:
         name: Locate the source image on GHCR
         run: |
           set -euo pipefail
-          OWNER="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          OWNER="$(printf '%s' "${IMAGE_OWNER}" | tr '[:upper:]' '[:lower:]')"
           SRC="ghcr.io/${OWNER}/${IMAGE}:sha-${SHA}"
           # Only a definite "not found" may skip an image, and only when its
           # k8s-build leg failed. Anything else (403 on the token exchange,
@@ -376,6 +380,7 @@ jobs:
       - name: Verify the published image
         if: steps.src.outputs.skip != 'true'
         env:
+          SRC: ${{ steps.src.outputs.src }}
           SRC_DIGEST: ${{ steps.src.outputs.digest }}
         run: |
           set -euo pipefail
@@ -404,7 +409,7 @@ jobs:
           {
             echo "### \`${DOCKERHUB_NAMESPACE}/${REPO_NAME}\`"
             echo ""
-            echo "- Source: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/${IMAGE}:sha-${SHA}\`"
+            echo "- Source: \`${SRC}\`"
             echo "- Digest: \`${SRC_DIGEST}\`"
             echo "- Tags: $(printf '`%s` ' "${TAGS[@]}")"
             echo ""

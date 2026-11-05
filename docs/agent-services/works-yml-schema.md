@@ -159,7 +159,7 @@ _in_ the repo rather than what to build.
 kind: repo
 spec:
     kind: repo
-    source: { repo: ever-works/ever-works, branch: develop }
+    source: { repo: ever-co/ever-works, branch: develop }
     tasks:
         base_branch: develop
         setup: ['pnpm install --frozen-lockfile']

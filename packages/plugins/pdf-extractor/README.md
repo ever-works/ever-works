@@ -67,7 +67,7 @@ pnpm --filter @ever-works/pdf-extractor-plugin test
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Mistral AI console](https://console.mistral.ai)
 

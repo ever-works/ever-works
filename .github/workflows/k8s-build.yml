@@ -26,6 +26,15 @@ concurrency:
 permissions:
   contents: read
   packages: write
+# 🛑 The images stay under ghcr.io/ever-works/<image> whichever org hosts the
+# repository. The repo moved to ever-co/ever-works on 2026-11-05; every
+# Deployment, ArgoCD Image Updater rule and pull secret still reads
+# ghcr.io/ever-works/*, and the in-cluster CI runs this file with its own
+# GITHUB_REPOSITORY. Deriving the owner from the repository would silently move
+# the images, so it is pinned. Set the variable GHCR_IMAGE_OWNER (lower case)
+# only together with the matching k8s-gitops change.
+env:
+  IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}
 jobs:
   build:
     # 🛑 Deliberately the x64-16 pool, not x64-4. `ever-works-linux-x64-4` is ORG-scoped with
@@ -95,11 +104,15 @@ jobs:
       # Docker Hub, so the analytics-key gate runs here too, before any build.
       - uses: ./.github/actions/assert-no-analytics-key
       - uses: docker/setup-buildx-action@v4.4.1
+      # GITHUB_TOKEN can write only the packages of the repository's own org.
+      # When this repository and IMAGE_OWNER are in different orgs, set the
+      # secret GHCR_PUSH_TOKEN (classic PAT with write:packages on IMAGE_OWNER)
+      # and the variable GHCR_PUSH_USER (that PAT's login). Unset, nothing changes.
       - uses: docker/login-action@v4.7.0
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ vars.GHCR_PUSH_USER || github.actor }}
+          password: ${{ secrets.GHCR_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
       - id: t
         run: |
           set -uo pipefail
@@ -111,7 +124,7 @@ jobs:
           esac
           echo "tag=${MOVING}" >> "$GITHUB_OUTPUT"
 
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/${MATRIX_IMAGE}"
+          IMAGE="ghcr.io/${IMAGE_OWNER}/${MATRIX_IMAGE}"
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
           {
             echo "tags<<__TAGS__"
@@ -177,8 +190,8 @@ jobs:
           # moving env tag after re-reading the branch tip, closing the hours-long
           # check-then-build race.
           tags: ${{ steps.t.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache,mode=max
       # Back off to let the transient ghcr rate-limit window clear.
       - if: steps.buildpush.outcome == 'failure'
         run: sleep 45
@@ -205,8 +218,8 @@ jobs:
             NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
           # Build only the immutable tag; promotion happens after this retry too.
           tags: ${{ steps.t.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache,mode=max
 
       # 🛑 Re-check only AFTER the hours-long build has published its immutable
       # sha tag. Checking before the build is a TOCTOU bug: a newer commit can

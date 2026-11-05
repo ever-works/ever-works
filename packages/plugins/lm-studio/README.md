@@ -74,7 +74,7 @@ pnpm --filter @ever-works/lm-studio-plugin test
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [LM Studio homepage](https://lmstudio.ai)
 

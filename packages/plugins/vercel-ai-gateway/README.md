@@ -71,7 +71,7 @@ pnpm --filter @ever-works/vercel-ai-gateway-plugin test
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Vercel AI Gateway homepage](https://vercel.com/docs/ai-gateway)
 

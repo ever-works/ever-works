@@ -13,7 +13,7 @@
  */
 
 /** Fallback download location for the node apps. */
-const DEFAULT_DOWNLOAD_URL = 'https://github.com/ever-works/ever-works/releases';
+const DEFAULT_DOWNLOAD_URL = 'https://github.com/ever-co/ever-works/releases';
 
 /**
  * The `FLEET_ENABLED` switch, matching `config.fleet.isEnabled()` on the

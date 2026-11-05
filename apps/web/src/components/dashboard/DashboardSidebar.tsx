@@ -597,7 +597,7 @@ export function DashboardSidebar({
                                         onClick={() => {
                                             onInteraction?.();
                                             window.open(
-                                                'https://github.com/ever-works/ever-works/issues',
+                                                'https://github.com/ever-co/ever-works/issues',
                                                 '_blank',
                                             );
                                         }}

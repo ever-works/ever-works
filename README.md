@@ -7,9 +7,9 @@
 
 ![visitors](https://visitor-badge.laobi.icu/badge?page_id=ever-co.ever-works-platform)
 [![License: AGPL v3][uri_license_image]][uri_license]
-[![Status](https://img.shields.io/badge/Status-Pre--release-yellow.svg)](https://github.com/ever-works/ever-works/releases)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ever-works/ever-works)
-[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/ever-works/ever-works)
+[![Status](https://img.shields.io/badge/Status-Pre--release-yellow.svg)](https://github.com/ever-co/ever-works/releases)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ever-co/ever-works)
+[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/ever-co/ever-works)
 
 ## 🌟 What is it
 
@@ -103,7 +103,7 @@ See the [plugin documentation][uri_docs] for how to build and publish your own.
      - Trendshift: submit the repo at https://trendshift.io to get the numeric repository ID
      - Repobeats: generate an embed at https://repobeats.axiom.co to get the SVG hash -->
 
-<a href="https://trendshift.io/repositories/235659" target="_blank"><img src="https://trendshift.io/api/badge/repositories/235659" alt="ever-works%2Fever-works | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/235659" target="_blank"><img src="https://trendshift.io/api/badge/repositories/235659" alt="ever-co%2Fever-works | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 ![Alt](https://repobeats.axiom.co/api/embed/0000000000000000000000000000000000000000.svg 'Repobeats analytics image')
 
@@ -281,7 +281,7 @@ All other brand and product names are trademarks, registered trademarks, or serv
 ## 🍺 Contribute
 
 - Please give us a :star: on Github, it **helps**!
-- You are more than welcome to submit feature requests in the [separate repo](https://github.com/ever-works/ever-works/issues).
+- You are more than welcome to submit feature requests in the [separate repo](https://github.com/ever-co/ever-works/issues).
 - Pull requests are always welcome! Please base pull requests against the _develop_ branch and follow the [contributing guide](.github/CONTRIBUTING.md).
 
 ### Automated contributions
@@ -308,14 +308,14 @@ Private-development contributors:
 - Akilimaili C. I. (11 commits, 43,132++ 700--)
 - Roland MN (5 commits, 14,063++ 155--)
 
-Public contributions are tracked in the repository history from the initial public release onward in [CONTRIBUTORS.md](https://github.com/ever-works/ever-works/blob/develop/.github/CONTRIBUTORS.md).
-You can also view a full list of our [contributors tracked by GitHub](https://github.com/ever-works/ever-works/graphs/contributors).
+Public contributions are tracked in the repository history from the initial public release onward in [CONTRIBUTORS.md](https://github.com/ever-co/ever-works/blob/develop/.github/CONTRIBUTORS.md).
+You can also view a full list of our [contributors tracked by GitHub](https://github.com/ever-co/ever-works/graphs/contributors).
 
-<img src="https://contributors-img.web.app/image?repo=ever-works/ever-works" />
+<img src="https://contributors-img.web.app/image?repo=ever-co/ever-works" />
 
 ## ⭐ Star History
 
-[![Star History Chart](https://stats-github.ever.works/svg?repos=ever-works/ever-works&type=Date)](https://stats-github.ever.works/#ever-works/ever-works&Date)
+[![Star History Chart](https://stats-github.ever.works/svg?repos=ever-co/ever-works&type=Date)](https://stats-github.ever.works/#ever-co/ever-works&Date)
 
 ## ❤️ Powered By
 

@@ -22,7 +22,7 @@ locally, what it verifies, and how to triage a failure.**
 ## When the e2e suite runs
 
 The workflow is defined in
-[`.github/workflows/k8s-e2e.yml`](https://github.com/ever-works/ever-works/blob/develop/.github/workflows/k8s-e2e.yml)
+[`.github/workflows/k8s-e2e.yml`](https://github.com/ever-co/ever-works/blob/develop/.github/workflows/k8s-e2e.yml)
 and runs only when **the runtime path could be affected**:
 
 | Trigger             | Filter                                                     |
@@ -61,7 +61,7 @@ When promoting a new Kubernetes floor:
 
 ## What the e2e suite verifies
 
-Source: [`packages/plugins/k8s/src/__tests__/e2e/cluster.e2e.spec.ts`](https://github.com/ever-works/ever-works/blob/develop/packages/plugins/k8s/src/__tests__/e2e/cluster.e2e.spec.ts).
+Source: [`packages/plugins/k8s/src/__tests__/e2e/cluster.e2e.spec.ts`](https://github.com/ever-co/ever-works/blob/develop/packages/plugins/k8s/src/__tests__/e2e/cluster.e2e.spec.ts).
 
 | Test case                                                         | Why mocks can't cover it                                             |
 | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -175,7 +175,7 @@ the timestamp shape, otherwise delete it manually with
 ## Triaging a failure
 
 Pull the failed run from
-[Actions → K8s Plugin E2E](https://github.com/ever-works/ever-works/actions/workflows/k8s-e2e.yml).
+[Actions → K8s Plugin E2E](https://github.com/ever-co/ever-works/actions/workflows/k8s-e2e.yml).
 The "Show cluster state on failure" step contains:
 
 - `kubectl get nodes -o wide` — confirms the node is `Ready` and the
@@ -216,8 +216,8 @@ Common failure modes and the right next step:
 
 ## Related references
 
-- [Workflow source](https://github.com/ever-works/ever-works/blob/develop/.github/workflows/k8s-e2e.yml)
-- [Spec: `k8s-deployment` feature](https://github.com/ever-works/ever-works/tree/develop/docs/specs/features/k8s-deployment)
-- [`@ever-works/k8s-plugin` README](https://github.com/ever-works/ever-works/blob/develop/packages/plugins/k8s/README.md)
+- [Workflow source](https://github.com/ever-co/ever-works/blob/develop/.github/workflows/k8s-e2e.yml)
+- [Spec: `k8s-deployment` feature](https://github.com/ever-co/ever-works/tree/develop/docs/specs/features/k8s-deployment)
+- [`@ever-works/k8s-plugin` README](https://github.com/ever-co/ever-works/blob/develop/packages/plugins/k8s/README.md)
 - [kind release notes](https://github.com/kubernetes-sigs/kind/releases) — for choosing new node images
 - [ingress-nginx releases](https://github.com/kubernetes/ingress-nginx/releases) — for bumping the pinned controller tag

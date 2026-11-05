@@ -1,6 +1,6 @@
 # Ever Works — UI & design patterns
 
-Canonical design guidance across the Ever Works web surfaces — the platform (`ever-works/ever-works` → `apps/web`) and the open-source `directory-web-template` (and every customer site forked from it). These are the rules; per-repo CSS is just the local expression.
+Canonical design guidance across the Ever Works web surfaces — the platform (`ever-co/ever-works` → `apps/web`) and the open-source `directory-web-template` (and every customer site forked from it). These are the rules; per-repo CSS is just the local expression.
 
 ## Primary CTA — light vs dark mode
 

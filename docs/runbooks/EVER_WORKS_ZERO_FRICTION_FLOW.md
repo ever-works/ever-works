@@ -155,7 +155,7 @@ workflow's `env:` map maps GH secrets / inline values → `$VAR` →
 container env. Adding a new env var = (a) declare `- name: VAR / value:
 "$VAR"` in the 3 manifest YAMLs, (b) pass `VAR: ${{ secrets.VAR }}` (or
 inline) in the 3 workflow YAMLs, (c) `gh secret set VAR --repo
-ever-works/ever-works`.
+ever-co/ever-works`.
 
 ### DNS anchor record
 

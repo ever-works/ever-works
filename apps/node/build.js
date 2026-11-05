@@ -130,10 +130,10 @@ function buildPublishableManifest(manifest, version, externals) {
 		homepage: 'https://ever.works',
 		repository: {
 			type: 'git',
-			url: 'git+https://github.com/ever-works/ever-works.git',
+			url: 'git+https://github.com/ever-co/ever-works.git',
 			directory: 'apps/node'
 		},
-		bugs: { url: 'https://github.com/ever-works/ever-works/issues' },
+		bugs: { url: 'https://github.com/ever-co/ever-works/issues' },
 		keywords: ['ever-works', 'fleet', 'agent', 'node', 'runner', 'claude-code', 'codex'],
 		// No leading './': npm normalises bin targets and warns (misleadingly, "script name … was invalid and
 		// removed") when the written value differs from the normalised one. It is kept, not removed.

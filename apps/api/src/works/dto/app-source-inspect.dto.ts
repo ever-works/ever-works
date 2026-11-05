@@ -62,7 +62,7 @@ export class AppSourceInspectRequestDto implements AppSourceInspectRequest {
             'The existing GitHub repository to inspect — an `https://github.com/<owner>/<repo>` your ' +
             'connected account can reach. Trimmed before parsing, at most 400 characters (the parser’s ' +
             'own limit). Only the host rules the parser knows are accepted.',
-        example: 'https://github.com/ever-works/ever-works',
+        example: 'https://github.com/ever-co/ever-works',
         maxLength: 400,
     })
     @IsString()
@@ -124,10 +124,10 @@ export class AppSourceRepositoryDto implements AppSourceRepositoryShape {
     @ApiProperty({ example: 'ever-works' })
     repo!: string;
 
-    @ApiProperty({ example: 'ever-works/ever-works' })
+    @ApiProperty({ example: 'ever-co/ever-works' })
     fullName!: string;
 
-    @ApiProperty({ example: 'https://github.com/ever-works/ever-works' })
+    @ApiProperty({ example: 'https://github.com/ever-co/ever-works' })
     url!: string;
 
     @ApiPropertyOptional()

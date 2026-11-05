@@ -30,7 +30,7 @@ Built with NestJS.
 Make sure you have [pnpm](https://pnpm.io/) installed, then clone the repository:
 
 ```sh
-git clone https://github.com/ever-works/ever-works.git
+git clone https://github.com/ever-co/ever-works.git
 ```
 
 Navigate to the `apps/api` work:

@@ -192,7 +192,7 @@ Requires either `OPENAI_API_KEY` in the environment or local Codex auth (`codex 
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Codex CLI homepage](https://github.com/openai/codex)
 - [OpenAI API keys](https://platform.openai.com/account/api-keys)

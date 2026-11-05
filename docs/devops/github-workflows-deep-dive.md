@@ -133,6 +133,20 @@ green.
 
 **Secrets Used:** `DIGITALOCEAN_ACCESS_TOKEN`, `GITHUB_TOKEN`, `CW_DOCKER_REGISTRY`, `CW_DOCKER_USER`, `CW_DOCKER_USER_PASSWORD`
 
+### GHCR image owner
+
+The images live under `ghcr.io/ever-works/<image>` although the repository is
+`ever-co/ever-works` (moved on 2026-11-05). `k8s-build.yml`, `docker-build-publish-*.yml`,
+`docker-hub-publish.yml` and `egress-audit.yml` build every GHCR path from one workflow-level
+variable, `IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}`, instead of the repository
+owner, so the clusters, ArgoCD Image Updater and the pull secrets keep reading the same paths.
+Set `GHCR_IMAGE_OWNER` (lower case) only together with the matching k8s-gitops change.
+
+`GITHUB_TOKEN` can write only the packages of the repository's own organization. Where the
+repository and `IMAGE_OWNER` differ, set the secret `GHCR_PUSH_TOKEN` (a classic PAT with
+`write:packages` on the image owner) and the variable `GHCR_PUSH_USER` (that PAT's login); the
+GHCR login steps of the pushing workflows use them when they are set and `GITHUB_TOKEN` otherwise.
+
 ## Docker Hub Publish Workflow (`docker-hub-publish.yml`)
 
 Publishes the platform images to Docker Hub under the **`everco`** organisation (the org Ever
@@ -194,7 +208,7 @@ dependencies are published as caret ranges.
 `@ever-works` scope, "bypass 2FA", at most 90 days (npm's cap for write tokens; classic tokens
 were revoked on 2025-12-09). Rotate it when the job fails with 401 or `E404 PUT`. npm tries
 trusted publishing (OIDC) first, so packages configured with
-`npm trust github <name> --file publish-plugins.yml --repo ever-works/ever-works --allow-publish`
+`npm trust github <name> --file publish-plugins.yml --repo ever-co/ever-works --allow-publish`
 need no token at all. `GITHUB_TOKEN` covers GitHub Packages.
 
 ## Kubernetes Deploy Workflows

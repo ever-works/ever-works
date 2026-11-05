@@ -1,7 +1,7 @@
 ---
 name: ever-works
 description: >-
-  Repo-specific guide to the Ever Works monorepo (ever-works/ever-works) — its
+  Repo-specific guide to the Ever Works monorepo (ever-co/ever-works) — its
   pnpm + Turborepo layout, the per-workspace test runners (Jest vs Vitest vs
   Playwright), file-naming and import-alias conventions, the commit/branch
   model, and the real build/lint/type-check commands. Use this whenever working

@@ -8396,7 +8396,7 @@
                 "formTitle": "Nowy Work — Repozytorium",
                 "formSubtitle": "Zarejestruj istniejące repozytorium kodu jako Work. Nic nie jest generowane ani wdrażane — zadania, cele i uruchomienia floty po prostu pracują w tym repozytorium.",
                 "urlLabel": "URL repozytorium",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "Repozytorium GitHub, do którego masz dostęp. Staje się bez zmian repozytorium danych Worka.",
                 "nameLabel": "Nazwa Worka",
                 "slugLabel": "Slug Worka",

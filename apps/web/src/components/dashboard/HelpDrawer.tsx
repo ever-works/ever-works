@@ -53,9 +53,9 @@ interface HelpDrawerProps {
 export type HelpDrawerTab = 'manual' | 'tips' | 'shortcuts' | 'faq' | 'resources';
 
 const DOCS_URL = 'https://docs.ever.works/docs';
-const GITHUB_URL = 'https://github.com/ever-works/ever-works';
-const ISSUES_URL = 'https://github.com/ever-works/ever-works/issues';
-const DISCUSSIONS_URL = 'https://github.com/ever-works/ever-works/discussions';
+const GITHUB_URL = 'https://github.com/ever-co/ever-works';
+const ISSUES_URL = 'https://github.com/ever-co/ever-works/issues';
+const DISCUSSIONS_URL = 'https://github.com/ever-co/ever-works/discussions';
 
 const APP_ENV = process.env.NEXT_PUBLIC_APP_ENV || process.env.NODE_ENV || 'production';
 const STATUS_URL = process.env.NEXT_PUBLIC_STATUS_URL;

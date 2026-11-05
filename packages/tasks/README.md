@@ -84,7 +84,7 @@ This package houses the `TriggerJobRuntimeProvider` adapter — the Trigger.dev 
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Repository](https://github.com/ever-works/ever-works)
+- [Repository](https://github.com/ever-co/ever-works)
 - [Trigger.dev docs](https://trigger.dev/docs)
 - [`@ever-works/agent`](../agent) — domain logic invoked by tasks
 

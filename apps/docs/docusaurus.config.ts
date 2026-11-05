@@ -155,8 +155,8 @@ const config: Config = {
 					// the translation file they would actually edit.
 					editUrl: ({ locale, docPath }: { locale: string; docPath: string }) =>
 						locale === 'en'
-							? `https://github.com/ever-works/ever-works/edit/develop/docs/${docPath}`
-							: `https://github.com/ever-works/ever-works/edit/develop/apps/docs/i18n/${locale}/docusaurus-plugin-content-docs/current/${docPath}`
+							? `https://github.com/ever-co/ever-works/edit/develop/docs/${docPath}`
+							: `https://github.com/ever-co/ever-works/edit/develop/apps/docs/i18n/${locale}/docusaurus-plugin-content-docs/current/${docPath}`
 				},
 				theme: {
 					customCss: './src/css/custom.css'
@@ -252,7 +252,7 @@ const config: Config = {
 						items: [
 							{
 								label: 'GitHub',
-								href: 'https://github.com/ever-works/ever-works'
+								href: 'https://github.com/ever-co/ever-works'
 							}
 						]
 					}

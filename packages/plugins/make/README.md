@@ -75,7 +75,7 @@ pnpm --filter @ever-works/make-plugin test
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Make.com homepage](https://www.make.com)
 - [Make.com API documentation](https://developers.make.com/api-documentation)
