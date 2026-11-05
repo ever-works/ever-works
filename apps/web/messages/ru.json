@@ -898,6 +898,22 @@
                 "error": "Не удалось создать миссию. Попробуйте ещё раз.",
                 "chatUnavailable": "Чат сейчас недоступен — воспользуйтесь «Создать вручную»."
             },
+            "buildOnApp": {
+                "product": "Продукт",
+                "business": "Бизнес",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Выберите App Work",
+                "noAppWorks": "У вас пока нет App Work. Сначала добавьте его в разделе Works.",
+                "summary": "Каждый понедельник в 08:00 UTC · до {count} задач в неделю · {amount} за запуск",
+                "backlogNote": "Новые задачи ждут вашего одобрения в бэклоге.",
+                "suggestedGoals": "Предлагаемые цели (создаются как черновики):",
+                "rules": "Рекомендуемые правила приложения: изменения схемы сливает человек, PR до {lines} строк",
+                "proposeRules": "Предложить эти правила",
+                "proposeNeedsAppWork": "Сначала выберите App Work.",
+                "rulesProposed": "В App Work открыта задача на изменение правил приложения.",
+                "rulesFailed": "Не удалось открыть задачу. Попробуйте ещё раз.",
+                "create": "Создать миссию"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

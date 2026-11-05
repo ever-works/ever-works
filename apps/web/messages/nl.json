@@ -906,6 +906,22 @@
                 "error": "Kon de missie niet aanmaken. Probeer het opnieuw.",
                 "chatUnavailable": "Chat is momenteel niet beschikbaar — gebruik \"Handmatig aanmaken\"."
             },
+            "buildOnApp": {
+                "product": "Product",
+                "business": "Bedrijf",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Kies een App Work",
+                "noAppWorks": "Je hebt nog geen App Work. Voeg er eerst een toe via Works.",
+                "summary": "Elke maandag om 08:00 UTC · tot {count} taken per week · {amount} per uitvoering",
+                "backlogNote": "Nieuwe taken wachten in de Backlog op je goedkeuring.",
+                "suggestedGoals": "Voorgestelde doelen (aangemaakt als concept):",
+                "rules": "Aanbevolen app-regels: schemawijzigingen worden door een persoon samengevoegd, PR’s van hooguit {lines} regels",
+                "proposeRules": "Deze regels voorstellen",
+                "proposeNeedsAppWork": "Kies eerst een App Work.",
+                "rulesProposed": "Er is een taak geopend op het App Work om de app-regels te wijzigen.",
+                "rulesFailed": "De taak kon niet worden geopend. Probeer het opnieuw.",
+                "create": "Missie aanmaken"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

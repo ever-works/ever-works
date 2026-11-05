@@ -898,6 +898,22 @@
                 "error": "Não foi possível criar a missão. Tente novamente.",
                 "chatUnavailable": "O chat está indisponível — use «Criar manualmente»."
             },
+            "buildOnApp": {
+                "product": "Produto",
+                "business": "Negócio",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Escolha um App Work",
+                "noAppWorks": "Você ainda não tem um App Work. Adicione um em Works primeiro.",
+                "summary": "Toda segunda-feira às 08:00 UTC · até {count} tarefas por semana · {amount} por execução",
+                "backlogNote": "Novas tarefas aguardam sua aprovação no Backlog.",
+                "suggestedGoals": "Metas sugeridas (criadas como rascunhos):",
+                "rules": "Regras de app recomendadas: mudanças de esquema mescladas por uma pessoa, PRs de até {lines} linhas",
+                "proposeRules": "Propor estas regras",
+                "proposeNeedsAppWork": "Escolha um App Work primeiro.",
+                "rulesProposed": "Uma tarefa para alterar as regras do app foi aberta no App Work.",
+                "rulesFailed": "Não foi possível abrir a tarefa. Tente novamente.",
+                "create": "Criar missão"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

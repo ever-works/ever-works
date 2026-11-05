@@ -83,3 +83,58 @@ describe('MissionsController — output mode (APW-08 T34)', () => {
         expect(calls[1][2].taskOutput).toBeUndefined();
     });
 });
+
+/**
+ * APW-08 T38–T40 — the create passes `templateInputs` through and leaves omitted fields
+ * `undefined` (so a catalog template's manifest can supply them; explicit `null`s stay), and
+ * `GET templates/:templateId/manifest` answers the service's view of a catalog template.
+ */
+describe('MissionsController — Mission templates (APW-08 T38–T40)', () => {
+    it('create: passes templateInputs, and keeps omitted fields undefined and explicit nulls', async () => {
+        const { controller, service } = build();
+        const templateInputs = {
+            product: 'Booking',
+            business: 'Yoga Loft',
+            appWorkId: '11111111-1111-4111-8111-111111111111',
+        };
+        await controller.create(session, {
+            description: 'Build on Cal.com',
+            type: 'scheduled',
+            missionTemplateRepo: 'build-on-open-source-app',
+            templateInputs,
+        } as never);
+        await controller.create(session, {
+            description: 'Explicit nulls',
+            type: 'one-shot',
+            schedule: null,
+            outstandingIdeasCap: null,
+            guardrailsOverride: null,
+        } as never);
+        const calls = service.create.mock.calls as unknown as Array<
+            [string, Record<string, unknown>]
+        >;
+        expect(calls[0][1]).toMatchObject({
+            missionTemplateRepo: 'build-on-open-source-app',
+            templateInputs,
+        });
+        for (const key of ['schedule', 'outstandingIdeasCap', 'guardrailsOverride']) {
+            expect(calls[0][1][key]).toBeUndefined();
+            expect(calls[1][1][key]).toBeNull();
+        }
+    });
+
+    it('GET templates/:templateId/manifest answers the service view; a malformed id is 400', async () => {
+        const view = { templateId: 'build-on-open-source-app', warnings: [] };
+        const service = { readTemplateManifest: jest.fn(async () => view) };
+        const controller = new (MissionsController as unknown as new (
+            ...args: unknown[]
+        ) => MissionsController)(service, {}, {}, {});
+
+        await expect(
+            controller.readTemplateManifest(session, 'build-on-open-source-app'),
+        ).resolves.toBe(view);
+        expect(service.readTemplateManifest).toHaveBeenCalledWith('u1', 'build-on-open-source-app');
+        await expect(controller.readTemplateManifest(session, '../etc')).rejects.toThrow();
+        expect(service.readTemplateManifest).toHaveBeenCalledTimes(1);
+    });
+});

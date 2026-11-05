@@ -23,6 +23,7 @@ import {
     type CloneMissionResult,
     type MissionDto,
     type MissionGuardrailsOverride,
+    type MissionTemplateManifestView,
 } from '@ever-works/agent/missions';
 import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
 import { BudgetOwnerType } from '@ever-works/agent/entities';
@@ -133,19 +134,44 @@ export class MissionsController {
                 title: body.title,
                 description: body.description,
                 type: body.type,
-                schedule: body.schedule ?? null,
+                // APW-08 T38 — an OMITTED field stays `undefined` so a catalog template's manifest
+                // can supply it; an explicit `null` is kept (the service defaults the rest to null).
+                schedule: body.schedule,
                 autoBuildWorks: body.autoBuildWorks,
-                outstandingIdeasCap: body.outstandingIdeasCap ?? null,
-                guardrailsOverride:
-                    (body.guardrailsOverride as MissionGuardrailsOverride | null | undefined) ??
-                    null,
+                outstandingIdeasCap: body.outstandingIdeasCap,
+                guardrailsOverride: body.guardrailsOverride as
+                    | MissionGuardrailsOverride
+                    | null
+                    | undefined,
                 missionTemplateRepo: body.missionTemplateRepo ?? null,
                 // APW-08 T34 (FR-51) — validated and normalized by the service.
                 outputMode: body.outputMode,
                 taskOutput: body.taskOutput as Record<string, unknown> | null | undefined,
+                // APW-08 T39 (FR-56) — checked by the service (the Work must be the caller's App Work).
+                templateInputs: body.templateInputs,
             },
             this.scopeContext?.getScope(),
         );
+    }
+
+    /**
+     * APW-08 T40 — a catalog Mission template's manifest, as the create form shows it (the three
+     * template fields, the FR-57 summary, the suggested Goals and the recommended app rules).
+     * Declared before `GET :id` so the literal segment is never read as a Mission id. Any signed-in
+     * person may read a catalog template; the read uses their own git credentials.
+     */
+    @Get('templates/:templateId/manifest')
+    @ApiOperation({ summary: "Read a Mission template's manifest (create-form summary)" })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async readTemplateManifest(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+    ): Promise<MissionTemplateManifestView> {
+        if (!/^[A-Za-z0-9._-]{1,120}$/.test(templateId)) {
+            throw new BadRequestException('templateId must be a Mission template id.');
+        }
+        return this.service.readTemplateManifest(auth.userId, templateId);
     }
 
     @Get(':id')

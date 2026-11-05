@@ -46,6 +46,10 @@ export interface WorkSelectProps {
     readonly testId?: string;
     /** Lands on the trigger button so a `<label htmlFor>` can address it. */
     readonly id?: string;
+    /** APW-08 T40 — only Works of these kinds are offered (e.g. `['app']`). Omitted = every kind. */
+    readonly kinds?: readonly string[];
+    /** APW-08 T40 — told how many Works the picker offers once they are loaded. */
+    readonly onLoaded?: (count: number) => void;
 }
 
 export function WorkSelect({
@@ -57,6 +61,8 @@ export function WorkSelect({
     placeholder,
     testId,
     id,
+    kinds,
+    onLoaded,
 }: WorkSelectProps) {
     const [works, setWorks] = useState<WorkOption[]>([]);
     const [loading, setLoading] = useState(true);
@@ -69,13 +75,15 @@ export function WorkSelect({
                 const res = await getWorks({ limit: WORK_PICKER_LIMIT });
                 if (cancelled) return;
                 if (res.success) {
-                    setWorks(
-                        res.works.map((w) => ({
+                    const loaded = res.works
+                        .map((w) => ({
                             id: w.id,
                             name: w.name,
                             kind: w.kind ?? null,
-                        })),
-                    );
+                        }))
+                        .filter((w) => !kinds || (w.kind !== null && kinds.includes(w.kind)));
+                    setWorks(loaded);
+                    onLoaded?.(loaded.length);
                 } else {
                     setLoadError(res.error ?? 'Failed to load Works.');
                 }
@@ -90,6 +98,8 @@ export function WorkSelect({
         return () => {
             cancelled = true;
         };
+        // Loaded once per mount: `kinds` is fixed for a picker and `onLoaded` is a notification.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const options = useMemo(() => {

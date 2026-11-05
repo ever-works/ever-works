@@ -898,6 +898,22 @@
                 "error": "Nie udało się utworzyć misji. Spróbuj ponownie.",
                 "chatUnavailable": "Czat jest niedostępny — użyj „Utwórz ręcznie”."
             },
+            "buildOnApp": {
+                "product": "Produkt",
+                "business": "Firma",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Wybierz App Work",
+                "noAppWorks": "Nie masz jeszcze żadnego App Work. Najpierw dodaj go w Works.",
+                "summary": "W każdy poniedziałek o 08:00 UTC · do {count} zadań tygodniowo · {amount} za uruchomienie",
+                "backlogNote": "Nowe zadania czekają w Backlogu na Twoją akceptację.",
+                "suggestedGoals": "Sugerowane cele (tworzone jako szkice):",
+                "rules": "Zalecane reguły aplikacji: zmiany schematu scala człowiek, PR-y do {lines} wierszy",
+                "proposeRules": "Zaproponuj te reguły",
+                "proposeNeedsAppWork": "Najpierw wybierz App Work.",
+                "rulesProposed": "W App Work otwarto zadanie zmiany reguł aplikacji.",
+                "rulesFailed": "Nie udało się otworzyć zadania. Spróbuj ponownie.",
+                "create": "Utwórz misję"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

@@ -943,6 +943,22 @@
                 "minLength": "La descripción debe tener al menos 10 caracteres.",
                 "error": "No se pudo crear la misión. Inténtalo de nuevo.",
                 "chatUnavailable": "El chat no está disponible ahora mismo: usa «Crear manualmente»."
+            },
+            "buildOnApp": {
+                "product": "Producto",
+                "business": "Negocio",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Elige un App Work",
+                "noAppWorks": "Aún no tienes ningún App Work. Añade uno desde Works primero.",
+                "summary": "Cada lunes a las 08:00 UTC · hasta {count} tareas por semana · {amount} por ejecución",
+                "backlogNote": "Las tareas nuevas esperan tu aprobación en el Backlog.",
+                "suggestedGoals": "Objetivos sugeridos (se crean como borradores):",
+                "rules": "Reglas de app recomendadas: los cambios de esquema los fusiona una persona, PR de {lines} líneas como máximo",
+                "proposeRules": "Proponer estas reglas",
+                "proposeNeedsAppWork": "Elige primero un App Work.",
+                "rulesProposed": "Se abrió una tarea en el App Work para cambiar las reglas de la app.",
+                "rulesFailed": "No se pudo abrir la tarea. Inténtalo de nuevo.",
+                "create": "Crear misión"
             }
         },
         "memoryPage": {

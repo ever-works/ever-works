@@ -898,6 +898,22 @@
                 "error": "ไม่สามารถสร้างภารกิจได้ กรุณาลองใหม่อีกครั้ง",
                 "chatUnavailable": "แชทไม่พร้อมใช้งานขณะนี้ — ใช้ \"สร้างด้วยตนเอง\" แทน"
             },
+            "buildOnApp": {
+                "product": "ผลิตภัณฑ์",
+                "business": "ธุรกิจ",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "เลือก App Work",
+                "noAppWorks": "คุณยังไม่มี App Work เพิ่มจาก Works ก่อน",
+                "summary": "ทุกวันจันทร์ 08:00 UTC · สูงสุด {count} งานต่อสัปดาห์ · {amount} ต่อการรัน",
+                "backlogNote": "งานใหม่จะรอการอนุมัติของคุณใน Backlog",
+                "suggestedGoals": "เป้าหมายที่แนะนำ (สร้างเป็นฉบับร่าง):",
+                "rules": "กฎของแอปที่แนะนำ: การเปลี่ยนสคีมาให้คนเป็นผู้ merge, PR ไม่เกิน {lines} บรรทัด",
+                "proposeRules": "เสนอกฎเหล่านี้",
+                "proposeNeedsAppWork": "เลือก App Work ก่อน",
+                "rulesProposed": "เปิดงานบน App Work เพื่อเปลี่ยนกฎของแอปแล้ว",
+                "rulesFailed": "ไม่สามารถเปิดงานได้ ลองอีกครั้ง",
+                "create": "สร้างภารกิจ"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

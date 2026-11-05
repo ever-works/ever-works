@@ -906,6 +906,22 @@
                 "error": "ミッションを作成できませんでした。もう一度お試しください。",
                 "chatUnavailable": "チャットは現在利用できません。「手動で作成」をご利用ください。"
             },
+            "buildOnApp": {
+                "product": "プロダクト",
+                "business": "ビジネス",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "App Work を選択",
+                "noAppWorks": "App Work がまだありません。まず Works から追加してください。",
+                "summary": "毎週月曜 08:00 UTC · 週に最大 {count} 件のタスク · 1 回の実行あたり {amount}",
+                "backlogNote": "新しいタスクは承認されるまでバックログで待機します。",
+                "suggestedGoals": "提案されるゴール（下書きとして作成）：",
+                "rules": "推奨アプリルール：スキーマ変更は人がマージ、PR は {lines} 行まで",
+                "proposeRules": "これらのルールを提案",
+                "proposeNeedsAppWork": "先に App Work を選択してください。",
+                "rulesProposed": "アプリルールを変更するタスクを App Work に作成しました。",
+                "rulesFailed": "タスクを作成できませんでした。もう一度お試しください。",
+                "create": "ミッションを作成"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

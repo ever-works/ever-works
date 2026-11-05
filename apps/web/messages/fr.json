@@ -943,6 +943,22 @@
                 "minLength": "La description doit comporter au moins 10 caractères.",
                 "error": "Impossible de créer la mission. Veuillez réessayer.",
                 "chatUnavailable": "Le chat est indisponible — utilisez « Créer manuellement »."
+            },
+            "buildOnApp": {
+                "product": "Produit",
+                "business": "Entreprise",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Choisir un App Work",
+                "noAppWorks": "Vous n’avez pas encore d’App Work. Ajoutez-en un depuis Works.",
+                "summary": "Chaque lundi à 08:00 UTC · jusqu’à {count} tâches par semaine · {amount} par exécution",
+                "backlogNote": "Les nouvelles tâches attendent votre approbation dans le Backlog.",
+                "suggestedGoals": "Objectifs suggérés (créés en brouillon) :",
+                "rules": "Règles d’app recommandées : modifications de schéma fusionnées par une personne, PR de {lines} lignes au plus",
+                "proposeRules": "Proposer ces règles",
+                "proposeNeedsAppWork": "Choisissez d’abord un App Work.",
+                "rulesProposed": "Une tâche pour modifier les règles de l’app a été ouverte sur l’App Work.",
+                "rulesFailed": "Impossible d’ouvrir la tâche. Réessayez.",
+                "create": "Créer la mission"
             }
         },
         "memoryPage": {

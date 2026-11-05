@@ -898,6 +898,22 @@
                 "error": "Không thể tạo nhiệm vụ. Vui lòng thử lại.",
                 "chatUnavailable": "Trò chuyện hiện không khả dụng — hãy dùng \"Tạo thủ công\"."
             },
+            "buildOnApp": {
+                "product": "Sản phẩm",
+                "business": "Doanh nghiệp",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Chọn một App Work",
+                "noAppWorks": "Bạn chưa có App Work nào. Hãy thêm một App Work từ Works trước.",
+                "summary": "Mỗi thứ Hai lúc 08:00 UTC · tối đa {count} tác vụ mỗi tuần · {amount} mỗi lần chạy",
+                "backlogNote": "Tác vụ mới chờ bạn phê duyệt trong Backlog.",
+                "suggestedGoals": "Mục tiêu đề xuất (được tạo dưới dạng bản nháp):",
+                "rules": "Quy tắc ứng dụng đề xuất: thay đổi lược đồ do một người hợp nhất, PR tối đa {lines} dòng",
+                "proposeRules": "Đề xuất các quy tắc này",
+                "proposeNeedsAppWork": "Hãy chọn một App Work trước.",
+                "rulesProposed": "Đã mở một tác vụ trên App Work để thay đổi quy tắc ứng dụng.",
+                "rulesFailed": "Không thể mở tác vụ. Hãy thử lại.",
+                "create": "Tạo nhiệm vụ"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

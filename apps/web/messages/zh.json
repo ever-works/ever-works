@@ -898,6 +898,22 @@
                 "error": "无法创建 Mission，请重试。",
                 "chatUnavailable": "聊天当前不可用——请改用“手动创建”。"
             },
+            "buildOnApp": {
+                "product": "产品",
+                "business": "业务",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "选择一个 App Work",
+                "noAppWorks": "你还没有 App Work。请先在 Works 中添加一个。",
+                "summary": "每周一 08:00 UTC · 每周最多 {count} 个任务 · 每次运行 {amount}",
+                "backlogNote": "新任务会在待办列表中等待你批准。",
+                "suggestedGoals": "建议的目标（以草稿形式创建）：",
+                "rules": "推荐的应用规则：架构变更由人工合并，PR 不超过 {lines} 行",
+                "proposeRules": "提议这些规则",
+                "proposeNeedsAppWork": "请先选择一个 App Work。",
+                "rulesProposed": "已在 App Work 上创建一个修改应用规则的任务。",
+                "rulesFailed": "无法创建任务，请重试。",
+                "create": "创建 Mission"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

@@ -8,7 +8,7 @@ import { NewPageClient } from '@/components/new';
 // `TypeError: a.filter is not a function` out of the server render.
 import { ALL_NEW_CHIP_VALUES, type ChipType } from '@/lib/work-kinds/chip-values';
 import { templatesAPI } from '@/lib/api/templates';
-import { missionsAPI } from '@/lib/api/missions';
+import { missionsAPI, type MissionTemplateManifestView } from '@/lib/api/missions';
 import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -91,6 +91,8 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
 
     let initialPrompt: string | undefined;
     let initialTemplateId: string | undefined;
+    let missionTemplate: { id: string; manifest: MissionTemplateManifestView | null } | null = null;
+    let missionTemplateDescription = '';
     const templateIdRaw = (params?.template ?? '').trim();
     if (initialType === 'mission' && templateIdRaw.length > 0) {
         const list = await templatesAPI.list('mission').catch(() => ({
@@ -101,6 +103,10 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
             initialTemplateId = tpl.id;
             const description = (tpl.description ?? '').trim();
             initialPrompt = description.length > 0 ? `${tpl.name}\n\n${description}` : tpl.name;
+            // APW-08 T40 (APW08-G13) — the template's manifest decides whether "Use this Template"
+            // opens the Mission form with the template's fields (a template about an App Work).
+            missionTemplate = { id: tpl.id, manifest: await missionsAPI.templateManifest(tpl.id) };
+            missionTemplateDescription = description;
         }
     }
 
@@ -109,6 +115,8 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
             initialType={initialType}
             initialPrompt={initialPrompt}
             initialTemplateId={initialTemplateId}
+            missionTemplate={missionTemplate}
+            missionTemplateDescription={missionTemplateDescription}
             disabledKinds={disabledKinds}
         />
     );

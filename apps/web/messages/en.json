@@ -1430,6 +1430,22 @@
                 "error": "Couldn't create the Mission. Please try again.",
                 "chatUnavailable": "Chat is unavailable right now — use \"Create manually\" instead."
             },
+            "buildOnApp": {
+                "product": "Product",
+                "business": "Business",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Choose an App Work",
+                "noAppWorks": "You have no App Work yet. Add one from Works first.",
+                "summary": "Every Monday 08:00 UTC · up to {count} Tasks a week · {amount} per run",
+                "backlogNote": "New Tasks wait in Backlog for your approval.",
+                "suggestedGoals": "Suggested Goals (created as drafts):",
+                "rules": "Recommended app rules: schema changes merged by a person, {lines}-line PRs",
+                "proposeRules": "Propose these rules",
+                "proposeNeedsAppWork": "Choose an App Work first.",
+                "rulesProposed": "A Task to change the app rules was opened on the App Work.",
+                "rulesFailed": "Couldn’t open the Task. Try again.",
+                "create": "Create Mission"
+            },
             "menu": {
                 "chat": "Chat about it"
             }
