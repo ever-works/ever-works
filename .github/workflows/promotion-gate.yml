@@ -116,6 +116,11 @@ jobs:
           LEG_TOTAL=$(printf '%s' "$LEGS" | jq 'length')
           if [ "$LEG_TOTAL" -gt 0 ]; then
             NOT_GREEN=$(printf '%s' "$LEGS" | jq -r '.[] | select(.state != "success") | "  \(.state): \(.context)"')
+            SHARDS=$(printf '%s' "$LEGS" | jq '[.[].context | select(test("^ci-builds/e2e.yml:e2e/shard:[0-9]+$"))] | unique | length')
+            if [ "$SHARDS" -ne 32 ]; then
+              NOT_GREEN="$NOT_GREEN
+  missing: only $SHARDS of the 32 shards reported"
+            fi
             if [ -z "$NOT_GREEN" ]; then
               echo "E2E is green for the commit being promoted ($LEG_TOTAL in-cluster jobs and shards)."
               exit 0
