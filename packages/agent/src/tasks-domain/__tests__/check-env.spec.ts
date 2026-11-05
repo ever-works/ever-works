@@ -1,9 +1,11 @@
+import { HOST_CREDENTIAL_ENV_PATTERN } from '@ever-works/contracts';
 import {
     buildCheckEnv,
     normalizePassthrough,
     CHECK_ENV_ALLOWLIST,
     MAX_ENV_PASSTHROUGH,
     NO_CWD_IN_EXE_PATH_ENV,
+    PLATFORM_OWNED_ENV_PATTERN,
 } from '../check-env';
 
 /**
@@ -286,5 +288,107 @@ describe('buildCheckEnv — the CHECKOUT must not be able to choose the program 
         const env = buildCheckEnv({ parentEnv: { ...PLATFORM_ENV, PATH: '.::./' } });
         // Never the empty string, which is itself "the current directory".
         expect(env.PATH).toBe('/usr/local/bin:/usr/bin:/bin');
+    });
+});
+
+/**
+ * The HOST's credentials (the 2026-11-03 sweep's #3051 follow-up). The fleet
+ * node already refused `KUBECONFIG` / `GITHUB_TOKEN` / `NPM_TOKEN` & co. in a
+ * check's own passthrough; this copy did not, and on the platform's worker
+ * every one of them is the platform's credential. Both runtimes now compose
+ * their refusal with ONE shared list (`HOST_CREDENTIAL_ENV_PATTERN`).
+ */
+describe("buildCheckEnv — the host's own credentials are not self-grantable", () => {
+    const HOST_ENV: NodeJS.ProcessEnv = {
+        ...PLATFORM_ENV,
+        KUBECONFIG: '/etc/kubernetes/admin.conf',
+        GITHUB_TOKEN: 'ghp_platform-token',
+        GITHUB_PAT: 'github_pat_platform',
+        GITHUB_APP_PRIVATE_KEY: '-----BEGIN KEY-----',
+        NPM_TOKEN: 'npm_platform-token',
+        NODE_AUTH_TOKEN: 'npm_setup-node-token',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        DIGITALOCEAN_ACCESS_TOKEN: 'dop_v1_platform',
+        VAULT_TOKEN: 'hvs.platform',
+        DOCKER_AUTH_CONFIG: '{"auths":{}}',
+        SSH_AUTH_SOCK: '/tmp/ssh-agent.sock',
+        DOCKER_CONFIG: '/home/worker/.docker-registry-auth',
+        GITLAB_TOKEN: 'glpat-platform',
+        AZURE_CLIENT_SECRET: 'azure-secret',
+        CLOUDSDK_CONFIG: '/secrets/gcloud',
+        VERCEL_TOKEN: 'vercel-platform-token',
+        FLEET_ENROLLMENT_SECRET: 'fleet-secret',
+        // Harmless neighbours.
+        GITHUB_ACTIONS: 'true',
+        GITHUB_PATH: '/home/runner/_temp/add_path',
+        DOCKER_HOST: 'unix:///var/run/docker.sock',
+        NPM_CONFIG_REGISTRY: 'https://registry.npmjs.org/',
+        CUSTOM_BUILD_FLAG: 'yes',
+    };
+    const credentials = [
+        'KUBECONFIG',
+        'GITHUB_TOKEN',
+        'GITHUB_PAT',
+        'GITHUB_APP_PRIVATE_KEY',
+        'NPM_TOKEN',
+        'NODE_AUTH_TOKEN',
+        'CLOUDFLARE_API_TOKEN',
+        'DIGITALOCEAN_ACCESS_TOKEN',
+        'VAULT_TOKEN',
+        'DOCKER_AUTH_CONFIG',
+        'SSH_AUTH_SOCK',
+        'DOCKER_CONFIG',
+        'GITLAB_TOKEN',
+        'AZURE_CLIENT_SECRET',
+        'CLOUDSDK_CONFIG',
+        'VERCEL_TOKEN',
+        'FLEET_ENROLLMENT_SECRET',
+    ];
+
+    it('drops every host credential a check asks for in its own passthrough', () => {
+        const env = buildCheckEnv({ parentEnv: HOST_ENV, passthrough: credentials });
+        for (const name of credentials) expect(env[name]).toBeUndefined();
+        expect(JSON.stringify(env)).not.toMatch(
+            /ghp_|github_pat_|npm_|hvs\.|dop_v1_|glpat-|admin\.conf|ssh-agent|registry-auth|vercel-platform|fleet-secret/,
+        );
+        expect(normalizePassthrough(credentials)).toEqual([]);
+    });
+
+    it('is case-insensitive (a lower-case spelling is still refused)', () => {
+        expect(normalizePassthrough(['ssh_auth_sock', 'Docker_Config', 'kubeconfig'])).toEqual([]);
+    });
+
+    it('leaves harmless neighbours passable (GITHUB_ACTIONS, GITHUB_PATH, DOCKER_HOST, NPM_CONFIG_REGISTRY)', () => {
+        const env = buildCheckEnv({
+            parentEnv: HOST_ENV,
+            passthrough: [
+                'GITHUB_ACTIONS',
+                'GITHUB_PATH',
+                'DOCKER_HOST',
+                'NPM_CONFIG_REGISTRY',
+                'CUSTOM_BUILD_FLAG',
+            ],
+        });
+        expect(env.GITHUB_ACTIONS).toBe('true');
+        expect(env.GITHUB_PATH).toBe('/home/runner/_temp/add_path');
+        expect(env.DOCKER_HOST).toBe('unix:///var/run/docker.sock');
+        expect(env.NPM_CONFIG_REGISTRY).toBe('https://registry.npmjs.org/');
+        expect(env.CUSTOM_BUILD_FLAG).toBe('yes');
+    });
+
+    it('parity: refuses every name the shared host-credential list refuses (one list, two runtimes)', () => {
+        // Built from the shared pattern's own alternatives, so a name added
+        // there is checked here without editing this spec.
+        const samples = HOST_CREDENTIAL_ENV_PATTERN.source
+            .replace(/^\^\(\?:/, '')
+            .replace(/\)$/, '')
+            .replace(/\(\?:|\)\$/g, '')
+            .split('|')
+            .map((alt) => (alt.endsWith('_') ? `${alt}SAMPLE` : alt));
+        expect(samples.length).toBeGreaterThan(40);
+        for (const name of samples) {
+            expect(HOST_CREDENTIAL_ENV_PATTERN.test(name)).toBe(true);
+            expect(PLATFORM_OWNED_ENV_PATTERN.test(name)).toBe(true);
+        }
     });
 });

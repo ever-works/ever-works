@@ -1,4 +1,5 @@
 import { homedir, tmpdir } from 'os';
+import { HOST_CREDENTIAL_ENV_PATTERN } from '@ever-works/contracts';
 
 /**
  * Quality gates — the environment an acceptance-check subprocess runs with.
@@ -131,14 +132,37 @@ export const SECRETISH_ENV_KEY_PATTERN =
     /(SECRET|TOKEN|KEY|PASSWORD|PASSWD|CREDENTIAL|DSN|DATABASE_URL|CONNECTION)/i;
 
 /**
- * Platform-owned configuration namespaces. These are NEVER grantable — not
- * by the allowlist, not by an explicit `envPassthrough` — because they are
- * the platform's own credentials, not the Work's. Without this, the opt-in
+ * The platform's own configuration namespaces. Same list as the fleet
+ * node's `NODE_PLATFORM_OWNED_ENV_PATTERN` (`FLEET_` included: the API's
+ * fleet settings live there), minus the host credentials, which both
+ * runtimes take from one shared list — see {@link PLATFORM_OWNED_ENV_PATTERN}.
+ */
+const PLATFORM_NAMESPACE_ENV_PATTERN =
+    /^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_)/i;
+
+/**
+ * Platform-owned configuration. These are NEVER grantable — not by the
+ * allowlist, not by an explicit `envPassthrough` — because they are the
+ * platform's own credentials, not the Work's. Without this, the opt-in
  * escape hatch would re-open the very hole this module closes
  * (`envPassthrough: ['PLATFORM_ENCRYPTION_KEY']`).
+ *
+ * Two parts: the platform's own namespaces above, and the HOST's
+ * credentials (`KUBECONFIG`, `GITHUB_TOKEN`, `SSH_AUTH_SOCK`,
+ * `DOCKER_CONFIG`, `AZURE_*`, …) from `HOST_CREDENTIAL_ENV_PATTERN` in
+ * `@ever-works/contracts` — the SAME list the fleet node refuses, so the two
+ * runtimes that run a check cannot disagree about it. On the platform's
+ * worker every one of those is the platform's credential, and there is no
+ * per-repository grant here, so they are refused outright.
+ *
+ * Known gap (see `HOST_CREDENTIAL_ENV_PATTERN`): credential FILES at their
+ * default home locations, and a mounted service-account token, stay
+ * readable by path; no env-name rule closes that.
  */
-export const PLATFORM_OWNED_ENV_PATTERN =
-    /^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_)/i;
+export const PLATFORM_OWNED_ENV_PATTERN = new RegExp(
+    `${PLATFORM_NAMESPACE_ENV_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`,
+    'i',
+);
 
 /**
  * Shape a passthrough NAME must have to be honored. Anything else (spaces,

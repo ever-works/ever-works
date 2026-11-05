@@ -4,7 +4,11 @@ import { promises as fs } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { isAbsolute, relative, resolve, sep } from 'path';
 import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/contracts';
-import { FLEET_JOB_MAX_RESULT_BYTES, resolveExclusiveAgentCredentials } from '@ever-works/contracts';
+import {
+	FLEET_JOB_MAX_RESULT_BYTES,
+	HOST_CREDENTIAL_ENV_PATTERN,
+	resolveExclusiveAgentCredentials
+} from '@ever-works/contracts';
 import { enforceAcceptanceChecksExecutionPolicy } from '../execution-policy';
 import type { NodeExecutionPolicy } from '../types';
 import { isMissingToolExit, MISSING_TOOL_REASON, type MissingToolReason } from './acceptance-checks.missing-tool';
@@ -912,6 +916,14 @@ export const NODE_SECRETISH_ENV_KEY_PATTERN =
 	/(SECRET|TOKEN|KEY|PASSWORD|PASSWD|CREDENTIAL|DSN|DATABASE_URL|CONNECTION)/i;
 
 /**
+ * The platform's own configuration namespaces, plus this node's
+ * (`FLEET_`). The host-credential half of the refusal is
+ * {@link HOST_CREDENTIAL_ENV_PATTERN} — see {@link NODE_PLATFORM_OWNED_ENV_PATTERN}.
+ */
+const NODE_PLATFORM_NAMESPACE_ENV_PATTERN =
+	/^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_)/i;
+
+/**
  * Namespaces that are NEVER grantable — not by the allowlist, not by an
  * explicit `envPassthrough`. On a fleet node this additionally covers
  * the node's OWN credential namespace: a check must never be able to
@@ -920,18 +932,31 @@ export const NODE_SECRETISH_ENV_KEY_PATTERN =
  * It also covers the HOST's own credentials. A fleet node runs on an
  * operator's PC, whose environment can hold a `KUBECONFIG` pointing at a
  * cluster-admin config, a `GITHUB_TOKEN` / `GITHUB_PAT`, an `NPM_TOKEN`,
- * a Cloudflare / DigitalOcean / Vault / OpenBao / Proxmox credential or a
+ * an ssh-agent socket, a Docker config directory, Azure / Google Cloud /
+ * Cloudflare / DigitalOcean / Vault / OpenBao / Proxmox credentials or a
  * registry auth blob. `envPassthrough` bypasses the secret-NAME sweep
  * above, so without these entries a check could grant itself any of
- * them. Exact credential names only where a broad prefix would also
- * catch harmless context (`GITHUB_ACTIONS`, `DOCKER_HOST`) — and those are
- * anchored at the END, so `GITHUB_PAT` does not also refuse Actions'
- * `GITHUB_PATH`, and `NPM_TOKEN` stays a name, not a namespace. An operator
- * can still grant one per repository (an `NPM_TOKEN` for a private
- * registry, say) — these are not in {@link NODE_UNGRANTABLE_ENV_PATTERN}.
+ * them. That half is {@link HOST_CREDENTIAL_ENV_PATTERN} from
+ * `@ever-works/contracts` — ONE list shared with the platform's
+ * `buildCheckEnv`, so the two runtimes that run a check cannot drift
+ * apart on it (they had: the platform never learned the names this node
+ * refused). Exact credential names only where a broad prefix would also
+ * catch harmless context (`GITHUB_ACTIONS`, `DOCKER_HOST`), anchored at
+ * the END, so `GITHUB_PAT` does not also refuse Actions' `GITHUB_PATH`.
+ * An operator can still grant one per repository (an `NPM_TOKEN` for a
+ * private registry, say) — these are not in
+ * {@link NODE_UNGRANTABLE_ENV_PATTERN}.
+ *
+ * Known gap, stated rather than hidden: credential FILES at their default
+ * home locations (`~/.ssh`, `~/.npmrc`, `~/.docker/config.json`,
+ * `~/.kube/config`, …) stay readable — a check runs with the machine's
+ * home (see `establishModelContainment`), and no env-name rule can stop a
+ * command naming an absolute path.
  */
-export const NODE_PLATFORM_OWNED_ENV_PATTERN =
-	/^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_|GITHUB_APP_|CLOUDFLARE_|CF_API_|VAULT_|BAO_|DIGITALOCEAN_|PROXMOX_|PVE_|(?:KUBECONFIG|GITHUB_TOKEN|GITHUB_PAT|NPM_TOKEN|NODE_AUTH_TOKEN|DOCKER_AUTH_CONFIG)$)/i;
+export const NODE_PLATFORM_OWNED_ENV_PATTERN = new RegExp(
+	`${NODE_PLATFORM_NAMESPACE_ENV_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`,
+	'i'
+);
 
 /**
  * The subset of the above that stays refused even WITH an explicit
