@@ -46,7 +46,7 @@ graph TD
 The Vercel AI Gateway exposes an OpenAI-compatible API at `https://ai-gateway.vercel.sh/v1`. This means:
 
 - All requests use the same format as OpenAI API calls.
-- Model names use the `provider/model` format (e.g., `openai/gpt-4o`, `anthropic/claude-sonnet-4-20250514`).
+- Model names use the `provider/model` format (e.g., `openai/gpt-6.1-sol`, `anthropic/claude-sonnet-5.5`). xAI models are listed under `spacexai/` (for example `spacexai/grok-4.7`).
 - The plugin delegates to `AiOperations` with `providerType: 'openai'`.
 
 ## Configuration
@@ -56,13 +56,17 @@ The Vercel AI Gateway exposes an OpenAI-compatible API at `https://ai-gateway.ve
 | Setting        | Type     | Required | Default                           | Scope    | Description                                   |
 | -------------- | -------- | -------- | --------------------------------- | -------- | --------------------------------------------- |
 | `apiKey`       | `string` | Yes      | --                                | `user`   | Vercel AI Gateway API key (secret)            |
-| `defaultModel` | `string` | Yes      | `openai/gpt-5.1`                  | `global` | Model for all AI tasks (unless tier-specific) |
-| `simpleModel`  | `string` | No       | `openai/gpt-5-nano`               | `global` | Model for tags, short descriptions            |
-| `mediumModel`  | `string` | No       | `openai/gpt-4o`                   | `global` | Model for listings, summaries                 |
-| `complexModel` | `string` | No       | `openai/gpt-5.1`                  | `global` | Model for full page generation                |
+| `defaultModel` | `string` | Yes      | `openai/gpt-6-astra`              | `global` | Model for all AI tasks (unless tier-specific) |
+| `simpleModel`  | `string` | No       | `openai/gpt-6-luna`               | `global` | Model for tags, short descriptions            |
+| `mediumModel`  | `string` | No       | `openai/gpt-6.1-sol`              | `global` | Model for listings, summaries                 |
+| `complexModel` | `string` | No       | `openai/gpt-6-astra`              | `global` | Model for full page generation                |
 | `baseUrl`      | `string` | No       | `https://ai-gateway.vercel.sh/v1` | --       | Custom endpoint (hidden)                      |
 | `temperature`  | `number` | No       | `0.7`                             | --       | Generation temperature 0--2 (hidden)          |
 | `maxTokens`    | `number` | No       | `4096`                            | --       | Max response tokens (hidden)                  |
+
+Model defaults as of 2026-11-05 — source: [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models) (each id was listed that day) and OpenAI's [model guide](https://developers.openai.com/api/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. The `onLoad` bootstrap and `getDefaultModelId()` use the simple tier, `openai/gpt-6-luna`.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The defaults moved from `openai/gpt-5.1` (default, complex), `openai/gpt-5-nano` (simple) and `openai/gpt-4o` (standard) to `openai/gpt-6-astra`, `openai/gpt-6-luna` and `openai/gpt-6.1-sol`. OpenAI has deprecated all three old ids, and the gateway no longer lists `openai/gpt-5.1`. Nothing is migrated, because Ever Works has no production users yet.
 
 ### Environment Variables
 
@@ -79,11 +83,11 @@ The Vercel AI Gateway exposes an OpenAI-compatible API at `https://ai-gateway.ve
 
 The plugin supports assigning different models to different task complexities, optimizing cost and quality:
 
-| Tier         | Setting        | Handles                                   | Recommended Model       |
-| ------------ | -------------- | ----------------------------------------- | ----------------------- |
-| **Simple**   | `simpleModel`  | Tags, short descriptions, classifications | Fast, inexpensive model |
-| **Standard** | `mediumModel`  | Listings, summaries, content reformatting | Balanced model          |
-| **Complex**  | `complexModel` | Full page generation, multi-step analysis | Most capable model      |
+| Tier         | Setting        | Handles                                   | Recommended Model       | Default (2026-11-05) |
+| ------------ | -------------- | ----------------------------------------- | ----------------------- | -------------------- |
+| **Simple**   | `simpleModel`  | Tags, short descriptions, classifications | Fast, inexpensive model | `openai/gpt-6-luna`  |
+| **Standard** | `mediumModel`  | Listings, summaries, content reformatting | Balanced model          | `openai/gpt-6.1-sol` |
+| **Complex**  | `complexModel` | Full page generation, multi-step analysis | Most capable model      | `openai/gpt-6-astra` |
 
 If a tier-specific model is not set, the `defaultModel` is used as a fallback for all tasks.
 
@@ -187,6 +191,6 @@ This ensures that only valid, typed values are forwarded to the underlying LangC
 | ------------------------- | ---------------------------------- | --------------------------------------------------------------- |
 | "Plugin not loaded"       | `onLoad` not called                | Restart the plugin or server                                    |
 | Connection test fails     | Invalid API key or network issue   | Verify the key and check connectivity to `ai-gateway.vercel.sh` |
-| Model not found           | Invalid model name format          | Use `provider/model` format (e.g., `openai/gpt-4o`)             |
+| Model not found           | Invalid model name format          | Use `provider/model` format (e.g., `openai/gpt-6.1-sol`)        |
 | Slow responses            | Large `maxTokens` or complex model | Reduce `maxTokens` or use a faster model for simple tasks       |
 | Unexpected model behavior | Temperature too high               | Lower `temperature` toward 0 for more consistent output         |

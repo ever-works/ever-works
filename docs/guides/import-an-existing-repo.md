@@ -131,7 +131,7 @@ The fastest way to make any repository importable is to add the manifest. A file
 kind: directory
 name: Awesome Chairs
 initial_prompt: A curated directory of ergonomic office chairs, with pricing and build quality
-model: anthropic/claude-sonnet-4
+model: anthropic/claude-sonnet-5.5
 providers:
     ai: openai
     search: tavily

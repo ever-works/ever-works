@@ -227,7 +227,7 @@ const result = await promptService.promptSettings({
 When `scope` is `'work'` and an inherited value exists, the prompt displays:
 
 ```
-  Inherited: gpt-5.1
+  Inherited: gpt-6-astra
 ```
 
 Leaving a field blank preserves the inherited value.

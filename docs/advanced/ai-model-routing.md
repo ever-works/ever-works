@@ -285,7 +285,7 @@ const result = await this.aiFacade.askJson(
 const stream = this.aiFacade.createStreamingChatCompletion(
 	{
 		messages: [{ role: 'user', content: 'Hello' }],
-		model: 'gpt-4o'
+		model: 'openai/gpt-6.1-sol'
 	},
 	{ userId: user.id }
 );
@@ -298,8 +298,8 @@ for await (const chunk of stream) {
 ### Context Length Resolution
 
 ```typescript
-const contextLength = await this.aiFacade.resolveModelContextLength('gpt-4o', { userId: user.id });
-// Returns 128000 (from OpenRouter metadata, cached for 1 hour)
+const contextLength = await this.aiFacade.resolveModelContextLength('openai/gpt-6.1-sol', { userId: user.id });
+// Returns 1050000 (from OpenRouter metadata, cached for 1 hour)
 ```
 
 ## Best Practices

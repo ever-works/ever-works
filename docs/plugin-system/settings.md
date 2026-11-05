@@ -28,7 +28,7 @@ readonly settingsSchema: JsonSchema = {
         defaultModel: {
             type: 'string',
             title: 'Default Model',
-            default: 'gpt-4o',
+            default: 'gpt-6.1-sol',
             'x-widget': 'model-select',
             'x-scope': 'global',
         },
