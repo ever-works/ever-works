@@ -48,16 +48,31 @@ runs:
     - name: Ensure PowerShell 7
       if: runner.os == 'Windows' && runner.environment == 'self-hosted' && inputs.pwsh == 'true'
       shell: powershell
+      # The official zip, unpacked into the runner's tool cache: no installer,
+      # nothing machine-wide. Not choco: its powershell-core script walks the
+      # parent-process chain and looped forever on EVERDESK3 (a reused PID made
+      # the chain circular). Bump version and SHA-256 together, from the
+      # release's asset digest.
+      env:
+        PWSH_VERSION: 7.6.9
+        PWSH_SHA256: ce7484804c0f0ad4dda10c958e71acdaf7eebfb22505c1b480f89e0e9f1da94d
       run: |
         if (Get-Command pwsh.exe -ErrorAction SilentlyContinue) { Write-Host 'PowerShell 7 already on PATH'; exit 0 }
-        $dir = Join-Path $env:ProgramFiles 'PowerShell\7'
+        $dir = Join-Path $env:RUNNER_TOOL_CACHE "pwsh\$env:PWSH_VERSION\x64"
         if (-not (Test-Path (Join-Path $dir 'pwsh.exe'))) {
-          Write-Host "Installing PowerShell 7 on $env:RUNNER_NAME"
-          choco install -y powershell-core --no-progress
+          Write-Host "Fetching PowerShell $env:PWSH_VERSION for $env:RUNNER_NAME"
+          $zip = Join-Path $env:RUNNER_TEMP "pwsh-$env:PWSH_VERSION.zip"
+          $url = "https://github.com/PowerShell/PowerShell/releases/download/v$env:PWSH_VERSION/PowerShell-$env:PWSH_VERSION-win-x64.zip"
+          & curl.exe -fsSL --retry 5 -o $zip $url
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell download failed ($LASTEXITCODE)" }
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          if ($actual -cne $env:PWSH_SHA256) { throw 'PowerShell zip checksum mismatch' }
+          if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir
+          Remove-Item -Force $zip
         }
-        if (-not (Test-Path (Join-Path $dir 'pwsh.exe'))) {
-          throw "PowerShell 7 is missing on $env:RUNNER_NAME and choco could not install it"
-        }
+        if (-not (Test-Path (Join-Path $dir 'pwsh.exe'))) { throw "pwsh.exe missing under $dir" }
+        & (Join-Path $dir 'pwsh.exe') -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
         $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
     - name: Ensure rustup
