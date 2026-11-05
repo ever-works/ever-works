@@ -23,7 +23,8 @@ const PROVIDER = /digital\s*ocean/i;
 
 /**
  * Mentions that are not a route to the provider, each pinned to one file and one
- * exact literal, so any OTHER mention in that file still fails.
+ * exact literal, excused ONCE, so any other mention in that file (a second copy
+ * included) still fails.
  *
  * - The host-credential deny-list refuses the provider CLI's env namespace in a
  *   check's `envPassthrough` (a check must not read the host's cloud token). It
@@ -37,7 +38,8 @@ const PERMITTED_MENTIONS: Record<string, readonly string[]> = {
 function namesTheProvider(relativePath: string, text: string): boolean {
     let rest = text;
     for (const literal of PERMITTED_MENTIONS[relativePath.split(sep).join('/')] ?? []) {
-        rest = rest.split(literal).join('');
+        // `replace` with a string pattern removes the first occurrence only.
+        rest = rest.replace(literal, '');
     }
     return PROVIDER.test(rest);
 }
@@ -88,6 +90,7 @@ describe('machine providers are reached by capability only (FL-17)', () => {
         expect(
             namesTheProvider(path, "'DIGITALOCEAN_',\nimport { x } from 'digitalocean-plugin';"),
         ).toBe(true);
+        expect(namesTheProvider(path, "'DIGITALOCEAN_',\n'DIGITALOCEAN_',\n")).toBe(true);
         expect(namesTheProvider('packages/agent/src/other.ts', "'DIGITALOCEAN_',")).toBe(true);
     });
 });

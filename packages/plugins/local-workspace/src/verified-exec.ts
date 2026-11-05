@@ -335,8 +335,10 @@ interface ProcStat {
  * - an entry that vanished mid-scan (`ENOENT`/`ESRCH`) was reaped and is
  *   skipped; any other read error, or a line that does not parse, refuses.
  *
- * Every live member was sent SIGKILL before this runs, and a process with a
- * fatal signal pending cannot fork, so no new member can appear behind the scan.
+ * A member that is still running is listed in a running state, so it keeps
+ * the group alive whichever kill reached it (on the fallback path only the
+ * direct child was signalled). And a member that a kill did reach cannot add
+ * one behind the scan: a process with a fatal signal pending cannot fork.
  */
 export function linuxProcessGroupHasOnlyExitedMembers(
 	pgid: number,

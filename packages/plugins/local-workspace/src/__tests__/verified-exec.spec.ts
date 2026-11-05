@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -258,7 +258,9 @@ function isAlive(pid: number): boolean {
 			.slice(stat.lastIndexOf(')') + 1)
 			.trim()
 			.split(/\s+/)[0];
-		return state !== 'Z' && state !== 'X';
+		if (state !== 'Z' && state !== 'X') return true;
+		// A zombie-state leader whose other threads still run (`Zl`) is alive.
+		return readdirSync(`/proc/${pid}/task`).length > 1;
 	} catch {
 		// Gone between the two reads, or unreadable: only a vanished entry is "dead".
 		return existsSync(`/proc/${pid}`);
