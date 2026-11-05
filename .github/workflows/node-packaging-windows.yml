@@ -29,6 +29,11 @@ name: Node Packaging (Windows)
 # adding `push` would have left it reachable only by manual dispatch, which
 # would be a real loss of coverage rather than a move of it.
 # Runner: windows-2022, GitHub-hosted (not the self-hosted ARC pool).
+# It stays hosted on purpose, unlike the other Windows jobs that use our own
+# machines (vars.RUNNER_WINDOWS_X64, 2026-11-05): the steps below prove the
+# installer leaves no EverWorksNode task behind, which needs a clean, ephemeral
+# machine. Our Windows runners are persistent and EVERDESK1/EVERDESK4 run a
+# real fleet node, so the check would fail there for the wrong reason.
 on:
   push:
     branches: [main, stage]
