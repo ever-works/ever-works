@@ -115,7 +115,8 @@ jobs:
 
           TOTAL=$(printf '%s' "$BODY" | jq -r '.total_count // 0' 2>/dev/null)
           LOOKUP_BROKEN=""
-          if ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then
+          if ! [[ "$TOTAL" =~ ^[0-9]+$ ]] \
+            || ! printf '%s' "$BODY" | jq -e '.workflow_runs | type == "array"' > /dev/null 2>&1; then
             LOOKUP_BROKEN="the E2E runs answer for $HEAD_SHA is not the expected JSON"
             TOTAL=0
           fi
@@ -134,7 +135,8 @@ jobs:
                 return
               fi
               total=$(printf '%s' "$body" | jq -r '.total_count // empty' 2>/dev/null)
-              if ! [[ "$total" =~ ^[0-9]+$ ]]; then
+              if ! [[ "$total" =~ ^[0-9]+$ ]] \
+                || ! printf '%s' "$body" | jq -e '.jobs | type == "array"' > /dev/null 2>&1; then
                 echo "broken: the jobs of E2E run $cid are not the expected JSON"
                 return
               fi
@@ -194,6 +196,8 @@ jobs:
             BODY=$(printf '%s' "$RAW" | sed '$d')
             if [ "$CODE" != "200" ]; then
               LOOKUP_BROKEN="page $PAGE of the E2E runs for $HEAD_SHA (http $CODE)"
+            elif ! printf '%s' "$BODY" | jq -e '.workflow_runs | type == "array"' > /dev/null 2>&1; then
+              LOOKUP_BROKEN="page $PAGE of the E2E runs for $HEAD_SHA is not the expected JSON"
             fi
           done
 
