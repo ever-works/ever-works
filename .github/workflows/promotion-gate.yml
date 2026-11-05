@@ -99,7 +99,7 @@ jobs:
               "https://api.github.com/repos/$REPO/$1"
           }
 
-          RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=20")
+          RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=100")
           CURL_RC=$?
           CODE=$(printf '%s' "$RAW" | tail -n1)
           BODY=$(printf '%s' "$RAW" | sed '$d')
@@ -119,26 +119,42 @@ jobs:
           # may run a subset of the 32 shards (e2e.yml `inputs.shards`), and a subset's
           # green says nothing about the shards it skipped. So take the newest run that
           # covered all of them: a push run always does (pushes ignore `inputs`); a
-          # dispatch only when its jobs name all 32 shards. Runs come newest first.
+          # dispatch only when its jobs name all 32 shards. Runs come newest first, 100
+          # a page; later pages are read only while no qualifying run has been found.
+          # `filter=all` counts the jobs of every attempt, so a full dispatch whose failed
+          # jobs were re-run still shows all 32 shards; the verdict stays the run's own
+          # (final) conclusion.
           RUN=""
-          for CANDIDATE in $(printf '%s' "$BODY" | jq -r '.workflow_runs[] | "\(.id):\(.event)"'); do
-            CID=${CANDIDATE%%:*}
-            CEVENT=${CANDIDATE#*:}
-            if [ "$CEVENT" != "push" ]; then
-              JRAW=$(api "actions/runs/$CID/jobs?per_page=100")
-              JCODE=$(printf '%s' "$JRAW" | tail -n1)
-              if [ "$JCODE" != "200" ]; then
-                echo "::warning::Could not list the jobs of E2E run $CID (http $JCODE) — not counting it."
-                continue
+          PAGE=1
+          while :; do
+            for CANDIDATE in $(printf '%s' "$BODY" | jq -r '.workflow_runs[] | "\(.id):\(.event)"'); do
+              CID=${CANDIDATE%%:*}
+              CEVENT=${CANDIDATE#*:}
+              if [ "$CEVENT" != "push" ]; then
+                JRAW=$(api "actions/runs/$CID/jobs?per_page=100&filter=all")
+                JCODE=$(printf '%s' "$JRAW" | tail -n1)
+                if [ "$JCODE" != "200" ]; then
+                  echo "::warning::Could not list the jobs of E2E run $CID (http $JCODE) — not counting it."
+                  continue
+                fi
+                SHARDS=$(printf '%s' "$JRAW" | sed '$d' | jq '[.jobs[].name | select(startswith("e2e (")) | split(", ") | .[1] // "" | rtrimstr(")")] | unique | length')
+                if [ "$SHARDS" != "32" ]; then
+                  echo "Skipping E2E run $CID ($CEVENT): it covered $SHARDS of the 32 shards."
+                  continue
+                fi
               fi
-              SHARDS=$(printf '%s' "$JRAW" | sed '$d' | jq '[.jobs[].name | select(startswith("e2e (")) | split(", ") | .[1] // "" | rtrimstr(")")] | unique | length')
-              if [ "$SHARDS" != "32" ]; then
-                echo "Skipping E2E run $CID ($CEVENT): it covered $SHARDS of the 32 shards."
-                continue
-              fi
+              RUN=$(printf '%s' "$BODY" | jq -c --argjson id "$CID" '.workflow_runs[] | select(.id == $id)')
+              break 2
+            done
+            [ $((PAGE * 100)) -ge "$TOTAL" ] && break
+            PAGE=$((PAGE + 1))
+            RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=100&page=$PAGE")
+            CODE=$(printf '%s' "$RAW" | tail -n1)
+            BODY=$(printf '%s' "$RAW" | sed '$d')
+            if [ "$CODE" != "200" ]; then
+              echo "::warning::Could not read page $PAGE of the E2E runs for $HEAD_SHA (http $CODE) — stopping the search there."
+              break
             fi
-            RUN=$(printf '%s' "$BODY" | jq -c --argjson id "$CID" '.workflow_runs[] | select(.id == $id)')
-            break
           done
 
           if [ "$TOTAL" = "0" ] || [ -z "$RUN" ]; then

@@ -155,7 +155,9 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
         run: |
-          if ! [[ "$SHARD" =~ ^[0-9]+$ ]] || [ "$SHARD" -lt 1 ] || [ "$SHARD" -gt 32 ]; then
+          # Canonical numbers only: a `01` would also name its job `e2e (26.x, 01)`,
+          # which the promotion gate's shard count would not recognise as shard 1.
+          if ! [[ "$SHARD" =~ ^[1-9][0-9]*$ ]] || [ "$SHARD" -gt 32 ]; then
             echo "::error::shard must be an integer from 1 to 32, got '$SHARD'"
             exit 1
           fi
