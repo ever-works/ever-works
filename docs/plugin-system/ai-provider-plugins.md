@@ -253,7 +253,7 @@ Perplexity specializes in search-augmented AI responses with built-in web citati
 | ------------------ | ------------------------------- |
 | Package            | `@ever-works/openrouter-plugin` |
 | Provider Type      | `openrouter`                    |
-| Configuration Mode | `user-required`                 |
+| Configuration Mode | `hybrid`                        |
 | Default Model      | `openai/gpt-6.1-sol`            |
 | Structured Output  | Model dependent                 |
 | Streaming          | Yes                             |
@@ -269,7 +269,7 @@ OpenRouter aggregates multiple AI providers behind a single API. It overrides `r
 | ------------------ | -------------------------------------- |
 | Package            | `@ever-works/vercel-ai-gateway-plugin` |
 | Provider Type      | `vercel-ai-gateway`                    |
-| Configuration Mode | `user-required`                        |
+| Configuration Mode | `hybrid`                               |
 | Default Model      | `openai/gpt-6-astra`                   |
 | Structured Output  | Model dependent                        |
 | Streaming          | Yes                                    |

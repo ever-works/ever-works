@@ -24,7 +24,7 @@ Together AI is a cloud platform for running open-weight AI models. It is an infe
 
 ## Available Models
 
-Models as of 2026-11-05 — source: the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models), read on 2026-11-06. Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+Models as of 2026-11-06 — source: the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 **Neither list has Together AI model ids.** On 2026-11-06 OpenRouter's list (454 models) had no `together/` id, and neither did the Vercel AI Gateway's (495 models). OpenRouter lists models under their author's prefix and decides per request which host serves them, so you pick the model, not Together AI. The earlier version of this page said Together models use a `together/` prefix; no id on OpenRouter's list has that format.
 
@@ -41,7 +41,7 @@ Open-weight models present on OpenRouter's list on 2026-11-06 (the Vercel AI Gat
 | `deepseek/deepseek-v4.1-flash`      | `deepseek/deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 1,048,576            |
 | `moonshotai/kimi-k3`                | `moonshotai/kimi-k3`           | Kimi K3             | 1,048,576            |
 
-`meta-llama/llama-3.3-70b-instruct` is an older model that is still listed. `mistralai/mistral-large` and `qwen/qwen-2.5-72b-instruct`, which this page used to list, are older generations; for Mistral see the [Mistral Plugin](./mistral-plugin.md), and for Qwen the current ids on OpenRouter start at `qwen/qwen3.8-*`.
+`meta-llama/llama-3.3-70b-instruct` is an older model that is still listed. `mistralai/mistral-large` and `qwen/qwen-2.5-72b-instruct`, which this page used to list, are older generations; for Mistral see the [Mistral Plugin](./mistral-plugin.md), and for Qwen the newest ids on OpenRouter are `qwen/qwen3.8-*`.
 
 :::note
 OpenRouter may route a request to Together AI or to another host serving the same model, based on availability and cost. Ever Works' OpenRouter plugin has no setting to pin the host, so you cannot force Together AI. Each model's page on [openrouter.ai/models](https://openrouter.ai/models) shows which hosts serve it.
@@ -97,7 +97,7 @@ OpenRouter selects a host for each model request. When you specify a model like 
 
 ## Tiered Model Strategy
 
-Open-weight models work well in cost-optimized configurations (OpenRouter prices per million input / output tokens, 2026-11-06):
+Open-weight models work well in cost-optimized configurations. Costs are the `pricing` field of OpenRouter's model list on 2026-11-06, per million input / output tokens; what a request costs depends on the host OpenRouter routes it to:
 
 | Tier     | Use Case              | Recommended Model          | Cost          |
 | -------- | --------------------- | -------------------------- | ------------- |

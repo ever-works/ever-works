@@ -111,7 +111,7 @@ The response is a standard `chat.completion` object:
 	"id": "chatcmpl-abc123",
 	"object": "chat.completion",
 	"created": 1735689600,
-	"model": "gpt-4o-mini",
+	"model": "gpt-6.1-sol",
 	"choices": [
 		{
 			"index": 0,
@@ -130,11 +130,11 @@ The response is a standard `chat.completion` object:
 Send `"stream": true` and the response switches to `text/event-stream` with `Cache-Control: no-cache`, `Connection: keep-alive` and `X-Accel-Buffering: no` (so an intermediate proxy cannot buffer the stream). Each frame is a `chat.completion.chunk`, and the stream ends with a literal `[DONE]` frame:
 
 ```
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1735689600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1735689600,"model":"gpt-6.1-sol","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1735689600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"Start"},"finish_reason":null}]}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1735689600,"model":"gpt-6.1-sol","choices":[{"index":0,"delta":{"content":"Start"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1735689600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1735689600,"model":"gpt-6.1-sol","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
 
 data: [DONE]
 ```
@@ -200,7 +200,7 @@ curl -X POST http://localhost:3100/api/conversations/<conversation-id>/messages 
       {
         "role": "assistant",
         "content": "Start with five: ...",
-        "model": "gpt-4o-mini",
+        "model": "gpt-6.1-sol",
         "usage": { "promptTokens": 412, "completionTokens": 96, "totalTokens": 508 }
       }
     ]

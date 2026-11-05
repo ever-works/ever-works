@@ -1,11 +1,11 @@
 ---
 id: xai-plugin
-title: 'xAI Grok Models via OpenRouter'
-sidebar_label: 'xAI Grok (via OpenRouter)'
+title: 'xAI Grok Models'
+sidebar_label: 'xAI Grok'
 sidebar_position: 35
 ---
 
-# xAI Grok Models via OpenRouter
+# xAI Grok Models
 
 xAI builds the Grok family of models. Ever Works reaches them two ways:
 
@@ -25,7 +25,7 @@ There is no separate plugin called `xai`; this page keeps its old address so exi
 
 ## Available Grok Models
 
-Models as of 2026-11-05 — source: [docs.x.ai/developers/models](https://docs.x.ai/developers/models), and for the gateway ids the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models) (both read on 2026-11-06). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+Models as of 2026-11-06 — source: [docs.x.ai/developers/models](https://docs.x.ai/developers/models), and for the gateway ids the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 The internal CLI's provider registry lists the two current Grok ids in its OpenRouter model list:
 
@@ -56,7 +56,7 @@ Model availability on OpenRouter changes over time. Check [openrouter.ai/models]
 
 ### Setting Up Grok Models
 
-**With the dedicated `grok` plugin:** enable **Grok (xAI)** at `/plugins`, paste your xAI API key (env fallback `XAI_API_KEY`), and keep its defaults or pick another Grok id. Its defaults as of 2026-11-05 are `grok-4.7` for the default, standard and complex tiers and `grok-4.3` for the simple tier (source: [docs.x.ai/developers/models](https://docs.x.ai/developers/models)). **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Only the simple tier moved, from `grok-4.7` to `grok-4.3`.
+**With the dedicated `grok` plugin:** enable **Grok (xAI)** at `/plugins`, paste your xAI API key (env fallback `XAI_API_KEY`), and keep its defaults or pick another Grok id. Its defaults as of 2026-11-06 are `grok-4.7` for the default, standard and complex tiers and `grok-4.3` for the simple tier (source: [docs.x.ai/developers/models](https://docs.x.ai/developers/models)). **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Only the simple tier moved, from `grok-4.7` to `grok-4.3`.
 
 **Through OpenRouter:**
 

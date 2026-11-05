@@ -107,7 +107,7 @@ The facade implements intelligent model routing based on task complexity:
 
 ### Auto-Escalation
 
-When an `askJson` call fails validation (the AI returns malformed JSON or the response does not match the Zod schema), the facade automatically retries with a more capable model. The escalation chain is defined per provider and typically moves from a faster model to a more capable one (e.g., GPT-4o-mini to GPT-4o, or Claude 3.5 Haiku to Claude 3.5 Sonnet).
+When an `askJson` call fails validation (the AI returns malformed JSON or the response does not match the Zod schema), the facade automatically retries with a more capable model. The escalation chain is defined per provider and typically moves from a faster model to a more capable one (e.g., GPT-6 Luna to GPT-6.1 Sol, or Claude Haiku 5.5 to Claude Sonnet 5.5).
 
 ### OpenRouter Model Lookup
 

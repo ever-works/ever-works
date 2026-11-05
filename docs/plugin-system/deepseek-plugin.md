@@ -20,7 +20,7 @@ DeepSeek is a Chinese AI lab that publishes open-weight models and runs its own 
 
 ## Available DeepSeek Models
 
-Models as of 2026-11-05 — source: [api-docs.deepseek.com/quick_start/pricing](https://api-docs.deepseek.com/quick_start/pricing), and for the gateway ids the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models) (both read on 2026-11-06). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+Models as of 2026-11-06 — source: [api-docs.deepseek.com/quick_start/pricing](https://api-docs.deepseek.com/quick_start/pricing), and for the gateway ids the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 DeepSeek's own API serves two current models, `deepseek-flash` (DeepSeek V4.1 Flash) and `deepseek-v4-pro`, both with a 1M-token context and 384K output tokens. It retired the `deepseek-chat` and `deepseek-reasoner` API names on 2026-07-24.
 
@@ -65,7 +65,7 @@ The platform's reasoning registry still has an entry for DeepSeek's older reason
 
 When a model whose name matches (for example `deepseek/deepseek-r1-0528`) is selected on OpenRouter, the platform sends `reasoning.effort: 'low'`. This instructs the model to minimize its internal reasoning tokens while still producing structured output. The entry has no slice for other providers, so Ollama's `deepseek-r1` gets no reasoning parameter.
 
-The current V4 models do **not** match this pattern (`deepseek-v4-pro` and `deepseek-v4.1-flash` contain neither `deepseek-r` nor `deepseek-reasoner`), so Ever Works sends no reasoning effort for them. OpenRouter's list (2026-11-06) shows reasoning on by default for both with a default effort of `high`, so requests run at that default.
+The current V4 models do **not** match this pattern (`deepseek-v4-pro` and `deepseek-v4.1-flash` contain neither `deepseek-r` nor `deepseek-reasoner`), so Ever Works sends no reasoning effort for them. OpenRouter's list (2026-11-06) marks reasoning as enabled by default for V4.1 Flash (default effort `high`) and gives V4 Pro a default effort of `high`, so requests run at those defaults.
 
 ### How Reasoning Config Resolution Works
 
@@ -177,7 +177,7 @@ DeepSeek models do not support embeddings. If your workflow requires semantic se
 
 | Issue                     | Cause                                                    | Solution                                                                             |
 | ------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Verbose or slow reasoning | V4 models reason at their default effort (`high`)        | Use `deepseek/deepseek-v4.1-flash` for simple tasks; reserve V4 Pro for complex ones |
+| Verbose or slow reasoning | V4 models run at their default reasoning effort (`high`) | Use `deepseek/deepseek-v4.1-flash` for simple tasks; reserve V4 Pro for complex ones |
 | Model not found           | Incorrect or retired model ID (`deepseek/deepseek-r1`)   | Use a current id with the `deepseek/` prefix, e.g. `deepseek/deepseek-v4-pro`        |
 | Old ids stop answering    | DeepSeek retired `deepseek-chat` and `deepseek-reasoner` | Move a saved old id to `deepseek/deepseek-v4.1-flash` or `deepseek/deepseek-v4-pro`  |
 | Rate limits               | OpenRouter rate limiting                                 | Check your OpenRouter plan; add billing credits if needed                            |

@@ -80,7 +80,7 @@ The default model, the `onLoad` bootstrap and `getDefaultModelId()` equal the st
 
 **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The defaults moved from `models/gemini-2.0-flash` (simple; shut down 2026-06-01, so this is a fix), `models/gemini-2.5-flash` (default and standard) and `models/gemini-2.5-pro` (complex) to the ids above. The 2.5 models are deprecated since 2026-11-02, serve existing users only and are re-routed from 2026-12-01, so a config that saved one should switch.
 
-From Gemini 3.6 Flash on, Google ignores `temperature`, `top_p` and `top_k`, so the hidden `temperature` setting has no effect on the current defaults.
+From Gemini 3.6 Flash on, Google ignores `temperature`, `top_p` and `top_k`, so the hidden `temperature` setting has no effect on Gemini 3.8 Flash (default and standard tiers) or Gemini 4 Argon (complex tier). Gemini 3.5 Flash-Lite (simple tier) predates that change.
 
 ### Model Naming Convention
 

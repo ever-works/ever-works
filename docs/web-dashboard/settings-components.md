@@ -173,7 +173,11 @@ Wraps each plugin in a `CollapsibleCard` showing:
 The `usePluginSettings` hook handles validation, change tracking, and sanitization before calling the `updatePluginSettings` server action.
 
 ```tsx
-<PluginSettingsInline plugin={openaiPlugin} settings={{ apiKey: 'sk-...', model: 'gpt-4o' }} oauthConnection={null} />
+<PluginSettingsInline
+	plugin={openaiPlugin}
+	settings={{ apiKey: 'sk-...', model: 'gpt-6.1-sol' }}
+	oauthConnection={null}
+/>
 ```
 
 ### PluginOAuthConnection

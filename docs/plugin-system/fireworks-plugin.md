@@ -50,7 +50,7 @@ These preferences are applied at the OpenRouter level, outside of Ever Works con
 
 ## Models Commonly Served by Fireworks AI
 
-Models as of 2026-11-05 — source: the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models), read on 2026-11-06. Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+Models as of 2026-11-06 — source: the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 **Fireworks' own model.** Both lists carry exactly one Fireworks id:
 
@@ -107,14 +107,14 @@ Fireworks AI is known for fast inference times. This benefits Ever Works in seve
 | Ollama (local)                | Depends on hardware         | Free              |
 | OpenAI (direct)               | Standard                    | Per-token         |
 
-If raw inference speed is your top priority and you want open-weight models, consider the **Groq** plugin as a direct alternative. Groq uses custom LPU hardware; its plugin defaults to `openai/gpt-oss-120b` (simple tier `openai/gpt-oss-20b`) as of 2026-11-05.
+If raw inference speed is your top priority and you want open-weight models, consider the **Groq** plugin as a direct alternative. Groq uses custom LPU hardware; its plugin defaults to `openai/gpt-oss-120b` (simple tier `openai/gpt-oss-20b`) as of 2026-11-06.
 
 ## Tiered Strategy with Fireworks-Served Models
 
 ```mermaid
 graph LR
     subgraph "Cost-Optimized Pipeline"
-        S["Simple Tasks"] --> SM["gpt-oss-20b<br/>Lowest cost"]
+        S["Simple Tasks"] --> SM["gpt-oss-20b<br/>Lowest cost of the three"]
         M["Standard Tasks"] --> MM["gpt-oss-120b<br/>Low cost, fast"]
         C["Complex Tasks"] --> CM["deepseek-v4-pro<br/>Highest quality"]
     end
@@ -126,7 +126,7 @@ graph LR
 | Standard | `openai/gpt-oss-120b`      | Good quality at $0.15 / $0.60                                 |
 | Complex  | `deepseek/deepseek-v4-pro` | Strong open-weight quality for full pages ($1.60 / $3.20)     |
 
-Prices are OpenRouter's on 2026-11-06. `meta-llama/llama-3.3-70b-instruct:free`, which this table used to recommend, is no longer listed. To use Fireworks' own model, set a tier to `fireworks/ember-1`.
+Prices are the `pricing` field of OpenRouter's model list on 2026-11-06, per million input / output tokens; what a request costs depends on the host OpenRouter routes it to. `meta-llama/llama-3.3-70b-instruct:free`, which this table used to recommend, is no longer listed. To use Fireworks' own model, set a tier to `fireworks/ember-1`.
 
 ## Capabilities
 

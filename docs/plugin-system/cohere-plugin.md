@@ -23,7 +23,7 @@ Cohere is an enterprise AI platform that offers models optimized for business ap
 
 ## Available Cohere Models
 
-Models as of 2026-11-05 — source: the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models), read on 2026-11-06. Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+Models as of 2026-11-06 — source: the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 Cohere models are available on OpenRouter with the `cohere/` prefix. These are every `cohere/` chat id on OpenRouter's list on 2026-11-06 (prices per million input / output tokens):
 

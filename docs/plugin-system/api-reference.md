@@ -32,7 +32,7 @@ Get all available plugins with the current user's installation status.
 			"id": "openai",
 			"name": "OpenAI",
 			"version": "1.0.0",
-			"description": "Connects to OpenAI for content generation and chat",
+			"description": "OpenAI AI provider plugin for Ever Works platform",
 			"category": "ai-provider",
 			"capabilities": ["ai-provider"],
 			"icon": { "type": "svg", "value": "<svg>...</svg>" },

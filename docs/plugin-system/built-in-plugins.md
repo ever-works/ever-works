@@ -1204,7 +1204,7 @@ Pipeline plugin that delegates the full generation to the Gemini CLI agent. Dist
 
 See [Gemini Plugin](./gemini-plugin.md) for setup. Refer to `packages/plugins/gemini/src/` for the current settings schema.
 
-Default model: `gemini-3.8-flash`; Gemini CLI pinned to `0.67.0`. Model defaults as of 2026-11-05 — source: [Gemini API models](https://aistudio.google.com/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default moved from `gemini-2.5-flash`, and the CLI pin from `latest`/`0.45.2`. These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
+Default model: `gemini-3.8-flash`; Gemini CLI pinned to `0.67.0`. Model defaults as of 2026-11-05 — source: [Gemini API models](https://aistudio.google.com/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default moved from `gemini-2.5-flash`, and the CLI pin from `0.45.2`. These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
 
 ### OpenCode Generator
 

@@ -52,15 +52,15 @@ MODEL_ROUTING_AUTO_ESCALATION=true
 
 # ECONOMY tier (for SIMPLE tasks)
 MODEL_ROUTING_ECONOMY_PROVIDER=openrouter
-MODEL_ROUTING_ECONOMY_MODEL=gpt-6-luna
+MODEL_ROUTING_ECONOMY_MODEL=openai/gpt-6-luna
 
 # STANDARD tier (for MEDIUM tasks)
 MODEL_ROUTING_STANDARD_PROVIDER=openrouter
-MODEL_ROUTING_STANDARD_MODEL=gpt-6.1-sol
+MODEL_ROUTING_STANDARD_MODEL=openai/gpt-6.1-sol
 
 # PREMIUM tier (for COMPLEX tasks)
 MODEL_ROUTING_PREMIUM_PROVIDER=openrouter
-MODEL_ROUTING_PREMIUM_MODEL=gpt-6-astra
+MODEL_ROUTING_PREMIUM_MODEL=openai/gpt-6-astra
 ```
 
 When `MODEL_ROUTING_ENABLED=false` (the default), all tasks use the default provider and model configured via `AI_DEFAULT_PROVIDER` and `{PROVIDER}_MODEL`.

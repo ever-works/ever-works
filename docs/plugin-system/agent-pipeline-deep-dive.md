@@ -310,7 +310,7 @@ Each tool type has a custom summarizer that preserves the most important informa
 
 ### Reasoning Model Support
 
-The plugin supports reasoning models (like o1, o3) via `wrapReasoningFilteredModel()`, which filters out reasoning tokens from the output to prevent them from consuming context budget.
+The plugin supports reasoning models (for example `gpt-6-astra` or `deepseek/deepseek-v4-pro`) via `wrapReasoningFilteredModel()`, which filters out reasoning tokens from the output to prevent them from consuming context budget.
 
 ### Tool Calling Retry
 

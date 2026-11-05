@@ -133,11 +133,11 @@ flowchart LR
 
 Models as of 2026-11-05 — source: [ollama.com/library](https://ollama.com/library). Availability depends on the models you have pulled; the picker accepts a custom model id and keeps existing saved selections.
 
-| Tier    | Use Cases                                 | Default      | Other small tool-capable models in the library |
-| ------- | ----------------------------------------- | ------------ | ---------------------------------------------- |
-| Simple  | Tags, short descriptions, classifications | `qwen3.5:4b` | `qwen3.5:2b`, `gemma4:e2b`, `ministral-3:3b`   |
-| Medium  | Listings, summaries, content reformatting | `qwen3.5:4b` | `gemma4:e4b`, `qwen3:4b`                       |
-| Complex | Full page generation, multi-step analysis | `qwen3.5:4b` | `qwen3.5:9b`, `gpt-oss:20b`                    |
+| Tier    | Use Cases                                 | Default      | Other tool-capable models in the library                           |
+| ------- | ----------------------------------------- | ------------ | ------------------------------------------------------------------ |
+| Simple  | Tags, short descriptions, classifications | `qwen3.5:4b` | `qwen3.5:2b`, `gemma4:e2b`, `ministral-3:3b`                       |
+| Medium  | Listings, summaries, content reformatting | `qwen3.5:4b` | `gemma4:e4b`, `qwen3:4b`                                           |
+| Complex | Full page generation, multi-step analysis | `qwen3.5:4b` | `qwen3.5:9b`, `gpt-oss:20b`; larger: `qwen3.5:27b`, `gpt-oss:120b` |
 
 `gemma3`, `gemma2`, `phi4` and `deepseek-coder-v2` carry no tools badge in the library, so they are poor fits for the structured-output and tool-calling steps.
 

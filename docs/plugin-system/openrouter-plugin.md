@@ -116,7 +116,7 @@ Users can mix and match models from different providers across tiers. For exampl
 | Max Context Length | 128,000 tokens                 |
 
 :::note
-Vision support depends on the specific model selected. While the plugin reports `supportsVision: false` at the plugin level, individual models accessed through OpenRouter (such as GPT-4o or Claude Sonnet) do support vision. The capability is determined at the model level, not the provider level.
+Vision support depends on the specific model selected. While the plugin reports `supportsVision: false` at the plugin level, individual models accessed through OpenRouter (such as GPT-6.1 Sol or Claude Sonnet 5.5) do support vision. The capability is determined at the model level, not the provider level.
 :::
 
 ## Configuration Mode: Hybrid
