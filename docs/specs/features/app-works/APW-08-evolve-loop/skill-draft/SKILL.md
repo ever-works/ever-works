@@ -6,12 +6,11 @@ description: >
     3f9c2ab", or a Goal iteration or Mission Task filed on that App Work. Covers planning within the app's
     size guidance, respecting its protected paths and human-merge paths, running its declared checks, and
     writing a reviewable pull request against the branch the app deploys from.
-license: MIT
+license: Apache-2.0
 tags: [app-works, code-change, pull-request, quality-gates]
 metadata:
     author: ever-works
-    version: '0.1.0'
-    status: draft
+    version: '1.0.0'
     program: app-works
     epic: APW-08
 ---

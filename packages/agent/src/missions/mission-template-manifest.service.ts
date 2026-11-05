@@ -3,6 +3,12 @@ import * as path from 'node:path';
 import YAML from 'yaml';
 import { z } from 'zod';
 import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
+import {
+    MISSION_OPEN_TASKS_CAP,
+    MISSION_OUTPUT_MODES,
+    MISSION_TASK_OUTPUT_RELATIONS,
+    MISSION_TASKS_PER_TICK,
+} from './mission-task-output';
 
 /**
  * Phase 8 PR JJ — Mission Template manifest parser
@@ -65,6 +71,29 @@ const defaultsSchema = z
         /** -1 = unlimited; null/omitted = inherit user-level default. */
         outstandingIdeasCap: z.number().int().min(-1).optional(),
         guardrails: guardrailsSchema.optional(),
+        /**
+         * APW-08 T38 (FR-57) — what the spawned Mission's tick files: Ideas, Tasks on its
+         * attached App Works, or both. Omitted = the Mission's own default (`ideas`).
+         */
+        outputMode: z.enum(MISSION_OUTPUT_MODES).optional(),
+        /** APW-08 T38 — the Task output's bounds, the same ranges the Mission write accepts. */
+        taskOutput: z
+            .object({
+                tasksPerTick: z
+                    .number()
+                    .int()
+                    .min(MISSION_TASKS_PER_TICK.min)
+                    .max(MISSION_TASKS_PER_TICK.max)
+                    .optional(),
+                openTasksCap: z
+                    .number()
+                    .int()
+                    .min(MISSION_OPEN_TASKS_CAP.min)
+                    .max(MISSION_OPEN_TASKS_CAP.max)
+                    .optional(),
+            })
+            .passthrough()
+            .optional(),
     })
     .passthrough();
 
@@ -120,6 +149,58 @@ const kbSchema = z
     })
     .passthrough();
 
+// APW-08 T38 (FR-59) — a repository path glob the template recommends for the App spec. Only
+// ever SHOWN to the person and written into a change request's text; never applied.
+const appSpecPathSchema = z.string().min(1).max(300);
+
+/**
+ * APW-08 T38 (FR-56, FR-59) — the App Work a Mission made from this template is about, and the
+ * App spec rules the template recommends. The platform never writes `recommendedAppSpec` into the
+ * App spec: **Propose these rules** files a change request describing it, which reaches the App
+ * spec by pull request (Constitution III).
+ */
+const appWorkSchema = z
+    .object({
+        requiredRelation: z.enum(MISSION_TASK_OUTPUT_RELATIONS).optional(),
+        recommendedAppSpec: z
+            .object({
+                agents: z
+                    .object({
+                        maxPullRequestChangedLines: z
+                            .number()
+                            .int()
+                            .positive()
+                            .max(100_000)
+                            .optional(),
+                        requireHumanMergePaths: z.array(appSpecPathSchema).max(100).optional(),
+                    })
+                    .passthrough()
+                    .optional(),
+                display: z
+                    .object({
+                        protectedPaths: z.array(appSpecPathSchema).max(100).optional(),
+                    })
+                    .passthrough()
+                    .optional(),
+            })
+            .passthrough()
+            .optional(),
+    })
+    .passthrough();
+
+/**
+ * APW-08 T38 (FR-58) — a delivery Goal the template creates, as a DRAFT scoped to the chosen App
+ * Work and attached to the Mission. `{product}`, `{business}` and `{appWork}` in the title and the
+ * criteria are filled from the template's inputs at create time.
+ */
+const suggestedGoalSchema = z
+    .object({
+        title: z.string().min(1).max(200),
+        goalKind: z.literal('delivery'),
+        dodCriteria: z.array(z.string().min(1).max(300)).min(1).max(10),
+    })
+    .passthrough();
+
 const manifestSchema = z
     .object({
         /**
@@ -135,6 +216,10 @@ const manifestSchema = z
          * Ideas. Strings match the Template entity `id` column.
          */
         recommendedWorkTemplates: z.array(z.string().min(1).max(120)).max(50).optional(),
+        /** APW-08 T38 — present on a template that is about one App Work (FR-56). */
+        appWork: appWorkSchema.optional(),
+        /** APW-08 T38 — draft delivery Goals created with the Mission (FR-58). */
+        suggestedGoals: z.array(suggestedGoalSchema).max(10).optional(),
     })
     .passthrough();
 
@@ -219,6 +304,8 @@ export class MissionTemplateManifestService {
             autoBuildWorks?: boolean;
             outstandingIdeasCap?: number | null;
             guardrailsOverride?: Record<string, unknown> | null;
+            outputMode?: string;
+            taskOutput?: Record<string, unknown> | null;
         },
     >(input: T, manifest: MissionTemplateManifest): T {
         const defaults = manifest.defaults;
@@ -244,6 +331,13 @@ export class MissionTemplateManifestService {
             // about — pass them through anyway; the entity's JSON
             // column accepts arbitrary shapes.
             merged.guardrailsOverride = { ...defaults.guardrails };
+        }
+        // APW-08 T38 — the Mission's Output. Same rule: only a field the caller left undefined.
+        if (merged.outputMode === undefined && typeof defaults.outputMode === 'string') {
+            merged.outputMode = defaults.outputMode;
+        }
+        if (merged.taskOutput === undefined && defaults.taskOutput) {
+            merged.taskOutput = { ...defaults.taskOutput };
         }
         return merged;
     }
