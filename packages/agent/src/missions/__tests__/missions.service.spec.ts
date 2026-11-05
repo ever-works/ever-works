@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import type { ModuleRef } from '@nestjs/core';
+import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
 import type { Repository } from 'typeorm';
 import { MissionsService } from '../missions.service';
 import { Mission, MissionOutcome, MissionStatus, MissionType } from '../../entities/mission.entity';
@@ -12,6 +16,10 @@ import type {
 import { TitlerService } from '../../titler/titler.service';
 import type { ActivityLogService } from '../../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../../entities/activity-log.types';
+import { GoalsService } from '../../goals/goals.service';
+import type { GitFacadeService } from '../../facades/git.facade';
+import { MissionTemplateManifestService } from '../mission-template-manifest.service';
+import { MissionTemplateManifestReader } from '../mission-template-manifest.reader';
 
 /** Hand-rolled in-memory Repository<Mission> mock. Enough surface
  *  for what Phase 3 PR H's MissionsService actually calls. */
@@ -802,5 +810,311 @@ describe('MissionsService — output mode (APW-08 T34)', () => {
             ).rejects.toBeInstanceOf(BadRequestException);
             expect(repo._rows[0].taskOutput).toBeNull();
         });
+    });
+});
+
+/**
+ * APW-08 T39 (FR-56…FR-58, ACC-08-27 unit half) — `templateInputs` on create: the title filled
+ * from Product / Business / App Work, the `improves` relation through the ordinary attach path,
+ * and the template's two suggested Goals created as DRAFT delivery Goals scoped to the App Work
+ * and linked to the Mission. The App spec is untouched: the only git call is the template
+ * manifest's own read.
+ */
+describe('MissionsService — templateInputs (APW-08 T39)', () => {
+    const TEMPLATE_ID = 'build-on-open-source-app';
+    const APP_WORK = { id: 'w-app', name: 'Cal.com', kind: 'app', userId: 'u1' };
+    const RUNTIME_MANIFEST = readFileSync(
+        resolve(
+            __dirname,
+            '../../../../../docs/specs/features/app-works/APW-08-evolve-loop/mission-template-draft/.works/mission.yml',
+        ),
+        'utf8',
+    );
+
+    let repo: ReturnType<typeof makeRepoMock>;
+    let missionWorks: ReturnType<typeof makeMissionWorksMock>;
+    let worksRepo: { findOne: jest.Mock };
+    let git: { getFileContent: jest.Mock };
+    let goals: { create: jest.Mock; linkToMission: jest.Mock; delete: jest.Mock };
+    let goalsWired: boolean;
+
+    const moduleRef = {
+        get: jest.fn((token: unknown) => {
+            if (token === GoalsService && goalsWired) return goals;
+            throw new UnknownElementException(String(token));
+        }),
+    };
+
+    const build = () =>
+        new MissionsService(
+            repo as unknown as Repository<Mission>,
+            new TitlerService(),
+            undefined, // tickService
+            undefined, // missionAttachments
+            undefined, // uploadsRepo
+            missionWorks as unknown as MissionWorkRepository,
+            worksRepo as unknown as Repository<Work>,
+            undefined, // activityLog
+            undefined, // accessPolicy
+            undefined, // domainEvents
+            undefined, // recordVisibility
+            undefined, // agentsRepo
+            new MissionTemplateManifestReader(
+                new MissionTemplateManifestService(),
+                git as unknown as GitFacadeService,
+            ),
+            moduleRef as unknown as ModuleRef,
+        );
+
+    const input = (overrides: Record<string, unknown> = {}) => ({
+        description: 'Weekly changes on the App Work.',
+        type: MissionType.SCHEDULED,
+        missionTemplateRepo: TEMPLATE_ID,
+        templateInputs: { product: 'Booking', business: 'Yoga Loft', appWorkId: APP_WORK.id },
+        ...overrides,
+    });
+
+    beforeEach(() => {
+        repo = makeRepoMock();
+        missionWorks = makeMissionWorksMock();
+        missionWorks.listForMissionWithWork.mockResolvedValue([
+            { relation: 'improves', workKind: 'app' } as unknown as MissionWorkWithWork,
+        ]);
+        worksRepo = {
+            findOne: jest.fn(async (opts: { where: { id: string; userId?: string } }) =>
+                opts.where.id === APP_WORK.id && opts.where.userId === APP_WORK.userId
+                    ? (APP_WORK as unknown as Work)
+                    : null,
+            ),
+        };
+        git = {
+            getFileContent: jest.fn(async () => ({ content: RUNTIME_MANIFEST, encoding: 'utf-8' })),
+        };
+        let goalId = 0;
+        goals = {
+            create: jest.fn(async (_userId: string, goal: { title: string }) => ({
+                id: `g${++goalId}`,
+                title: goal.title,
+            })),
+            linkToMission: jest.fn(async () => ({})),
+            delete: jest.fn(async () => ({ deleted: true })),
+        };
+        goalsWired = true;
+        moduleRef.get.mockClear();
+    });
+
+    it('fills the title, attaches the App Work as Improves and creates two draft Goals scoped to it', async () => {
+        const dto = await build().create('u1', input());
+
+        expect(dto.title).toBe('Build my own Booking for Yoga Loft on top of Cal.com');
+        // FR-57 from the template's manifest.
+        expect(dto).toMatchObject({
+            schedule: '0 8 * * 1',
+            outputMode: 'tasks',
+            taskOutput: { tasksPerTick: 2, openTasksCap: 4 },
+            outstandingIdeasCap: 0,
+            guardrailsOverride: { maxBudgetCentsPerRun: 1500, requireApprovalBeforeCreate: true },
+        });
+        expect(dto.warnings).toBeUndefined();
+
+        expect(missionWorks.attach).toHaveBeenCalledTimes(1);
+        expect(missionWorks.attach).toHaveBeenCalledWith({
+            missionId: dto.id,
+            workId: APP_WORK.id,
+            userId: 'u1',
+            relation: 'improves',
+        });
+
+        expect(goals.create).toHaveBeenCalledTimes(2);
+        for (const [userId, goal] of goals.create.mock.calls) {
+            expect(userId).toBe('u1');
+            expect(goal).toMatchObject({ goalKind: 'delivery', workId: APP_WORK.id });
+            expect(goal.dodCriteria.length).toBeGreaterThanOrEqual(1);
+            for (const criterion of goal.dodCriteria) {
+                expect(criterion).toMatchObject({ status: 'open' });
+                expect(criterion.text).not.toMatch(/\{(product|business|appWork)\}/);
+            }
+        }
+        expect(goals.create.mock.calls[0][1].dodCriteria[0].text).toBe(
+            'A product brief for Booking at Yoga Loft exists in the Mission knowledge base',
+        );
+        expect(goals.linkToMission.mock.calls).toEqual([
+            ['u1', dto.id, 'g1', false, undefined],
+            ['u1', dto.id, 'g2', false, undefined],
+        ]);
+    });
+
+    it('leaves the App spec untouched: the only git call is the template manifest read', async () => {
+        await build().create('u1', input());
+        expect(git.getFileContent).toHaveBeenCalledTimes(1);
+        expect(git.getFileContent.mock.calls[0].slice(0, 3)).toEqual([
+            'ever-works',
+            'build-on-open-source-app-mission-template',
+            '.works/mission.yml',
+        ]);
+        expect(worksRepo.findOne).toHaveBeenCalled();
+    });
+
+    it('a value the person set wins over the template (FR-60)', async () => {
+        const dto = await build().create(
+            'u1',
+            input({
+                title: 'My own title',
+                schedule: '0 6 * * 3',
+                taskOutput: { tasksPerTick: 1 },
+            }),
+        );
+        expect(dto.title).toBe('My own title');
+        expect(dto.schedule).toBe('0 6 * * 3');
+        expect(dto.taskOutput.tasksPerTick).toBe(1);
+    });
+
+    it('a Work that is not the caller’s is 404 workNotFound and nothing is written', async () => {
+        await expect(
+            build().create(
+                'u1',
+                input({ templateInputs: { product: 'P', business: 'B', appWorkId: 'w-other' } }),
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(repo._rows).toHaveLength(0);
+        expect(goals.create).not.toHaveBeenCalled();
+    });
+
+    it('a Work that is not an App Work is refused before anything is written', async () => {
+        worksRepo.findOne.mockResolvedValueOnce({ ...APP_WORK, kind: 'website' });
+        await expect(build().create('u1', input())).rejects.toBeInstanceOf(BadRequestException);
+        expect(repo._rows).toHaveLength(0);
+    });
+
+    it('refuses templateInputs without a catalog template, and over-long inputs', async () => {
+        await expect(
+            build().create('u1', input({ missionTemplateRepo: null })),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            build().create(
+                'u1',
+                input({
+                    templateInputs: { product: 'p'.repeat(81), business: 'B', appWorkId: 'w-app' },
+                }),
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(repo._rows).toHaveLength(0);
+    });
+
+    it('an unreadable manifest still fills the title and attaches the Work, but files no Goal', async () => {
+        git.getFileContent.mockRejectedValueOnce(new Error('No connected account'));
+        const dto = await build().create('u1', input({ schedule: '0 8 * * 1' }));
+        expect(dto.title).toBe('Build my own Booking for Yoga Loft on top of Cal.com');
+        expect(missionWorks.attach).toHaveBeenCalledTimes(1);
+        expect(goals.create).not.toHaveBeenCalled();
+        expect(dto.warnings).toEqual(['templateManifestUnreadable']);
+    });
+
+    it('refuses templateInputs for a template that is not about an App Work, readable or not', async () => {
+        git.getFileContent.mockRejectedValue(new Error('No connected account'));
+        await expect(
+            build().create('u1', input({ missionTemplateRepo: 'starter-business' })),
+        ).rejects.toMatchObject({
+            response: expect.objectContaining({ code: 'templateInputsNotAccepted' }),
+        });
+        expect(repo._rows).toHaveLength(0);
+    });
+
+    it('a failed attach and a failed Goal are answered as warnings; the rest is still done', async () => {
+        missionWorks.attach.mockRejectedValueOnce(new Error('db down'));
+        goals.create.mockRejectedValueOnce(new Error('goal refused'));
+        const dto = await build().create('u1', input());
+        expect(repo._rows).toHaveLength(1);
+        // The second Goal is still created and linked after the first failed.
+        expect(goals.create).toHaveBeenCalledTimes(2);
+        expect(goals.linkToMission).toHaveBeenCalledTimes(1);
+        expect(dto.warnings).toEqual(
+            expect.arrayContaining(['templateWorkNotAttached', 'templateGoalsNotCreated']),
+        );
+    });
+
+    it('a Goal created but not linked is removed, and the write says so (review of #3077)', async () => {
+        goals.linkToMission.mockRejectedValueOnce(new Error('link refused'));
+        const dto = await build().create('u1', input());
+        expect(goals.create).toHaveBeenCalledTimes(2);
+        // The first Goal was created (g1) and its link failed: it is deleted; g2 is linked.
+        expect(goals.delete).toHaveBeenCalledTimes(1);
+        expect(goals.delete).toHaveBeenCalledWith('u1', 'g1', undefined);
+        expect(dto.warnings).toEqual(['templateGoalsNotCreated']);
+    });
+
+    describe('readTemplateManifest (APW-08 T40)', () => {
+        it('answers the form’s view of the template', async () => {
+            const view = await build().readTemplateManifest('u1', TEMPLATE_ID);
+            expect(view).toEqual({
+                templateId: TEMPLATE_ID,
+                defaults: {
+                    cadence: '0 8 * * 1',
+                    outputMode: 'tasks',
+                    tasksPerTick: 2,
+                    openTasksCap: 4,
+                    maxBudgetCentsPerRun: 1500,
+                    requireApprovalBeforeCreate: true,
+                    outstandingIdeasCap: 0,
+                },
+                appWork: {
+                    requiredRelation: 'improves',
+                    maxPullRequestChangedLines: 400,
+                    requireHumanMergePaths: [
+                        '**/migrations/**',
+                        '**/prisma/schema.prisma',
+                        '**/*.sql',
+                        '**/schema.rb',
+                    ],
+                    protectedPaths: ['LICENSE*', 'NOTICE*'],
+                },
+                suggestedGoals: [
+                    expect.objectContaining({ title: 'First customised feature live' }),
+                    expect.objectContaining({
+                        title: 'Four changes live in a month, none closed without deploying',
+                    }),
+                ],
+                warnings: [],
+            });
+        });
+
+        it('shows the budget a create would store, not an out-of-range one', async () => {
+            git.getFileContent.mockResolvedValueOnce({
+                content: RUNTIME_MANIFEST.replace(
+                    'maxBudgetCentsPerRun: 1500',
+                    'maxBudgetCentsPerRun: 5000000',
+                ),
+                encoding: 'utf-8',
+            });
+            const view = await build().readTemplateManifest('u1', TEMPLATE_ID);
+            expect(view.defaults?.maxBudgetCentsPerRun).toBeNull();
+            expect(view.defaults?.requireApprovalBeforeCreate).toBe(true);
+        });
+
+        it('an unreadable manifest answers the warning and nothing else', async () => {
+            git.getFileContent.mockRejectedValueOnce(new Error('No connected account'));
+            await expect(build().readTemplateManifest('u1', TEMPLATE_ID)).resolves.toEqual({
+                templateId: TEMPLATE_ID,
+                defaults: null,
+                appWork: null,
+                suggestedGoals: [],
+                warnings: ['templateManifestUnreadable'],
+            });
+        });
+
+        it('an id that is not a catalog template is 404 templateNotFound, and nothing is read', async () => {
+            await expect(
+                build().readTemplateManifest('u1', 'no-such-template'),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(git.getFileContent).not.toHaveBeenCalled();
+        });
+    });
+
+    it('without GoalsService in the graph the Mission is created and the write says so', async () => {
+        goalsWired = false;
+        const dto = await build().create('u1', input());
+        expect(repo._rows).toHaveLength(1);
+        expect(missionWorks.attach).toHaveBeenCalledTimes(1);
+        expect(dto.warnings).toEqual(['templateGoalsNotCreated']);
     });
 });

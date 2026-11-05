@@ -1,0 +1,67 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://github.com/ever-works/missions/blob/main/schema/mission-template.schema.json",
+	"title": "Ever Works — Mission Template",
+	"description": "Schema for `mission.yml` in every Mission template. Mirrors the user-settable fields on the platform's Mission entity (packages/agent/src/entities/mission.entity.ts).",
+	"type": "object",
+	"required": ["slug", "title", "type", "summary"],
+	"additionalProperties": false,
+	"properties": {
+		"slug": {
+			"type": "string",
+			"pattern": "^[a-z0-9][a-z0-9-]{1,60}$"
+		},
+		"title": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 200
+		},
+		"summary": {
+			"type": "string",
+			"minLength": 8,
+			"maxLength": 280,
+			"description": "One-sentence description shown on the template card."
+		},
+		"type": {
+			"enum": ["ONE_SHOT", "SCHEDULED"]
+		},
+		"schedule": {
+			"type": ["string", "null"],
+			"description": "Cron expression. Required when type=SCHEDULED. Ignored for ONE_SHOT.",
+			"maxLength": 64
+		},
+		"autoBuildWorks": {
+			"type": "boolean",
+			"default": false,
+			"description": "When true, Ideas the Mission emits that pass guardrails become Works without per-Idea approval. Templates default this to false unless the BRIEF explicitly explains the trade-off."
+		},
+		"outstandingIdeasCap": {
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 10000,
+			"description": "Cap on pending (PENDING/QUEUED) Ideas this Mission may hold open at once. 0 means 'no cap'."
+		},
+		"guardrailsOverride": {
+			"type": "object",
+			"description": "Partial override of the tenant-global Work generation guardrails. Mirrors WorkGuardrails.",
+			"additionalProperties": true
+		},
+		"suggestedAgentTemplates": {
+			"type": "array",
+			"description": "Agent template slugs from `ever-works/agents` that this Mission expects on the team. The wizard offers to create them on activation.",
+			"items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,60}$" },
+			"maxItems": 16
+		},
+		"tags": {
+			"type": "array",
+			"items": { "type": "string", "minLength": 1, "maxLength": 40 },
+			"maxItems": 16
+		}
+	},
+	"allOf": [
+		{
+			"if": { "properties": { "type": { "const": "SCHEDULED" } } },
+			"then": { "required": ["schedule"] }
+		}
+	]
+}

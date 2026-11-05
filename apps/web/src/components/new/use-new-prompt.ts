@@ -74,6 +74,7 @@ export function useNewPrompt({
     inputId,
 }: UseNewPromptOptions = {}) {
     const t = useTranslations('dashboard.newPage');
+    const tb = useTranslations('dashboard.missionsPage.buildOnApp');
     const router = useRouter();
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedChip, setSelectedChip] = useState<ChipType>(initialType ?? 'mission');
@@ -178,6 +179,10 @@ export function useNewPrompt({
                         }
                     }
                     toast.success(t('toasts.missionCreated'));
+                    // APW-08 T40 (review of #3077) — a template that could not be read is said.
+                    if (mission.warnings?.includes('templateManifestUnreadable')) {
+                        toast.warning(tb('templateUnreadable'));
+                    }
                     onMissionCreated?.(mission);
                 } catch (err) {
                     toast.error(err instanceof Error ? err.message : t('toasts.submitError'));

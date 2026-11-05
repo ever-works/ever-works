@@ -139,25 +139,25 @@ describe('AppWorkForm', () => {
         expect(screen.queryByTestId('app-work-preview')).toBeNull();
     });
 
-    it('renders every spec §6.3 reason string from a fixture', async () => {
+    // One case per reason code, so every spec §6.3 string is still rendered from a fixture, but
+    // each full form render gets its own budget. As a single case looping over all 24 codes, it
+    // spent 24 renders of the form (with the whole English catalogue) against one 30 s timeout,
+    // and a loaded CI runner timed it out (stage run 41605694347) while every code was fine.
+    it.each(APP_SOURCE_REASON_CODES)('renders the spec §6.3 reason string for %s', async (code) => {
         const details = { owner: 'acme', fullName: 'acme/tasks-app', workName: 'Tasks' };
-        for (const code of APP_SOURCE_REASON_CODES) {
-            cleanup();
-            inspectMock.mockReset();
-            inspectMock.mockResolvedValue({ success: false, error: 'x', code, details });
-            renderForm();
-            await pasteAndCheck();
-            const expected = REASONS[code]
-                .replaceAll('{owner}', 'acme')
-                .replaceAll('{fullName}', 'acme/tasks-app')
-                .replaceAll('{workName}', 'Tasks')
-                // No preview in hand: size, name and time fall back to a dash.
-                .replaceAll('{size}', '—')
-                .replaceAll('{name}', '—')
-                .replaceAll('{time}', '—');
-            const alert = await screen.findByTestId('app-work-inspect-error');
-            expect(alert.textContent, code).toBe(expected);
-        }
+        inspectMock.mockResolvedValue({ success: false, error: 'x', code, details });
+        renderForm();
+        await pasteAndCheck();
+        const expected = REASONS[code]
+            .replaceAll('{owner}', 'acme')
+            .replaceAll('{fullName}', 'acme/tasks-app')
+            .replaceAll('{workName}', 'Tasks')
+            // No preview in hand: size, name and time fall back to a dash.
+            .replaceAll('{size}', '—')
+            .replaceAll('{name}', '—')
+            .replaceAll('{time}', '—');
+        const alert = await screen.findByTestId('app-work-inspect-error');
+        expect(alert.textContent, code).toBe(expected);
     });
 
     it('shows a disabled mode with its reason and defaults to the preview’s mode', async () => {

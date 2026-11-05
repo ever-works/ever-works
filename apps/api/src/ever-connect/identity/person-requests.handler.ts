@@ -251,7 +251,19 @@ export class PersonRequestsHandler {
         return toAnswer(row, true);
     }
 
-    /** The connected identities whose hash is in `hashes` (read page by page). */
+    /**
+     * The connected identities whose hash is in `hashes` (read page by page).
+     *
+     * A full scan on purpose. The request names a person only by
+     * `sha256("<issuer>#<subject>")`, which no index on `(issuer, subject)` can
+     * answer, and narrowing to today's Ever ID issuer would answer `no_account`
+     * for an identity linked under an earlier issuer spelling — a wrong answer
+     * to a deletion request. It runs once per platform job (the answer is
+     * stored, so a redelivered event does not scan again). If the table grows
+     * large, the proportionate fix is a stored, indexed `subject_hash` column
+     * written on link and backfilled by a migration that pages in code
+     * (SQLite, which the specs use, has no `sha256()`).
+     */
     private async matchingIdentities(
         hashes: ReadonlySet<string>,
     ): Promise<Array<Pick<ExternalIdentity, 'id' | 'userId'>>> {

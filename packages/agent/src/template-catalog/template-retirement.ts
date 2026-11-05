@@ -3,7 +3,9 @@
  *
  * A row is RETIRED, not deactivated, when website-template discovery finds
  * that the repository behind it is an App Blueprint (e.g. ever-works/cal-template):
- * a repository named like a website template that generates an App Work.
+ * a repository named like a website template that generates an App Work — or
+ * a Mission template repository (APW-08 T41, e.g.
+ * ever-works/build-on-open-source-app-mission-template), named like one too.
  *
  * - The row stays `isActive: true`, so the website resolver keeps resolving it
  *   for every Work that names it and every Work inheriting a user default set
@@ -27,16 +29,22 @@
  * `WEBSITE_TEMPLATES` rows and user-created templates are never retired.
  */
 
-/** Why a row was retired. The only reason today. */
-export type TemplateRetirementReason = 'app_blueprint';
+/** Why a row was retired. */
+export type TemplateRetirementReason = 'app_blueprint' | 'mission_template';
 
 const RETIRED_REASON_KEY = 'retiredReason';
 const RETIRED_AT_KEY = 'retiredAt';
-const RETIREMENT_REASONS: readonly TemplateRetirementReason[] = ['app_blueprint'];
+const RETIREMENT_REASONS: readonly TemplateRetirementReason[] = [
+    'app_blueprint',
+    'mission_template',
+];
 const RETIREMENT_EXPLANATIONS: Record<TemplateRetirementReason, string> = {
     app_blueprint:
         'is an App Blueprint, not a website template. Choose a website template, or create an App Work ' +
         'from the Blueprint instead.',
+    mission_template:
+        'is a Mission template, not a website template. Choose a website template, or start a Mission ' +
+        'from it instead.',
 };
 
 type WithMetadata = { metadata?: Record<string, unknown> | null };
@@ -108,6 +116,9 @@ export function retiredTemplateSelectionMessage(
 const DEFAULT_INHERITANCE_EXPLANATIONS: Record<TemplateRetirementReason, string> = {
     app_blueprint:
         'is an App Blueprint, not a website template, so a Work cannot newly inherit it. Choose a ' +
+        'website template for this Work, or set a website template as your default first.',
+    mission_template:
+        'is a Mission template, not a website template, so a Work cannot newly inherit it. Choose a ' +
         'website template for this Work, or set a website template as your default first.',
 };
 

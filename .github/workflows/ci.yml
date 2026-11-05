@@ -455,6 +455,7 @@ jobs:
           fi
 
       - name: Build all packages
+        id: build
         if: steps.scope.outputs.code == 'true'
         run: pnpm build --filter=!./apps/docs
 
@@ -732,6 +733,28 @@ jobs:
         env:
           NODE_ENV: test
         run: pnpm test:cli
+
+      # The repo-wide type-check (D-3). Nothing ran it before. `pnpm build`
+      # proves only what each build compiles, and most builds (tsup, swc) do
+      # not type-check at all, or check a build tsconfig that leaves the spec
+      # files out. So a type error that only `type-check` sees went straight to
+      # `stage`. Five of them were there when this step was added, in
+      # `packages/agent` and `packages/plugins/github-actions-build`.
+      #
+      # LAST, and run whenever the build succeeded: a type error must not hide
+      # the test results of a promotion, and a red test must not hide a type
+      # error. Either one still fails the job.
+      #
+      # `type-check` depends on `^build` in turbo.json, so it is right on a cold
+      # tree too. Here those builds are turbo cache hits from "Build all
+      # packages". The one exception is apps/node, which that step skips and
+      # apps/desktop-node depends on; it builds here with two `tsc` runs. The
+      # concurrency cap bounds memory: the large `tsc` runs (apps/web, apps/api,
+      # packages/agent) take a few GB each, against the ~36 GiB limit of an
+      # ever-works x64-4 runner pod.
+      - name: Type-check
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm type-check --concurrency=4
 
   # EW-742 P6 T37 — per-provider job-runtime plugin matrix.
   #

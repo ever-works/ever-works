@@ -168,7 +168,10 @@ describe('readJobLogTail (plan §4.8)', () => {
 
 describe('getBuild attaches the failure (plan §4.9)', () => {
 	function failingPlugin(log: string, jobs?: readonly ActionsJob[]) {
-		const downloadJobLogTail = vi.fn(async () => ({ bytes: utf8(log), partial: false }));
+		const downloadJobLogTail = vi.fn<NonNullable<ActionsRunsPort['downloadJobLogTail']>>(async () => ({
+			bytes: utf8(log),
+			partial: false
+		}));
 		const port = fakePort({
 			getWorkflowRun: async () => run(),
 			listRunJobs: async () => jobs ?? [job('build')],

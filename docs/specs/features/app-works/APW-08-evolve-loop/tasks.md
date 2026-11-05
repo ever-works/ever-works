@@ -5,8 +5,8 @@
 
 **Epic ID**: `APW-08-evolve-loop`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
-**Status**: `In progress` — P0 and P1 built on `develop` except the T30 ship gate; T43, T44 and T46 are partly built (their rest needs P2 or a Fleet producer); P2 (T31–T37) and P3 (T38–T42) not started (2026-10-31)
-**Last updated**: 2026-10-31
+**Status**: `In progress` — P0 and P1 built on `develop` except the T30 ship gate; P2 (T31–T37) merged in #3061; P3 (T38–T42) built on `feat/apw08-p3-open-source-template` (2026-11-05); T43 and T46 partly built (their rest needs a Fleet producer); T44's P2/P3 doc edits made with P3; T45 closes with the T30 ship gate (owner-run)
+**Last updated**: 2026-11-05
 
 ---
 
@@ -1066,7 +1066,7 @@ _Delivers FR-45…FR-55._
 
 _Delivers FR-56…FR-60._
 
-- [ ] **T38. Manifest keys and the missing `applyDefaults` caller.**
+- [x] **T38. Manifest keys and the missing `applyDefaults` caller.**
       **Modify** `packages/agent/src/missions/mission-template-manifest.service.ts` — optional `defaults.outputMode`,
       `defaults.taskOutput`, top-level `appWork { requiredRelation, recommendedAppSpec }` and
       `suggestedGoals[] { title (≤ 200), goalKind: 'delivery', dodCriteria[] (1–10, ≤ 300 chars) }`; `applyDefaults`
@@ -1087,8 +1087,40 @@ _Delivers FR-56…FR-60._
       `mission-template-manifest.service.spec.ts` passes
       unchanged (ACC-08-27, unit half). Run: `pnpm --filter @ever-works/agent test mission-template`.
       **Done when**: the specs are green.
+      **Status (2026-11-05, P3 lane, branch `feat/apw08-p3-open-source-template`): built.**
+    - **Manifest keys.** `defaults.outputMode` / `defaults.taskOutput` (the Mission write's own bounds),
+      `appWork { requiredRelation (improves | operates), recommendedAppSpec }` and
+      `suggestedGoals[] { title ≤ 200, goalKind: delivery, dodCriteria 1–10 × ≤ 300 }`; `applyDefaults` carries
+      `outputMode` / `taskOutput`.
+    - **The fetch (APW08-G13).** `MissionTemplateManifestReader` reads `.works/mission.yml` through
+      `GitFacadeService.getFileContent` at the template's recorded `branch`, with the template's `owner` / `repo`
+      from `findMissionTemplateConfig` and the person's own git connection (`providerId` = the row's `gitProvider`,
+      default `github` — the catalog row's own host). It never throws: unreadable or invalid answers one warning,
+      `templateManifestUnreadable`, and the Mission keeps its explicit values.
+    - **The caller.** `MissionsService.create` applies the manifest under the caller's values: explicit values and
+      explicit `null`s win, and a one-shot create never takes the template's cadence. The API create now passes an
+      OMITTED `schedule` / `outstandingIdeasCap` / `guardrailsOverride` as `undefined` (it used to coerce them to
+      `null`, which would have hidden every default).
+    - **The read endpoint** for the form is T40's `GET /api/me/missions/templates/:templateId/manifest`.
 
-- [ ] **T39. Template inputs.**
+    Specs: `mission-template-defaults` 18/18 (new: the facade read at the branch, base64, both starters' defaults
+    applied, explicit values and nulls win, one-shot stays one-shot, four unreadable shapes → one warning, no read
+    for a non-catalog value, guardrails narrowed, the read deadline); `mission-template-manifest.service` and
+    `mission-template.config` unchanged; `template-catalog.service` 65/65 (2 new: a Mission template repository is
+    never listed as a website template, and an earlier row for one is retired).
+    **Independent review (2026-11-05; CodeRabbit was rate-limited), fixed on the branch:** a template's
+    guardrails and Task output are narrowed to the keys and ranges a person may write (never an Agent) before
+    they are stored; the read gives up after 5 s (`templateManifestUnreadable`); `appWork` path globs refuse
+    whitespace, backticks and backslashes (they reach a change request's text); whether a template takes
+    `templateInputs` is the row's own `takesAppWork`, not the manifest's readability; website-template discovery
+    no longer lists a Mission template repository (`*-mission-template` or a `MISSION_TEMPLATES` row) and
+    retires a row an earlier discovery saved for one (`retiredReason: mission_template`); the form says when a
+    template was unreadable or only partly applied; the App Work picker asks the API for `kind=app`.
+    **Known gap:** the two starter repositories (`ever-works/starter-business-mission-template`,
+    `…/starter-content-mission-template`) do not exist on GitHub, so their Missions answer
+    `templateManifestUnreadable` until they are published.
+
+- [x] **T39. Template inputs.**
       **Modify** `packages/agent/src/missions/missions.service.ts`, `apps/api/src/missions/dto/mission.dto.ts` —
       `templateInputs { product (≤ 80), business (≤ 80), appWorkId }`: title interpolation, `improves` relation via
       `MissionWorkRepository.attach`, draft delivery Goals via `GoalsService` with `workId` + `mission_goals` link.
@@ -1096,8 +1128,19 @@ _Delivers FR-56…FR-60._
       Goals scoped and linked, App spec untouched (no git call). Run:
       `pnpm --filter @ever-works/agent test missions.service`.
       **Done when**: the spec is green.
+      **Status (2026-11-05, P3 lane): built.** `CreateMissionDto.templateInputs` (`product` / `business` 1–80,
+      `appWorkId` uuid). The service needs a catalog template (`400 templateRequired`), refuses one whose manifest
+      has no `appWork` (`400 templateInputsNotAccepted`), and checks the App Work before writing anything
+      (`404 workNotFound` for another account's or a missing Work, `400 notAppWork`). After the write: the title is
+      _Build my own {product} for {business} on top of {appWork}_ unless one was given; the Work is attached through
+      `attachWork` (`MissionWorkRepository.attach` + `mission.work.linked`) with the manifest's relation; each
+      suggested Goal is created through `GoalsService.create` (draft, `delivery`, `workId`, criteria filled from the
+      inputs) and linked with `linkToMission`. `GoalsService` is resolved lazily (no module import, no cycle). A step
+      that fails answers `templateWorkNotAttached` / `templateGoalsNotCreated`; the Mission stays. No git call is
+      made for the App Work. Specs: `missions.service` 66/66 (13 new T39 / T40 cases, `readTemplateManifest` included); `mission.dto` (6 new);
+      `missions.controller` 4/4 (2 new).
 
-- [ ] **T40. Template form and "Propose these rules".**
+- [x] **T40. Template form and "Propose these rules".
       **Modify** `apps/web/src/components/missions/NewMissionForm.tsx` — the three fields and summary when the selected
       template's manifest has `appWork`; **Propose these rules** calls `POST /api/works/:id/evolve` with a generated
       request describing `recommendedAppSpec` (human-merge paths, size guidance).
@@ -1114,8 +1157,19 @@ _Delivers FR-56…FR-60._
       App spec write; **the `/new?type=mission&template=…` path renders the same fields** (APW08-G13). Run:
       `pnpm --filter ever-works-web test NewMissionForm app-works-evolve-messages`.
       **Done when**: the specs are green.
+      **Status (2026-11-05, P3 lane): built.** `BuildOnAppTemplateFields` (Product, Business, an App Work picker —
+      `WorkSelect` gains `kinds` — the FR-57 summary, the draft Goals, the recommended rules and **Propose these
+      rules\*\*, which calls `requestAppChangeAction` once with a generated request asking for a pull request on
+      `.works/works.yml`) is shared by `NewMissionForm` (`/missions/new?template=<id>`, new) and the catalog path
+      (`/new?type=mission&template=<id>`: `NewPageClient` renders `NewMissionForm` when the template's manifest has
+      `appWork`; every other template keeps the prompt composer). The form starts on the template's cadence and
+      sends only what the person sees, so the manifest supplies the rest (FR-57) and their edits win (FR-60).
+      `GET /api/me/missions/templates/:templateId/manifest` (declared before `GET :id`, 30/min, `404
+  templateNotFound`) answers the form's view. Copy `dashboard.missionsPage.buildOnApp` (plan §6 verbatim plus
+      five leaves) in all 21 locales. Specs: `NewMissionForm.unit` 9/9 (new), `app-works-evolve-messages` 8/8,
+      `NewPageClient.unit` unchanged.
 
-- [ ] **T41. Catalog content and the template's real home (outside this monorepo).**
+- [x] **T41. Catalog content and the template's real home (outside this monorepo).**
       **The seed mechanism decides the destination (APW08-G13, EXT-13).** The platform reads **one repository per
       template** — `MissionTemplateConfig { owner, repo, branch }`
       (`packages/agent/src/missions/mission-template.config.ts:27-60`) — and **no code reads `ever-works/missions`**
@@ -1145,11 +1199,39 @@ _Delivers FR-56…FR-60._
       catalog shape (a JSON-Schema check over the local file).
       **Done when**: the template card renders on `/templates` (Kind: Mission), the Skill appears in the catalog, and
       both `mission.yml` files exist with their distinct shapes.
+      **Status (2026-11-05, P3 lane): built.**
+    - **Seed row.** `build-on-open-source-app` in `MISSION_TEMPLATES` (seeded into the catalog on boot like the
+      two starters).
+    - **Standalone repository.** `ever-works/build-on-open-source-app-mission-template` created (public, like the
+      `ever-works/missions` and `ever-works/skills` catalogs and the public Work templates — the two starter
+      repositories it would have copied do not exist) with the draft's `.works/mission.yml`, `README.md` and
+      `prompts/`, unchanged.
+    - **Catalog copy (EXT-13).** Checked against the real catalog schema, vendored at
+      `mission-template-draft/catalog/schema/mission-template.schema.json` (`ever-works/missions` @ `1cfb38b7`). It
+      failed before: `suggestedAgentTemplates` must be slug strings, so `[{ slug: app-provisioner, reason }]` became
+      `[starter-coder]` (`app-provisioner` is not in `ever-works/agents`). `manifest-row.json` now has the live
+      row's shape (`missionPath` / `briefPath` / `readmePath`, `tags`). Publishing the copy to
+      `ever-works/missions` is not done (a follow-up).
+    - **Skill (APW08-G14).** `skill-draft/manifest-row.json` gains the schema's required `path`, and `skillPath`
+      now names the `SKILL.md`; `SKILL.md`'s license is Apache-2.0 like its row. Published to `ever-works/skills`
+      as `skills/evolve-app/SKILL.md` plus its `manifest.json` row (validated against the repository's schema).
+    - **Spec.** `mission-template-defaults`: the seed row resolves; the runtime manifest parses with `appWork`, two
+      `suggestedGoals` and the FR-57 defaults; a Mission made from it through the facade gets FR-57; the catalog
+      copy passes the catalog schema and the runtime manifest does not (distinct shapes).
 
-- [ ] **T42. P3 e2e and gate.**
+- [x] **T42. P3 e2e and gate.**
       **Modify** `apps/web/e2e/missions-task-output.spec.ts` — add **Use this Template**.
       **Test**: `cd apps/web && pnpm exec playwright test missions-task-output` and the root gate.
       **Done when**: both are green and ACC-08-27 is walked.
+      **Status (2026-11-05, P3 lane): written; it runs in the e2e lane** (`e2e.yml`, on push to `stage` or by
+      dispatch — not run on this PC). `missions-task-output.spec.ts` gains **Use this Template**: the template is in
+      the Mission catalog and its manifest route answers (`404` for an unknown id); a create with the template's
+      inputs yields the FR-57 Mission titled from Product / Business / App Work with the App Work attached as
+      Improves, and two draft delivery Goals on it when the stack can read the template (the lane's seeded user
+      has no git connection, so there the create answers `templateManifestUnreadable` and files none — both
+      branches are asserted); another account's Work is `404` and inputs without a template `400`; the catalog
+      card's **Use this Template** opens `/new?type=mission&template=build-on-open-source-app`. The root gate is
+      CI's; the ACC-08-27 walk on a running build belongs with the T30 ship gate (owner-run).
 
 ---
 
@@ -1198,6 +1280,12 @@ _Delivers FR-56…FR-60._
       `docs/features/app-works.md` corrected for G06 / G22 (no refusal on a truncated patch alone; the file-count
       guidance) and linked to the new page; the APW-08 TRACKER row updated. **Waits on P2 / P3:** the `missions.md`
       (Output), `goals.md` (Work) and `mission-templates.md` edits — they describe surfaces that do not exist yet.
+      **Status (2026-11-05, P3 lane): the deferred edits are made.** `missions.md` gains **Output** (the three
+      modes, the 5-App-Work reach, the limits, approval → Backlog, the per-run budget, the daily notice, the panel);
+      `goals.md` gains **The Goal's Work** (scope, the awaiting-merge wait, locked while running, a removed Work
+      pauses the loop); `mission-templates.md` now says the defaults ARE applied (and how they are read), lists the
+      new keys and the third built-in, and describes templates about an App Work; `app-works-evolve.md`'s "Not yet"
+      keeps only the safety-rail holds and links the three. All that is left of T44 is the docs build check.
 
 - [ ] **T45. Statuses.**
       **Modify** `spec.md`, `plan.md` and this file — status `Implemented`.

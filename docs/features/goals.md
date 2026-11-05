@@ -66,6 +66,16 @@ An **explicit** `0` is still perfectly valid. "Keep failures at most 0" is a rea
 
 New Goals are created in **draft**. Nothing is evaluated until you activate them.
 
+### The Goal's Work
+
+**Work (optional)** scopes the Goal to one of your Works: its loop's iterations become Tasks on that Work. On an [App Work](./app-works.md) each iteration's change then goes through the delivery chain, and an iteration whose pull request is still open counts as work in flight: the loop says _Waiting for iteration {n}'s pull request to be merged or closed._ instead of starting more iterations than its concurrency allows.
+
+- The Work must be one of yours in the Goal's workspace; another account's Work is answered as not found.
+- It cannot change while the loop runs — pause the loop first. **No Work** clears it.
+- If the Work is removed, the loop pauses: _The Work this Goal was scoped to no longer exists._
+
+The [Build on an open-source app](./mission-templates.md#templates-about-an-app-work) Mission template creates two draft delivery Goals already scoped to the App Work you pick.
+
 ## Delivery goals
 
 A **delivery Goal** is for outcomes that are not a number — "ship feature X across three repos",
