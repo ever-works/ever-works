@@ -212,9 +212,10 @@ vi.mock('@ever-works/agent/app-works', async () => {
 
 // The REAL untrusted-line neutralizer, from its leaf (`task-brief` above already imports the same
 // file). The `@ever-works/agent/utils` barrel itself was the last unmocked `@ever-works/agent/*`
-// import of this module, and the most expensive part of the one cold import in `beforeAll`: about
-// 4-6 s of a locally measured ~11 s, the rest being the entity graph `assertUuid` used to drag in
-// from `task-context.utils`. Stage run 41605694347 timed that import out at 120 s.
+// import of this module. Once `assertUuid` stopped dragging in the entity graph (see
+// `assert-uuid.utils.ts`), the barrel was the most expensive part of the one cold import in
+// `beforeAll`: 4-6 s of the ~11 s that import still took locally. With it mocked, the import takes
+// ~1-1.7 s. Stage run 41605694347 timed the original import out at 120 s.
 vi.mock('@ever-works/agent/utils', async () => ({
     neutralizeUntrustedLine: (
         await vi.importActual<typeof import('../../../agent/src/utils/untrusted-content')>(

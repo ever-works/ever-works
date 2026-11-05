@@ -3,13 +3,10 @@ import { plainToInstance } from 'class-transformer';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { TriggerPluginHydratorService } from '../services/trigger-plugin-hydrator.service';
 import { Work, User } from '@ever-works/agent/entities';
-import { assertUuid } from './assert-uuid.utils';
-
 // H-22: the payload UUID guard lives in the dependency-free `assert-uuid.utils`
-// leaf. Import it from there, not from here: this module pulls in the entity
-// barrel and the worker services. Re-exported only so an older import keeps
-// compiling.
-export { assertUuid };
+// leaf. Import it from there, never from here: this module pulls in the entity
+// barrel and the worker services.
+import { assertUuid } from './assert-uuid.utils';
 
 /**
  * Shared bootstrap logic for both generation and import tasks:

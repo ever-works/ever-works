@@ -93,12 +93,7 @@ const readAction = vi.mocked(readAppLauncherListAction);
  */
 const LARGE_LIST_TIMEOUT_MS = 120_000;
 
-/** `describe` whose cases get {@link LARGE_LIST_TIMEOUT_MS}. */
-function describeLargeList(name: string, factory: () => void): void {
-    describe(name, factory, LARGE_LIST_TIMEOUT_MS);
-}
-
-/** `it` with {@link LARGE_LIST_TIMEOUT_MS}. */
+/** `it` with {@link LARGE_LIST_TIMEOUT_MS}: only for a case that renders a ~200-row page. */
 function itLargeList(name: string, fn: () => Promise<void> | void): void {
     it(name, fn, LARGE_LIST_TIMEOUT_MS);
 }
@@ -623,7 +618,7 @@ describe('AppLauncherSettings — reordering writes the whole section (FR-62, AC
 // Past 200 items (FR-63, ACC-11-47)
 // ---------------------------------------------------------------------------
 
-describeLargeList('AppLauncherSettings — past 200 eligible items (FR-63, ACC-11-47)', () => {
+describe('AppLauncherSettings — past 200 eligible items (FR-63, ACC-11-47)', () => {
     /** One Ever app plus 204 Works: 205 eligible, and the response carries 200. */
     function truncatedFixture(): {
         items: AppLauncherItem[];
@@ -635,7 +630,7 @@ describeLargeList('AppLauncherSettings — past 200 eligible items (FR-63, ACC-1
         return { items, meta: meta({ worksTotal: 204, total: 205, truncated: true }) };
     }
 
-    it('renders the counted line and the filter', () => {
+    itLargeList('renders the counted line and the filter', () => {
         const { items, meta: pageMeta } = truncatedFixture();
         renderEditor(items, { meta: pageMeta });
 
@@ -655,81 +650,92 @@ describeLargeList('AppLauncherSettings — past 200 eligible items (FR-63, ACC-1
         expect(screen.getByTestId('app-launcher-count')).not.toHaveTextContent('205');
     });
 
-    it('keeps every item it holds reachable: the filter narrows the view, never the list', () => {
-        const { items, meta: pageMeta } = truncatedFixture();
-        renderEditor(items, { meta: pageMeta });
+    itLargeList(
+        'keeps every item it holds reachable: the filter narrows the view, never the list',
+        () => {
+            const { items, meta: pageMeta } = truncatedFixture();
+            renderEditor(items, { meta: pageMeta });
 
-        // A row that sorts last is still reachable — filtering by its name
-        // renders it, and clearing the filter brings the whole page back.
-        const lastKey = workKey(199);
-        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
-            target: { value: 'Work 199' },
-        });
-        expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(1);
-        expect(rowFor(lastKey)).toBeInTheDocument();
+            // A row that sorts last is still reachable — filtering by its name
+            // renders it, and clearing the filter brings the whole page back.
+            const lastKey = workKey(199);
+            fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+                target: { value: 'Work 199' },
+            });
+            expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(1);
+            expect(rowFor(lastKey)).toBeInTheDocument();
 
-        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
-            target: { value: 'Work 2' },
-        });
-        // "Work 2" matches Work 2 and the 2x/20x family — a substring filter,
-        // so nothing the person typed is dropped behind the 200-item cap.
-        expect(screen.getAllByTestId('app-launcher-row').length).toBeGreaterThan(1);
+            fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+                target: { value: 'Work 2' },
+            });
+            // "Work 2" matches Work 2 and the 2x/20x family — a substring filter,
+            // so nothing the person typed is dropped behind the 200-item cap.
+            expect(screen.getAllByTestId('app-launcher-row').length).toBeGreaterThan(1);
 
-        fireEvent.change(screen.getByTestId('app-launcher-filter'), { target: { value: '' } });
-        expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(200);
-    });
+            fireEvent.change(screen.getByTestId('app-launcher-filter'), { target: { value: '' } });
+            expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(200);
+        },
+    );
 
-    it('reaches an item past the cap: the filter is sent to the server and its rows are rendered', async () => {
-        const { items, meta: pageMeta } = truncatedFixture();
-        // The 240th Work is not in the 200 rows the page holds…
-        const beyond = workItem(240, { name: 'Work 240' });
-        expect(items.map((item) => item.key)).not.toContain(beyond.key);
-        readAction.mockResolvedValue(
-            listedResponse([beyond], { worksTotal: 204, total: 250, truncated: true }),
-        );
+    itLargeList(
+        'reaches an item past the cap: the filter is sent to the server and its rows are rendered',
+        async () => {
+            const { items, meta: pageMeta } = truncatedFixture();
+            // The 240th Work is not in the 200 rows the page holds…
+            const beyond = workItem(240, { name: 'Work 240' });
+            expect(items.map((item) => item.key)).not.toContain(beyond.key);
+            readAction.mockResolvedValue(
+                listedResponse([beyond], { worksTotal: 204, total: 250, truncated: true }),
+            );
 
-        renderEditor(items, { meta: pageMeta });
-        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
-            target: { value: 'Work 240' },
-        });
-        await flushFilterDebounce();
+            renderEditor(items, { meta: pageMeta });
+            fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+                target: { value: 'Work 240' },
+            });
+            await flushFilterDebounce();
 
-        // …and the read that names it is what makes it reachable (FR-63).
-        expect(readAction).toHaveBeenCalledTimes(1);
-        expect(readAction).toHaveBeenCalledWith('Work 240');
-        expect(rowFor(beyond.key)).toBeInTheDocument();
-        expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(1);
-        // The count is the eligible total the read reported, before the filter.
-        expect(screen.getByTestId('app-launcher-count')).toHaveTextContent('Showing 200 of 250');
-    });
+            // …and the read that names it is what makes it reachable (FR-63).
+            expect(readAction).toHaveBeenCalledTimes(1);
+            expect(readAction).toHaveBeenCalledWith('Work 240');
+            expect(rowFor(beyond.key)).toBeInTheDocument();
+            expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(1);
+            // The count is the eligible total the read reported, before the filter.
+            expect(screen.getByTestId('app-launcher-count')).toHaveTextContent(
+                'Showing 200 of 250',
+            );
+        },
+    );
 
-    it('asks the server on its own debounce — never on the save window (FR-28, FR-63)', async () => {
-        const { items, meta: pageMeta } = truncatedFixture();
-        renderEditor(items, { meta: pageMeta });
+    itLargeList(
+        'asks the server on its own debounce — never on the save window (FR-28, FR-63)',
+        async () => {
+            const { items, meta: pageMeta } = truncatedFixture();
+            renderEditor(items, { meta: pageMeta });
 
-        expect(saveAction).not.toHaveBeenCalled();
-        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
-            target: { value: 'Work 240' },
-        });
+            expect(saveAction).not.toHaveBeenCalled();
+            fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+                target: { value: 'Work 240' },
+            });
 
-        // The filter is a read: it must not wait for the save's half-second.
-        expect(FILTER_DEBOUNCE_MS).toBeLessThan(SAVE_DEBOUNCE_MS);
-        await flushFilterDebounce();
-        expect(readAction).toHaveBeenCalledTimes(1);
-        expect(saveAction, 'a filter never saves anything').not.toHaveBeenCalled();
+            // The filter is a read: it must not wait for the save's half-second.
+            expect(FILTER_DEBOUNCE_MS).toBeLessThan(SAVE_DEBOUNCE_MS);
+            await flushFilterDebounce();
+            expect(readAction).toHaveBeenCalledTimes(1);
+            expect(saveAction, 'a filter never saves anything').not.toHaveBeenCalled();
 
-        // Clearing the filter asks again, so the page goes back to the read's own
-        // unfiltered answer instead of keeping a filtered list.
-        fireEvent.change(screen.getByTestId('app-launcher-filter'), { target: { value: '' } });
-        await flushFilterDebounce();
-        expect(readAction).toHaveBeenCalledTimes(2);
-        expect(readAction).toHaveBeenLastCalledWith('');
-        // Nothing is fetched until the window closes: a second keystroke inside it
-        // restarts the window rather than opening a second read.
-        expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(200);
-    });
+            // Clearing the filter asks again, so the page goes back to the read's own
+            // unfiltered answer instead of keeping a filtered list.
+            fireEvent.change(screen.getByTestId('app-launcher-filter'), { target: { value: '' } });
+            await flushFilterDebounce();
+            expect(readAction).toHaveBeenCalledTimes(2);
+            expect(readAction).toHaveBeenLastCalledWith('');
+            // Nothing is fetched until the window closes: a second keystroke inside it
+            // restarts the window rather than opening a second read.
+            expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(200);
+        },
+    );
 
-    it('coalesces keystrokes inside the window into one read', async () => {
+    itLargeList('coalesces keystrokes inside the window into one read', async () => {
         const { items, meta: pageMeta } = truncatedFixture();
         renderEditor(items, { meta: pageMeta });
 
@@ -759,7 +765,7 @@ describeLargeList('AppLauncherSettings — past 200 eligible items (FR-63, ACC-1
         expect(rowFor(cafe.key)).toBeInTheDocument();
     });
 
-    it('keeps the local narrowing and says so when the filtered read fails', async () => {
+    itLargeList('keeps the local narrowing and says so when the filtered read fails', async () => {
         const { items, meta: pageMeta } = truncatedFixture();
         readAction.mockResolvedValue({ success: false, data: null, error: 'failed_to_load_apps' });
 
