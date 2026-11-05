@@ -224,8 +224,11 @@ jobs:
   # `steps.<id>` or `needs.<job>` that does not exist, an unknown action input
   # or a bad `runs-on` label only showed up when that path ran, and for most of
   # these files that means a push to stage or main. actionlint finds those
-  # statically. It reads `.github/actionlint.yaml` (the self-hosted runner
-  # labels) and, where shellcheck is installed, checks every `run:` script.
+  # statically, on every run of this file: each stage/main push, and any
+  # `gh workflow run ci.yml --ref <branch>`, which is how to check a workflow
+  # change before it merges (this file does not run on pull requests, see the
+  # top). It reads `.github/actionlint.yaml` (the self-hosted runner labels)
+  # and checks every `run:` script with shellcheck.
   #
   # GitHub-hosted for the same reason as `release-tooling` above: no install and
   # no build, so it finishes in seconds instead of queueing for the pool. The
@@ -258,11 +261,20 @@ jobs:
       # legacy DigitalOcean deploy workflows) are opinions about scripts that
       # work; warnings are the likely bugs, and there were none left when this
       # job was added. Run `SHELLCHECK_OPTS= actionlint` locally to see all.
+      #
+      # shellcheck comes from the runner image (0.11.0 on ubuntu-26.04 when this
+      # was added), so an image update can change what it reports. actionlint
+      # silently skips `run:` scripts when shellcheck is missing, so a missing
+      # shellcheck fails this step instead of passing it.
       - name: actionlint
         env:
           SHELLCHECK_OPTS: --severity=warning
         run: |
-          shellcheck --version | head -2 || echo "shellcheck not installed: run: scripts are not checked"
+          if ! command -v shellcheck >/dev/null; then
+            echo "::error::shellcheck is not installed, so actionlint would not check any run: script"
+            exit 1
+          fi
+          shellcheck --version
           actionlint -color
 
 
