@@ -79,7 +79,7 @@ describe('getReasoningConfig — gemini & claude on openrouter', () => {
 		expect(getReasoningConfig('google', 'gemini-3-pro')).toEqual({ reasoning_effort: 'low' });
 	});
 
-	it('gemini-2/3 → openrouter effort=none', () => {
+	it('gemini-2 → openrouter effort=none', () => {
 		expect(getReasoningConfig('openrouter', 'google/gemini-2.0-flash')).toEqual({
 			reasoning: { effort: 'none' }
 		});
@@ -127,10 +127,36 @@ describe('getReasoningConfig — current families (models refresh 2026-11-05)', 
 		}
 	});
 
-	it('GPT-6 / 6.1 -pro variants are mandatory on OpenRouter → effort=low', () => {
+	it('the mandatory GPT-6 -pro variants (Astra, 6.1 Sol, 6.1 Terra) → effort=low', () => {
 		for (const model of ['openai/gpt-6-astra-pro', 'openai/gpt-6.1-sol-pro', 'openai/gpt-6.1-terra-pro']) {
 			expect(getReasoningConfig('openrouter', model)).toEqual({ reasoning: { effort: 'low' } });
 		}
+	});
+
+	it('GPT-6 Luna / Sol -pro accept none → effort=none', () => {
+		for (const model of ['openai/gpt-6-luna-pro', 'openai/gpt-6-sol-pro']) {
+			expect(getReasoningConfig('openrouter', model)).toEqual({ reasoning: { effort: 'none' } });
+		}
+	});
+
+	// OpenRouter supported_efforts (2026-11-05): gpt-5.2/5.4/5.5-pro accept only
+	// medium and up; gpt-5.1-codex(-mini/-max) and gpt-5.2-codex are mandatory
+	// with low as the lowest; gpt-5.3-codex and gpt-5.6-*-pro accept none.
+	it('GPT-5.x -pro (5.2–5.5) → effort=medium; GPT-5.1/5.2 -codex → effort=low', () => {
+		for (const model of ['gpt-5.2-pro', 'gpt-5.4-pro', 'gpt-5.5-pro']) {
+			expect(getReasoningConfig('openai', model)).toEqual({ reasoning: { effort: 'medium' } });
+			expect(getReasoningConfig('openrouter', `openai/${model}`)).toEqual({ reasoning: { effort: 'medium' } });
+		}
+		for (const model of ['gpt-5.1-codex', 'gpt-5.1-codex-mini', 'gpt-5.1-codex-max', 'gpt-5.2-codex']) {
+			expect(getReasoningConfig('openrouter', `openai/${model}`)).toEqual({ reasoning: { effort: 'low' } });
+		}
+		for (const model of ['gpt-5.3-codex', 'gpt-5.6-sol-pro']) {
+			expect(getReasoningConfig('openrouter', `openai/${model}`)).toEqual({ reasoning: { effort: 'none' } });
+		}
+	});
+
+	it('retired Gemini 2.0 Pro keeps effort=none (only 2.5 Pro and Gemini 3 Pro cannot turn reasoning off)', () => {
+		expect(getReasoningConfig('google', 'gemini-2.0-pro-exp')).toEqual({ reasoning_effort: 'none' });
 	});
 
 	it('GPT-6 Luna / Sol, GPT-6.1 Terra and GPT-5.6 accept none → effort=none', () => {
@@ -221,10 +247,13 @@ describe('getReasoningConfig — deepseek & groq', () => {
 		});
 	});
 
-	it('gpt-oss → groq effort=low + format=hidden', () => {
+	// Groq: "the `reasoning_format` parameter is not supported" for gpt-oss;
+	// `include_reasoning: false` hides the reasoning instead
+	// (https://console.groq.com/docs/reasoning, checked 2026-11-05).
+	it('gpt-oss → groq effort=low + include_reasoning=false (no reasoning_format)', () => {
 		expect(getReasoningConfig('groq', 'gpt-oss-120b')).toEqual({
 			reasoning_effort: 'low',
-			reasoning_format: 'hidden'
+			include_reasoning: false
 		});
 	});
 
@@ -282,7 +311,7 @@ describe('per-provider getter convenience functions', () => {
 	it('getGroqReasoningConfig matches getReasoningConfig("groq", …)', () => {
 		expect(getGroqReasoningConfig('gpt-oss-20b')).toEqual({
 			reasoning_effort: 'low',
-			reasoning_format: 'hidden'
+			include_reasoning: false
 		});
 		expect(getGroqReasoningConfig('qwen3-coder')).toEqual({ reasoning_effort: 'none' });
 		expect(getGroqReasoningConfig('gpt-5')).toBeUndefined();
