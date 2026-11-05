@@ -55,37 +55,44 @@ OpenRouter's API is OpenAI-compatible, so the plugin uses the same LangChain Ope
 | Setting        | Type     | Required | Default                        | Scope    | Widget         | Description                                                  |
 | -------------- | -------- | -------- | ------------------------------ | -------- | -------------- | ------------------------------------------------------------ |
 | `apiKey`       | `string` | Yes      | --                             | `user`   | --             | OpenRouter API key. Secret. Env: `PLUGIN_OPENROUTER_API_KEY` |
-| `defaultModel` | `string` | Yes      | `openai/gpt-5.1`               | `global` | `model-select` | Default model for all AI tasks.                              |
-| `simpleModel`  | `string` | No       | `openai/gpt-5-nano`            | `global` | `model-select` | Model for tags, descriptions, classifications.               |
-| `mediumModel`  | `string` | No       | `openai/gpt-4o`                | `global` | `model-select` | Model for listings, summaries, reformatting.                 |
-| `complexModel` | `string` | No       | `openai/gpt-5.1`               | `global` | `model-select` | Model for full page generation, multi-step analysis.         |
+| `defaultModel` | `string` | Yes      | `openai/gpt-6.1-sol`           | `global` | `model-select` | Default model for all AI tasks.                              |
+| `simpleModel`  | `string` | No       | `openai/gpt-6-luna`            | `global` | `model-select` | Model for tags, descriptions, classifications.               |
+| `mediumModel`  | `string` | No       | `openai/gpt-6.1-sol`           | `global` | `model-select` | Model for listings, summaries, reformatting.                 |
+| `complexModel` | `string` | No       | `openai/gpt-6-astra`           | `global` | `model-select` | Model for full page generation, multi-step analysis.         |
 | `temperature`  | `number` | No       | `0.7`                          | --       | --             | Sampling temperature (0--2). Hidden.                         |
 | `maxTokens`    | `number` | No       | `4096`                         | --       | --             | Max tokens per response. Hidden.                             |
 | `baseUrl`      | `string` | No       | `https://openrouter.ai/api/v1` | --       | --             | API endpoint. Hidden.                                        |
+
+Model defaults as of 2026-11-05 — source: [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) (each id was listed that day) and OpenAI's [model guide](https://developers.openai.com/api/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. The `onLoad` bootstrap and `getDefaultModelId()` use the simple tier, `openai/gpt-6-luna`.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The defaults moved from `openai/gpt-5-mini` (default, simple, standard) and `openai/gpt-5` (complex) to `openai/gpt-6.1-sol`, `openai/gpt-6-luna`, `openai/gpt-6.1-sol` and `openai/gpt-6-astra`; OpenAI shuts the old ids down on 2026-12-11. Nothing is migrated, because Ever Works has no production users yet.
 
 ### Model Naming Convention
 
 OpenRouter uses a `provider/model` naming convention. Model IDs include the provider prefix:
 
-| Provider  | Example Model IDs                                         |
-| --------- | --------------------------------------------------------- |
-| OpenAI    | `openai/gpt-5.1`, `openai/gpt-4o`, `openai/gpt-5-nano`    |
-| Anthropic | `anthropic/claude-sonnet-4`, `anthropic/claude-haiku-3.5` |
-| Google    | `google/gemini-2.5-pro`, `google/gemini-2.5-flash`        |
-| Meta      | `meta-llama/llama-4-scout`, `meta-llama/llama-4-maverick` |
+| Provider  | Example Model IDs                                                                        |
+| --------- | ---------------------------------------------------------------------------------------- |
+| OpenAI    | `openai/gpt-6-astra`, `openai/gpt-6.1-sol`, `openai/gpt-6-luna`                          |
+| Anthropic | `anthropic/claude-opus-5.5`, `anthropic/claude-sonnet-5.5`, `anthropic/claude-haiku-5.5` |
+| Google    | `google/gemini-4-argon`, `google/gemini-3.8-flash`, `google/gemini-3.5-flash-lite`       |
+| xAI       | `x-ai/grok-4.7`, `x-ai/grok-4.3`                                                         |
+| Meta      | `meta-llama/llama-4-scout`, `meta-llama/llama-4-maverick`                                |
+
+Example ids as of 2026-11-05 — source: [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models). Availability depends on your account/plan/region; the picker lists OpenRouter's live models, accepts a custom model id and keeps existing saved selections.
 
 ### Model Tiers
 
 ```mermaid
 graph LR
     subgraph "Default Tier Mapping"
-        S["Simple Tasks<br/>Tags, classifications"] --> SM["openai/gpt-5-nano<br/>Fastest, cheapest"]
-        M["Standard Tasks<br/>Summaries, listings"] --> MM["openai/gpt-4o<br/>Balanced"]
-        C["Complex Tasks<br/>Page generation"] --> CM["openai/gpt-5.1<br/>Highest quality"]
+        S["Simple Tasks<br/>Tags, classifications"] --> SM["openai/gpt-6-luna<br/>Cost-sensitive, high volume"]
+        M["Standard Tasks<br/>Summaries, listings"] --> MM["openai/gpt-6.1-sol<br/>Balanced"]
+        C["Complex Tasks<br/>Page generation"] --> CM["openai/gpt-6-astra<br/>Flagship"]
     end
 ```
 
-Users can mix and match models from different providers across tiers. For example, using `anthropic/claude-haiku-3.5` for simple tasks and `google/gemini-2.5-pro` for complex tasks.
+Users can mix and match models from different providers across tiers. For example, using `anthropic/claude-haiku-5.5` for simple tasks and `google/gemini-4-argon` for complex tasks.
 
 ### Environment Variables
 
@@ -153,11 +160,13 @@ graph TD
 
 Because OpenRouter provides access to models at different price points, the tiered model system enables cost optimization:
 
-| Tier     | Recommended Strategy           | Example Models                                 |
-| -------- | ------------------------------ | ---------------------------------------------- |
-| Simple   | Use the cheapest/fastest model | `openai/gpt-5-nano`, `google/gemini-2.0-flash` |
-| Standard | Balance cost and quality       | `openai/gpt-4o`, `anthropic/claude-haiku-3.5`  |
-| Complex  | Use the highest quality model  | `openai/gpt-5.1`, `anthropic/claude-sonnet-4`  |
+| Tier     | Recommended Strategy           | Example Models                                      |
+| -------- | ------------------------------ | --------------------------------------------------- |
+| Simple   | Use the cheapest/fastest model | `openai/gpt-6-luna`, `google/gemini-3.5-flash-lite` |
+| Standard | Balance cost and quality       | `openai/gpt-6.1-sol`, `anthropic/claude-sonnet-5.5` |
+| Complex  | Use the highest quality model  | `openai/gpt-6-astra`, `anthropic/claude-opus-5.5`   |
+
+Example ids as of 2026-11-05 — source: [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 ## Lifecycle
 
@@ -169,7 +178,7 @@ sequenceDiagram
 
     Engine->>Plugin: onLoad(context)
     Plugin->>AiOps: new AiOperations({ providerType: 'openrouter', ... })
-    Note right of AiOps: Default model: openai/gpt-5-nano
+    Note right of AiOps: Default model: openai/gpt-6-luna
     Plugin-->>Engine: loaded
 
     Engine->>Plugin: createChatCompletion(options)

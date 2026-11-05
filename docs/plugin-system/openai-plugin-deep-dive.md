@@ -37,10 +37,12 @@ On `onLoad`, the plugin creates an `AiOperations` instance with default configur
 ```typescript
 interface OpenAiSettings {
 	apiKey: string; // OpenAI API key (x-secret, user-scoped, required)
-	defaultModel: string; // Default model for all tasks (default: 'gpt-5.1')
-	simpleModel: string; // Model for tags, short descriptions (default: 'gpt-5-nano')
-	mediumModel: string; // Model for listings, summaries (default: 'gpt-4o-mini')
-	complexModel: string; // Model for full-page generation (default: 'gpt-5.1')
+	defaultModel: string; // Default model for all tasks (default: 'gpt-6-astra')
+	simpleModel: string; // Model for tags, short descriptions (default: 'gpt-6-luna')
+	mediumModel: string; // Model for listings, summaries (default: 'gpt-6.1-sol')
+	complexModel: string; // Model for full-page generation (default: 'gpt-6-astra')
+	embeddingModel: string; // Knowledge Base embeddings (default: 'text-embedding-3-small')
+	transcriptionModel: string; // Knowledge Base media speech-to-text (default: 'whisper-1')
 	temperature: number; // Response randomness, 0-2 (default: 0.7, hidden)
 	maxTokens: number; // Max response length (default: 4096, hidden)
 	baseUrl: string; // API endpoint (default: 'https://api.openai.com/v1', hidden)
@@ -51,16 +53,20 @@ interface OpenAiSettings {
 - Model fields use the `x-widget: 'model-select'` custom widget for UI rendering.
 - `temperature`, `maxTokens`, and `baseUrl` are hidden from the default settings UI but available for advanced configuration.
 
+Model defaults as of 2026-11-05 — source: [developers.openai.com/api/docs/models](https://developers.openai.com/api/docs/models) (shutdown dates: [developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The defaults moved from `gpt-5.1` (default and complex), `gpt-5-nano` (simple, and the `onLoad` bootstrap) and `gpt-4o-mini` (standard) to `gpt-6-astra`, `gpt-6-luna` and `gpt-6.1-sol`. OpenAI has deprecated all three previous ids (shutdowns 2027-04-01, 2026-12-11 and 2027-01-14); a saved one is still sent unchanged, so switch away before its shutdown date. The embedding and transcription defaults are unchanged.
+
 ## Capabilities
 
-| Capability        | Supported      | Details                                         |
-| ----------------- | -------------- | ----------------------------------------------- |
-| Structured output | Yes            | JSON mode and function calling                  |
-| Streaming         | Yes            | Server-sent events via async iterables          |
-| Tool calling      | Yes            | Function/tool calling for structured extraction |
-| Vision            | Yes            | Image analysis with multimodal models           |
-| Embeddings        | Yes            | `text-embedding-3-small` and others             |
-| Max context       | 128,000 tokens | For supported models like GPT-4o                |
+| Capability        | Supported      | Details                                                                                                                                                                                                        |
+| ----------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Structured output | Yes            | JSON mode and function calling                                                                                                                                                                                 |
+| Streaming         | Yes            | Server-sent events via async iterables                                                                                                                                                                         |
+| Tool calling      | Yes            | Function/tool calling for structured extraction                                                                                                                                                                |
+| Vision            | Yes            | Image analysis with multimodal models                                                                                                                                                                          |
+| Embeddings        | Yes            | `text-embedding-3-small` and others                                                                                                                                                                            |
+| Max context       | 128,000 tokens | Plugin-wide fallback hint (`FALLBACK_CONTEXT_WINDOW`), used only when neither the live model list nor the catalogue knows a model's window; the GPT-6 family's 1,050,000-token window comes from the live list |
 
 ## API Reference
 
@@ -91,10 +97,11 @@ interface OpenAiSettings {
 
 The `BaseAiProvider.resolveConfig()` method (inherited) merges settings from the 4-level hierarchy (work > user > admin > env) and resolves the correct model for the requested complexity tier:
 
-- **Simple tier**: `simpleModel` setting (default: `gpt-5-nano`) -- used for tags, short descriptions, quick classifications.
-- **Medium tier**: `mediumModel` setting (default: `gpt-4o-mini`) -- used for listings, summaries, content reformatting.
-- **Complex tier**: `complexModel` setting (default: `gpt-5.1`) -- used for full page generation and multi-step analysis.
-- **Default**: `defaultModel` setting (default: `gpt-5.1`) -- fallback for all other tasks.
+- **Simple tier**: `simpleModel` setting (default: `gpt-6-luna`) -- used for tags, short descriptions, quick classifications.
+- **Medium tier**: `mediumModel` setting (default: `gpt-6.1-sol`) -- used for listings, summaries, content reformatting.
+- **Complex tier**: `complexModel` setting (default: `gpt-6-astra`) -- used for full page generation and multi-step analysis.
+- **Default**: `defaultModel` setting (default: `gpt-6-astra`) -- fallback for all other tasks.
+- **Bootstrap**: the `onLoad` `AiOperations` instance and `getDefaultModelId()` use `gpt-6-luna`.
 
 ### AiOperations Wrapper
 
@@ -119,7 +126,7 @@ const response = await openaiPlugin.createChatCompletion({
 		{ role: 'system', content: 'You are a work content writer.' },
 		{ role: 'user', content: 'Write a description for Acme Corp.' }
 	],
-	settings: { apiKey: userApiKey, defaultModel: 'gpt-4o-mini' }
+	settings: { apiKey: userApiKey, defaultModel: 'gpt-6.1-sol' }
 });
 
 // Streaming chat completion
@@ -145,7 +152,7 @@ const available = await openaiPlugin.isAvailable({ apiKey: userApiKey });
 
 - **OpenAI API limits**: Depend on the user's OpenAI account tier. Free tier accounts have strict RPM (requests per minute) and TPM (tokens per minute) limits; paid tiers have progressively higher limits.
 - **Max tokens**: Defaults to 4,096 per response. Configurable via the `maxTokens` setting.
-- **Context window**: Up to 128,000 tokens for GPT-4o class models.
+- **Context window**: 1,050,000 tokens for the GPT-6 family (read from the live model list); the plugin's static fallback hint is 128,000 tokens, the window of `gpt-4o` / `gpt-4o-mini`.
 - The plugin does not implement internal rate-limit tracking. OpenAI returns `429 Too Many Requests` errors which propagate to callers.
 
 ## Error Handling

@@ -34,7 +34,7 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 | ------------------- | --------------------------- |
 | Base URL            | `https://api.mistral.ai/v1` |
 | Default Model       | `mistral-small-latest`      |
-| Simple Tier         | _(uses default)_            |
+| Simple Tier         | `mistral-small-latest`      |
 | Medium Tier         | `mistral-medium-latest`     |
 | Complex Tier        | `mistral-large-latest`      |
 | Max Context Tokens  | `128000`                    |
@@ -49,6 +49,10 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 | **Medium**         | `mistral-medium-latest` | Balanced capability              |
 | **Complex**        | `mistral-large-latest`  | Complex reasoning and generation |
 
+Model defaults as of 2026-11-05 — source: [docs.mistral.ai/models](https://docs.mistral.ai/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. On that date `mistral-small-latest` points to `mistral-small-2603` (Mistral Small 4, GA), `mistral-medium-latest` to `mistral-medium-3-5` and `mistral-large-latest` to `mistral-large-2512` (Mistral Large 3); the last two were deprecated on 2026-10-31 and retire on 2027-04-30.
+
+**Default shift (2026-11-05): no default changed.** Configs that never saved a model keep the `-latest` aliases, and saved selections are kept. The suggested successor of the deprecated medium and large models, `mistral-large-4`, is in Public Preview; the defaults will be revisited when it is GA.
+
 ## Configuration
 
 ### Settings Schema
@@ -56,8 +60,8 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 | Field              | Type     | Required | Description                                                                       |
 | ------------------ | -------- | -------- | --------------------------------------------------------------------------------- |
 | `apiKey`           | `string` | Yes      | Mistral API key (`x-secret`, `x-envVar: PLUGIN_MISTRAL_API_KEY`, `x-scope: user`) |
-| `model`            | `string` | No       | Override default model (`default: mistral-small-latest`)                          |
-| `simpleModel`      | `string` | No       | Model for simple tasks                                                            |
+| `defaultModel`     | `string` | Yes      | Default model (`default: mistral-small-latest`)                                   |
+| `simpleModel`      | `string` | No       | Model for simple tasks (`default: mistral-small-latest`)                          |
 | `mediumModel`      | `string` | No       | Model for medium tasks (`default: mistral-medium-latest`)                         |
 | `complexModel`     | `string` | No       | Model for complex tasks (`default: mistral-large-latest`)                         |
 | `maxContextTokens` | `number` | No       | Override max context window (`default: 128000`)                                   |
@@ -115,7 +119,8 @@ resolveConfig(settings: PluginSettings): ProviderConfig {
     return {
         apiKey: settings.apiKey as string,
         baseUrl: 'https://api.mistral.ai/v1',
-        defaultModel: (settings.model as string) || 'mistral-small-latest',
+        defaultModel: (settings.defaultModel as string) || 'mistral-small-latest',
+        simpleModel: (settings.simpleModel as string) || 'mistral-small-latest',
         mediumModel: (settings.mediumModel as string) || 'mistral-medium-latest',
         complexModel: (settings.complexModel as string) || 'mistral-large-latest',
         maxContextTokens: (settings.maxContextTokens as number) || 128000,
@@ -146,7 +151,7 @@ Mistral uses a `latest` suffix for their model aliases:
 - `mistral-medium-latest` - Points to the latest medium model version
 - `mistral-large-latest` - Points to the latest large model version
 
-Users can also specify pinned versions (e.g., `mistral-large-2407`) for reproducibility.
+Users can also specify pinned versions (e.g., `mistral-small-2603`) for reproducibility. A saved id is sent to Mistral unchanged.
 
 ### Stricter Type Resolution
 
@@ -154,7 +159,7 @@ Unlike other AI provider plugins that rely on the base class's generic type hand
 
 ```typescript
 apiKey: settings.apiKey as string,
-defaultModel: (settings.model as string) || 'mistral-small-latest',
+defaultModel: (settings.defaultModel as string) || 'mistral-small-latest',
 ```
 
 This provides an extra layer of type safety when settings come from the generic `PluginSettings` (`Record<string, unknown>`) type.

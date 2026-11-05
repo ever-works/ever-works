@@ -25,7 +25,7 @@ The Groq plugin provides ultra-fast AI inference through [Groq's](https://groq.c
 | Built-in           | Yes             |
 | Visibility         | `public`        |
 
-Groq runs open-source models such as Llama and Qwen at significantly higher speeds than conventional cloud providers, making it well suited for works with many items where generation speed is a priority.
+Groq runs open-weight models such as OpenAI's `gpt-oss` family at significantly higher speeds than conventional cloud providers, making it well suited for works with many items where generation speed is a priority.
 
 ## Architecture
 
@@ -47,13 +47,17 @@ Groq exposes an OpenAI-compatible API endpoint, so the plugin uses the same `AiO
 | Setting        | Type     | Default                          | Scope    | Description                                                 |
 | -------------- | -------- | -------------------------------- | -------- | ----------------------------------------------------------- |
 | `apiKey`       | `string` | (required)                       | `user`   | Groq API key (marked as secret)                             |
-| `defaultModel` | `string` | `qwen/qwen3-32b`                 | `global` | Used for all AI tasks unless a tier-specific model is set   |
-| `simpleModel`  | `string` | `qwen/qwen3-32b`                 | `global` | Handles tags, short descriptions, and quick classifications |
-| `mediumModel`  | `string` | `qwen/qwen3-32b`                 | `global` | Handles listings, summaries, and content reformatting       |
-| `complexModel` | `string` | `qwen/qwen3-32b`                 | `global` | Handles full page generation and multi-step analysis        |
+| `defaultModel` | `string` | `openai/gpt-oss-120b`            | `global` | Used for all AI tasks unless a tier-specific model is set   |
+| `simpleModel`  | `string` | `openai/gpt-oss-20b`             | `global` | Handles tags, short descriptions, and quick classifications |
+| `mediumModel`  | `string` | `openai/gpt-oss-120b`            | `global` | Handles listings, summaries, and content reformatting       |
+| `complexModel` | `string` | `openai/gpt-oss-120b`            | `global` | Handles full page generation and multi-step analysis        |
 | `baseUrl`      | `string` | `https://api.groq.com/openai/v1` | hidden   | Custom API endpoint for proxies or compatible services      |
 | `temperature`  | `number` | `0.7`                            | hidden   | Controls output randomness (0--2)                           |
 | `maxTokens`    | `number` | `4096`                           | hidden   | Maximum response length                                     |
+
+Model defaults as of 2026-11-05 — source: [console.groq.com/docs/models](https://console.groq.com/docs/models) (retirements: [deprecations](https://console.groq.com/docs/deprecations)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Every tier used to default to `qwen/qwen3-32b`, which Groq retired on 2026-07-17, so this is a fix: unsaved configs move to `openai/gpt-oss-120b` (default, medium, complex, `onLoad` bootstrap and `getDefaultModelId()`) and `openai/gpt-oss-20b` (simple). A saved retired id is still sent to Groq unchanged, and Groq's error then asks you to pick another model.
 
 ### Required Fields
 
@@ -121,11 +125,15 @@ flowchart LR
     C --> CM
 ```
 
-| Tier    | Use Cases                                 | Recommended Models                          |
-| ------- | ----------------------------------------- | ------------------------------------------- |
-| Simple  | Tags, short descriptions, classifications | `llama-3.1-8b-instant`, `gemma2-9b-it`      |
-| Medium  | Listings, summaries, content reformatting | `qwen/qwen3-32b`, `llama-3.3-70b-versatile` |
-| Complex | Full page generation, multi-step analysis | `qwen/qwen3-32b`, `llama-3.3-70b-versatile` |
+Model defaults as of 2026-11-05 — source: [console.groq.com/docs/models](https://console.groq.com/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+| Tier    | Use Cases                                 | Default model         |
+| ------- | ----------------------------------------- | --------------------- |
+| Simple  | Tags, short descriptions, classifications | `openai/gpt-oss-20b`  |
+| Medium  | Listings, summaries, content reformatting | `openai/gpt-oss-120b` |
+| Complex | Full page generation, multi-step analysis | `openai/gpt-oss-120b` |
+
+Both are Groq production models: `openai/gpt-oss-120b` (featured; 131,072-token context, $0.15 / $0.60 per million input / output tokens on 2026-11-05) and the smaller `openai/gpt-oss-20b` ($0.075 / $0.30). `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` are enterprise-only since 2026-08-16, and `qwen/qwen3-32b` was retired on 2026-07-17.
 
 If a tier-specific model is not set, the `defaultModel` is used for all tiers.
 
@@ -138,7 +146,7 @@ async onLoad(context: PluginContext): Promise<void> {
     await super.onLoad(context);
     this.aiOps = new AiOperations({
         apiKey: '',
-        model: 'qwen/qwen3-32b',
+        model: DEFAULT_MODEL, // 'openai/gpt-oss-120b', also returned by getDefaultModelId()
         baseURL: 'https://api.groq.com/openai/v1',
         temperature: 0.7,
         maxTokens: 4096,

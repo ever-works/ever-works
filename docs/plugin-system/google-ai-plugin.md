@@ -35,9 +35,9 @@ graph TD
     C --> D[AiOperations]
     D --> E["LangChain OpenAI-compatible Provider"]
     E --> F["Google AI API<br/>generativelanguage.googleapis.com/v1beta/openai/"]
-    F --> G["Gemini 2.0 Flash"]
-    F --> H["Gemini 2.5 Flash"]
-    F --> I["Gemini 2.5 Pro"]
+    F --> G["Gemini 3.5 Flash-Lite"]
+    F --> H["Gemini 3.8 Flash"]
+    F --> I["Gemini 4 Argon"]
 ```
 
 Google provides an OpenAI-compatible API endpoint at `https://generativelanguage.googleapis.com/v1beta/openai/`, which means the plugin reuses the same LangChain OpenAI provider with a custom `baseURL`.
@@ -49,10 +49,10 @@ Google provides an OpenAI-compatible API endpoint at `https://generativelanguage
 | Setting        | Type     | Required | Default                                                    | Scope    | Widget         | Description                                          |
 | -------------- | -------- | -------- | ---------------------------------------------------------- | -------- | -------------- | ---------------------------------------------------- |
 | `apiKey`       | `string` | Yes      | --                                                         | `user`   | --             | Google AI API key. Secret.                           |
-| `defaultModel` | `string` | Yes      | `models/gemini-2.5-flash`                                  | `global` | `model-select` | Default model for all AI tasks.                      |
-| `simpleModel`  | `string` | No       | `models/gemini-2.0-flash`                                  | `global` | `model-select` | Model for tags, descriptions, classifications.       |
-| `mediumModel`  | `string` | No       | `models/gemini-2.5-flash`                                  | `global` | `model-select` | Model for listings, summaries, reformatting.         |
-| `complexModel` | `string` | No       | `models/gemini-2.5-pro`                                    | `global` | `model-select` | Model for full page generation, multi-step analysis. |
+| `defaultModel` | `string` | Yes      | `models/gemini-3.8-flash`                                  | `global` | `model-select` | Default model for all AI tasks.                      |
+| `simpleModel`  | `string` | No       | `models/gemini-3.5-flash-lite`                             | `global` | `model-select` | Model for tags, descriptions, classifications.       |
+| `mediumModel`  | `string` | No       | `models/gemini-3.8-flash`                                  | `global` | `model-select` | Model for listings, summaries, reformatting.         |
+| `complexModel` | `string` | No       | `models/gemini-4-argon`                                    | `global` | `model-select` | Model for full page generation, multi-step analysis. |
 | `temperature`  | `number` | No       | `0.7`                                                      | --       | --             | Sampling temperature (0--2). Hidden.                 |
 | `maxTokens`    | `number` | No       | `4096`                                                     | --       | --             | Max tokens per response. Hidden.                     |
 | `baseUrl`      | `string` | No       | `https://generativelanguage.googleapis.com/v1beta/openai/` | --       | --             | API endpoint. Hidden.                                |
@@ -62,26 +62,34 @@ Google provides an OpenAI-compatible API endpoint at `https://generativelanguage
 ```mermaid
 graph LR
     subgraph "Gemini Model Tiers"
-        S["Simple Tasks<br/>Tags, classifications"] --> SM["gemini-2.0-flash<br/>Fastest, lowest cost"]
-        M["Standard Tasks<br/>Summaries, listings"] --> MM["gemini-2.5-flash<br/>Balanced speed + quality"]
-        C["Complex Tasks<br/>Page generation"] --> CM["gemini-2.5-pro<br/>Highest reasoning"]
+        S["Simple Tasks<br/>Tags, classifications"] --> SM["gemini-3.5-flash-lite<br/>Fastest, lowest cost"]
+        M["Standard Tasks<br/>Summaries, listings"] --> MM["gemini-3.8-flash<br/>Balanced speed + quality"]
+        C["Complex Tasks<br/>Page generation"] --> CM["gemini-4-argon<br/>Flagship"]
     end
 ```
 
-| Tier     | Default Model             | Strengths                                                |
-| -------- | ------------------------- | -------------------------------------------------------- |
-| Simple   | `models/gemini-2.0-flash` | Fast inference, low cost, good for structured extraction |
-| Standard | `models/gemini-2.5-flash` | Strong reasoning with thinking, balanced performance     |
-| Complex  | `models/gemini-2.5-pro`   | Advanced reasoning, best quality output                  |
+Model defaults as of 2026-11-05 — source: [aistudio.google.com/docs/models](https://aistudio.google.com/docs/models) (the `ai.google.dev/gemini-api/docs` pages redirect there; shutdown dates: [deprecations](https://aistudio.google.com/docs/deprecations)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+| Tier     | Default Model                  | Strengths                                                             |
+| -------- | ------------------------------ | --------------------------------------------------------------------- |
+| Simple   | `models/gemini-3.5-flash-lite` | Google's fastest, most cost-effective model                           |
+| Standard | `models/gemini-3.8-flash`      | Google's most intelligent Flash model, balanced performance           |
+| Complex  | `models/gemini-4-argon`        | Google's flagship ($2 / $10 per MTok until 2026-11-30, then $4 / $20) |
+
+The default model, the `onLoad` bootstrap and `getDefaultModelId()` equal the standard tier, `models/gemini-3.8-flash`.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The defaults moved from `models/gemini-2.0-flash` (simple; shut down 2026-06-01, so this is a fix), `models/gemini-2.5-flash` (default and standard) and `models/gemini-2.5-pro` (complex) to the ids above. The 2.5 models are deprecated since 2026-11-02, serve existing users only and are re-routed from 2026-12-01, so a config that saved one should switch.
+
+From Gemini 3.6 Flash on, Google ignores `temperature`, `top_p` and `top_k`, so the hidden `temperature` setting has no effect on the current defaults.
 
 ### Model Naming Convention
 
 Google Gemini models use a `models/` prefix:
 
 ```
-models/gemini-2.0-flash
-models/gemini-2.5-flash
-models/gemini-2.5-pro
+models/gemini-3.5-flash-lite
+models/gemini-3.8-flash
+models/gemini-4-argon
 ```
 
 ## Capabilities
@@ -94,7 +102,7 @@ models/gemini-2.5-pro
 | Vision             | Yes                  | Image analysis and understanding             |
 | Max Context Length | **1,048,576 tokens** | 1M token context window                      |
 
-The 1 million token context window is the largest among all AI provider plugins, making Gemini ideal for processing large volumes of source material during work generation.
+The 1,048,576-token hint is the largest static context hint among the AI provider plugins, and every current Gemini model takes 1,048,576 input tokens, making Gemini well suited to processing large volumes of source material during work generation.
 
 ### Context Window Comparison
 
@@ -154,13 +162,13 @@ graph TD
 
 ## Why Use Gemini?
 
-| Advantage         | Description                                                      |
-| ----------------- | ---------------------------------------------------------------- |
-| Extended context  | Process up to 1M tokens -- ideal for large source documents      |
-| Embedding support | Built-in text-embedding models for semantic search               |
-| Cost-efficient    | Gemini Flash models deliver strong results at low per-token cost |
-| Vision            | Analyze images and screenshots during content generation         |
-| Thinking models   | Gemini 2.5 models use extended thinking for better reasoning     |
+| Advantage         | Description                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Extended context  | Process up to 1M tokens -- ideal for large source documents                                                         |
+| Embedding support | Built-in text-embedding models for semantic search                                                                  |
+| Cost-efficient    | Gemini Flash models deliver strong results at low per-token cost                                                    |
+| Vision            | Analyze images and screenshots during content generation                                                            |
+| Thinking models   | Gemini 3.x and 4 models reason before answering; Ever Works requests the lowest reasoning effort each model accepts |
 
 ## Lifecycle
 
@@ -171,7 +179,7 @@ sequenceDiagram
     participant AiOps as AiOperations
 
     Engine->>Plugin: onLoad(context)
-    Plugin->>AiOps: new AiOperations({<br/>  providerType: 'google',<br/>  model: 'models/gemini-2.5-flash',<br/>  baseURL: '...googleapis.com/v1beta/openai/'<br/>})
+    Plugin->>AiOps: new AiOperations({<br/>  providerType: 'google',<br/>  model: 'models/gemini-3.8-flash',<br/>  baseURL: '...googleapis.com/v1beta/openai/'<br/>})
     Plugin-->>Engine: loaded
 
     Engine->>Plugin: createChatCompletion(options)

@@ -91,7 +91,7 @@ AI provider plugins implement `ai-provider` capability and power all content gen
 
 ### OpenAI
 
-Use OpenAI models (GPT-5.1, GPT-5-nano, GPT-4o-mini) for content generation and AI features.
+Use OpenAI models (GPT-6 Astra, GPT-6.1 Sol, GPT-6 Luna) for content generation and AI features.
 
 | Field              | Value           |
 | ------------------ | --------------- |
@@ -104,13 +104,17 @@ Use OpenAI models (GPT-5.1, GPT-5-nano, GPT-4o-mini) for content generation and 
 | Setting        | Type   | Default                     | Description                        |
 | -------------- | ------ | --------------------------- | ---------------------------------- |
 | `apiKey`       | string | —                           | OpenAI API key (required, secret)  |
-| `defaultModel` | string | `gpt-5.1`                   | Default model for all tasks        |
-| `simpleModel`  | string | `gpt-5-nano`                | Model for tags, short descriptions |
-| `mediumModel`  | string | `gpt-4o-mini`               | Model for summaries, reformatting  |
-| `complexModel` | string | `gpt-5.1`                   | Model for full page generation     |
+| `defaultModel` | string | `gpt-6-astra`               | Default model for all tasks        |
+| `simpleModel`  | string | `gpt-6-luna`                | Model for tags, short descriptions |
+| `mediumModel`  | string | `gpt-6.1-sol`               | Model for summaries, reformatting  |
+| `complexModel` | string | `gpt-6-astra`               | Model for full page generation     |
 | `temperature`  | number | `0.7`                       | Response variability (0–2)         |
 | `maxTokens`    | number | `4096`                      | Max response length                |
 | `baseUrl`      | string | `https://api.openai.com/v1` | API endpoint                       |
+
+Model defaults as of 2026-11-05 — source: [developers.openai.com/api/docs/models](https://developers.openai.com/api/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. They moved from `gpt-5.1` (default, complex), `gpt-5-nano` (simple) and `gpt-4o-mini` (standard).
 
 ### Anthropic
 
@@ -128,12 +132,16 @@ Use Anthropic Claude models for content generation.
 | -------------- | ------ | ------------------------------- | ------------------------------------ |
 | `apiKey`       | string | —                               | Anthropic API key (required, secret) |
 | `defaultModel` | string | `claude-opus-5-5`               | Default model                        |
-| `simpleModel`  | string | `claude-haiku-4-5-20251001`     | Simple tasks model                   |
-| `mediumModel`  | string | `claude-sonnet-4-5-20250929`    | Standard tasks model                 |
+| `simpleModel`  | string | `claude-haiku-5-5`              | Simple tasks model                   |
+| `mediumModel`  | string | `claude-sonnet-5-5`             | Standard tasks model                 |
 | `complexModel` | string | `claude-opus-5-5`               | Complex tasks model                  |
 | `temperature`  | number | `0.7`                           | Response variability                 |
 | `maxTokens`    | number | `4096`                          | Max response length                  |
 | `baseUrl`      | string | `https://api.anthropic.com/v1/` | API endpoint                         |
+
+Model defaults as of 2026-11-05 — source: [platform.claude.com models overview](https://platform.claude.com/docs/en/about-claude/models/overview). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The simple and standard tiers moved from `claude-haiku-4-5-20251001` and `claude-sonnet-4-5-20250929` (retires 2026-11-30); the default and complex tiers stay `claude-opus-5-5`.
 
 ### Google Gemini
 
@@ -150,13 +158,17 @@ Use Google Gemini models for content generation.
 | Setting        | Type   | Default                                                    | Description                       |
 | -------------- | ------ | ---------------------------------------------------------- | --------------------------------- |
 | `apiKey`       | string | —                                                          | Google API key (required, secret) |
-| `defaultModel` | string | `models/gemini-2.5-flash`                                  | Default model                     |
-| `simpleModel`  | string | `models/gemini-2.0-flash`                                  | Simple tasks model                |
-| `mediumModel`  | string | `models/gemini-2.5-flash`                                  | Standard tasks model              |
-| `complexModel` | string | `models/gemini-2.5-pro`                                    | Complex tasks model               |
+| `defaultModel` | string | `models/gemini-3.8-flash`                                  | Default model                     |
+| `simpleModel`  | string | `models/gemini-3.5-flash-lite`                             | Simple tasks model                |
+| `mediumModel`  | string | `models/gemini-3.8-flash`                                  | Standard tasks model              |
+| `complexModel` | string | `models/gemini-4-argon`                                    | Complex tasks model               |
 | `temperature`  | number | `0.7`                                                      | Response variability              |
 | `maxTokens`    | number | `4096`                                                     | Max response length               |
 | `baseUrl`      | string | `https://generativelanguage.googleapis.com/v1beta/openai/` | API endpoint                      |
+
+Model defaults as of 2026-11-05 — source: [aistudio.google.com/docs/models](https://aistudio.google.com/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. They moved from `models/gemini-2.5-flash` (default, standard; deprecated 2026-11-02), `models/gemini-2.0-flash` (simple; shut down 2026-06-01) and `models/gemini-2.5-pro` (complex; deprecated 2026-11-02).
 
 ### Groq
 
@@ -170,15 +182,22 @@ Use Groq for fast AI inference with open-source models.
 
 **Settings:**
 
-| Setting        | Type   | Default                                     | Description                     |
-| -------------- | ------ | ------------------------------------------- | ------------------------------- |
-| `apiKey`       | string | —                                           | Groq API key (required, secret) |
-| `defaultModel` | string | `meta-llama/llama-4-scout-17b-16e-instruct` | Default model                   |
-| `baseUrl`      | string | `https://api.groq.com/openai/v1`            | API endpoint                    |
+| Setting        | Type   | Default                          | Description                     |
+| -------------- | ------ | -------------------------------- | ------------------------------- |
+| `apiKey`       | string | —                                | Groq API key (required, secret) |
+| `defaultModel` | string | `openai/gpt-oss-120b`            | Default model                   |
+| `simpleModel`  | string | `openai/gpt-oss-20b`             | Simple tasks model              |
+| `mediumModel`  | string | `openai/gpt-oss-120b`            | Standard tasks model            |
+| `complexModel` | string | `openai/gpt-oss-120b`            | Complex tasks model             |
+| `baseUrl`      | string | `https://api.groq.com/openai/v1` | API endpoint                    |
+
+Model defaults as of 2026-11-05 — source: [console.groq.com/docs/models](https://console.groq.com/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Every tier previously defaulted to `qwen/qwen3-32b`, which Groq retired on 2026-07-17.
 
 ### Grok (xAI)
 
-Use xAI's Grok models through the OpenAI-compatible xAI API — 131,072-token context, vision input, tool calling and structured output. Assign a different Grok model per task tier.
+Use xAI's Grok models through the OpenAI-compatible xAI API — vision input, tool calling and structured output (the plugin reports a 131,072-token context hint; Grok 4.7 itself takes 500K). Assign a different Grok model per task tier.
 
 | Field              | Value           |
 | ------------------ | --------------- |
@@ -194,12 +213,16 @@ Use xAI's Grok models through the OpenAI-compatible xAI API — 131,072-token co
 | -------------- | ------ | --------------------- | ----------------------------------------------------------------------- |
 | `apiKey`       | string | —                     | xAI API key (required, secret, user-scoped; env fallback `XAI_API_KEY`) |
 | `defaultModel` | string | `grok-4.7`            | Default model for all AI tasks (required)                               |
-| `simpleModel`  | string | `grok-4.7`            | Tags, short descriptions, quick classifications                         |
+| `simpleModel`  | string | `grok-4.3`            | Tags, short descriptions, quick classifications                         |
 | `mediumModel`  | string | `grok-4.7`            | Listings, summaries, content reformatting                               |
 | `complexModel` | string | `grok-4.7`            | Full page generation and multi-step analysis                            |
 | `baseUrl`      | string | `https://api.x.ai/v1` | API endpoint (advanced, hidden by default)                              |
 | `temperature`  | number | `0.7`                 | Response variability (0–2, hidden)                                      |
 | `maxTokens`    | number | `4096`                | Max response length (hidden)                                            |
+
+Model defaults as of 2026-11-05 — source: [docs.x.ai/developers/models](https://docs.x.ai/developers/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Only the simple tier moved, from `grok-4.7` to `grok-4.3`.
 
 Get a key at [console.x.ai](https://console.x.ai), then enable the plugin at **Settings → Plugins → AI Provider** (`/settings/plugins/ai-provider`) and paste it into **xAI API Key**.
 
@@ -215,11 +238,13 @@ Use locally running models via Ollama. No API key required.
 
 **Settings:**
 
-| Setting        | Type   | Default  | Description                                              |
-| -------------- | ------ | -------- | -------------------------------------------------------- |
-| `baseUrl`      | string | —        | Ollama URL (required, e.g., `http://localhost:11434/v1`) |
-| `defaultModel` | string | `llama2` | Default model                                            |
-| `apiKey`       | string | `ollama` | API key (optional, defaults to `ollama`)                 |
+| Setting        | Type   | Default      | Description                                              |
+| -------------- | ------ | ------------ | -------------------------------------------------------- |
+| `baseUrl`      | string | —            | Ollama URL (required, e.g., `http://localhost:11434/v1`) |
+| `defaultModel` | string | `qwen3.5:4b` | Default model (also the default of every task tier)      |
+| `apiKey`       | string | `ollama`     | API key (optional, defaults to `ollama`)                 |
+
+Default model as of 2026-11-05 — source: [ollama.com/library/qwen3.5](https://ollama.com/library/qwen3.5). Run `ollama pull qwen3.5:4b` first; any model you have pulled appears in the picker. Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 ### LM Studio
 
@@ -239,6 +264,8 @@ Use locally running models via the LM Studio local server. No API key required.
 | `apiKey`       | string | `lm-studio` | API key (optional; only for an auth proxy in front of LM Studio) |
 | `defaultModel` | string | —           | Loaded model id (required; populated via the model picker)       |
 
+There is no built-in default model: the picker lists what your LM Studio server has loaded. As of 2026-11-05, see [lmstudio.ai/models](https://lmstudio.ai/models) for the models LM Studio can download. The picker accepts a custom model id and keeps existing saved selections.
+
 ### vLLM
 
 Use a self-hosted vLLM OpenAI-compatible server (typically GPU-hosted).
@@ -256,6 +283,8 @@ Use a self-hosted vLLM OpenAI-compatible server (typically GPU-hosted).
 | `baseUrl`      | string | —       | vLLM URL (required, e.g., `http://localhost:8000/v1`)                |
 | `apiKey`       | string | `EMPTY` | API key (secret; only required if started with `--api-key`)          |
 | `defaultModel` | string | —       | Model id passed to `vllm serve --model` (required; via model picker) |
+
+There is no built-in default model: use the model your server was started with. As of 2026-11-05, see [vLLM supported models](https://docs.vllm.ai/en/latest/models/supported_models.html). The picker accepts a custom model id and keeps existing saved selections.
 
 ### Mistral
 
@@ -279,6 +308,8 @@ Use Mistral AI models for content generation.
 | `temperature`  | number | `0.7`                       | Response variability (0–2)         |
 | `maxTokens`    | number | `4096`                      | Max response length                |
 | `baseUrl`      | string | `https://api.mistral.ai/v1` | API endpoint                       |
+
+Model defaults as of 2026-11-05 — source: [docs.mistral.ai/models](https://docs.mistral.ai/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. No default changed in the 2026-11-05 refresh: on that date `mistral-small-latest` points to `mistral-small-2603` (Small 4), while `mistral-medium-latest` and `mistral-large-latest` point to models Mistral deprecated on 2026-10-31 (retiring 2027-04-30).
 
 ## AI Gateways
 
@@ -309,13 +340,17 @@ Access 400+ models from multiple providers through OpenRouter.
 
 **Settings:**
 
-| Setting        | Type   | Default             | Description                 |
-| -------------- | ------ | ------------------- | --------------------------- |
-| `apiKey`       | string | —                   | OpenRouter API key (secret) |
-| `defaultModel` | string | `openai/gpt-5.1`    | Default model               |
-| `simpleModel`  | string | `openai/gpt-5-nano` | Simple tasks model          |
-| `mediumModel`  | string | `openai/gpt-4o`     | Standard tasks model        |
-| `complexModel` | string | `openai/gpt-5.1`    | Complex tasks model         |
+| Setting        | Type   | Default              | Description                 |
+| -------------- | ------ | -------------------- | --------------------------- |
+| `apiKey`       | string | —                    | OpenRouter API key (secret) |
+| `defaultModel` | string | `openai/gpt-6.1-sol` | Default model               |
+| `simpleModel`  | string | `openai/gpt-6-luna`  | Simple tasks model          |
+| `mediumModel`  | string | `openai/gpt-6.1-sol` | Standard tasks model        |
+| `complexModel` | string | `openai/gpt-6-astra` | Complex tasks model         |
+
+Model defaults as of 2026-11-05 — source: [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. They moved from `openai/gpt-5-mini` (default, simple, standard) and `openai/gpt-5` (complex), which OpenAI shuts down on 2026-12-11.
 
 ### Vercel AI Gateway
 
@@ -333,6 +368,12 @@ Route AI requests through Vercel's AI Gateway.
 | ----------------------------------- | -------- | ----------------------------------------------------- |
 | `PLUGIN_VERCEL_AI_GATEWAY_API_KEY`  | Yes      | API key                                               |
 | `PLUGIN_VERCEL_AI_GATEWAY_BASE_URL` | No       | Endpoint (default: `https://ai-gateway.vercel.sh/v1`) |
+
+**Default models:** `openai/gpt-6-astra` (default and complex tasks), `openai/gpt-6-luna` (simple tasks) and `openai/gpt-6.1-sol` (standard tasks).
+
+Model defaults as of 2026-11-05 — source: [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. xAI models are listed under `spacexai/`.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. They moved from `openai/gpt-5.1` (default, complex), `openai/gpt-5-nano` (simple) and `openai/gpt-4o` (standard).
 
 ## Search
 
@@ -1101,14 +1142,18 @@ Generation pipeline that uses the Claude Code CLI to autonomously research and g
 
 **Settings:**
 
-| Setting        | Type   | Default  | Description                                                 |
-| -------------- | ------ | -------- | ----------------------------------------------------------- |
-| `oauthToken`   | string | —        | Claude Code OAuth token (secret, from `claude setup-token`) |
-| `apiKey`       | string | —        | Anthropic API key (secret, alternative to OAuth)            |
-| `model`        | string | —        | Model alias or full name (e.g., `sonnet`, `opus`)           |
-| `version`      | string | `2.1.37` | Claude Code CLI version                                     |
-| `maxTurns`     | number | `500`    | Maximum conversation turns (1–100)                          |
-| `maxBudgetUsd` | number | —        | Maximum budget in USD                                       |
+| Setting        | Type   | Default   | Description                                                 |
+| -------------- | ------ | --------- | ----------------------------------------------------------- |
+| `oauthToken`   | string | —         | Claude Code OAuth token (secret, from `claude setup-token`) |
+| `apiKey`       | string | —         | Anthropic API key (secret, alternative to OAuth)            |
+| `model`        | string | `sonnet`  | Model alias or full id (e.g., `sonnet`, `opus`, `haiku`)    |
+| `version`      | string | `2.1.311` | Claude Code CLI version                                     |
+| `maxTurns`     | number | `500`     | Maximum conversation turns (1–100)                          |
+| `maxBudgetUsd` | number | —         | Maximum budget in USD                                       |
+
+Model defaults as of 2026-11-05 — source: [Claude Code model configuration](https://code.claude.com/docs/en/model-config). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. With CLI `2.1.311` the `sonnet` alias resolves to Sonnet 5.5 on the Anthropic API.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default stays `sonnet`; the CLI pin moved from `2.1.76` to `2.1.311`, so `sonnet` now means Sonnet 5.5. These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
 
 **Environment Variables:**
 
@@ -1129,6 +1174,8 @@ Hosted Claude Managed Agent pipeline. Delegates the full work generation to Anth
 
 See [Claude Managed Agent Plugin](./claude-managed-agent-plugin.md) for setup, settings, and the full list of environment variables. Refer to `packages/plugins/claude-managed-agent/src/` for the latest schema.
 
+Default model: `claude-sonnet-5-5`. Model defaults as of 2026-11-05 — source: [Managed Agents agent setup](https://platform.claude.com/docs/en/managed-agents/agent-setup). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default moved from `claude-sonnet-4-6`. These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
+
 ### Codex Generator
 
 Pipeline plugin that delegates the full generation to OpenAI Codex. Useful when you want Codex's tool-using behaviour to drive the entire generation flow.
@@ -1141,6 +1188,8 @@ Pipeline plugin that delegates the full generation to OpenAI Codex. Useful when 
 | Capabilities       | `pipeline`, `form-schema-provider` |
 
 See [Codex Plugin](./codex-plugin.md) for setup. Refer to `packages/plugins/codex/src/` for the current settings schema.
+
+Default model: `gpt-6.1-sol`; Codex CLI pinned to `0.166.0` (musl build on Linux). Model defaults as of 2026-11-05 — source: [Codex models](https://learn.chatgpt.com/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default moved from `gpt-5.4` and the CLI pin from `0.120.0`. These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
 
 ### Gemini Generator
 
@@ -1155,6 +1204,8 @@ Pipeline plugin that delegates the full generation to the Gemini CLI agent. Dist
 
 See [Gemini Plugin](./gemini-plugin.md) for setup. Refer to `packages/plugins/gemini/src/` for the current settings schema.
 
+Default model: `gemini-3.8-flash`; Gemini CLI pinned to `0.67.0`. Model defaults as of 2026-11-05 — source: [Gemini API models](https://aistudio.google.com/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. **Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default moved from `gemini-2.5-flash`, and the CLI pin from `latest`/`0.45.2`. These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
+
 ### OpenCode Generator
 
 Pipeline plugin that delegates the full generation to OpenCode, an open-source code agent.
@@ -1167,6 +1218,8 @@ Pipeline plugin that delegates the full generation to OpenCode, an open-source c
 | Capabilities       | `pipeline`, `form-schema-provider` |
 
 See [OpenCode Plugin](./opencode-plugin.md) for setup. Refer to `packages/plugins/opencode/src/` for the current settings schema.
+
+OpenCode runs the work's active AI provider model (no model list of its own) and is pinned to CLI `v1.19.5` from [`anomalyco/opencode`](https://github.com/anomalyco/opencode) (was `v1.0.223` from `sst/opencode`), as of 2026-11-05. These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
 
 ### Make.com Workflows
 

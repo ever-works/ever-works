@@ -22,7 +22,7 @@ AnthropicPlugin (extends BaseAiProvider)
             |-- Anthropic Messages API
 ```
 
-On `onLoad`, the plugin creates an `AiOperations` instance configured with `providerType: 'anthropic'` and the default Claude Sonnet model. Each request resolves its own configuration from the settings hierarchy, enabling per-request model and key customisation.
+On `onLoad`, the plugin creates an `AiOperations` instance configured with `providerType: 'anthropic'` and the default model, `claude-opus-5-5` (Claude Opus 5.5). Each request resolves its own configuration from the settings hierarchy, enabling per-request model and key customisation.
 
 ## Configuration
 
@@ -38,8 +38,8 @@ On `onLoad`, the plugin creates an `AiOperations` instance configured with `prov
 interface AnthropicSettings {
 	apiKey: string; // Anthropic API key (x-secret, user-scoped, required)
 	defaultModel: string; // Default model (default: 'claude-opus-5-5')
-	simpleModel: string; // Simple tasks model (default: 'claude-haiku-4-5-20251001')
-	mediumModel: string; // Standard tasks model (default: 'claude-sonnet-4-5-20250929')
+	simpleModel: string; // Simple tasks model (default: 'claude-haiku-5-5')
+	mediumModel: string; // Standard tasks model (default: 'claude-sonnet-5-5')
 	complexModel: string; // Complex tasks model (default: 'claude-opus-5-5')
 	baseUrl: string; // Custom API endpoint (default: 'https://api.anthropic.com/v1/', hidden)
 	temperature: number; // Response randomness, 0-2 (default: 0.7, hidden)
@@ -51,6 +51,10 @@ interface AnthropicSettings {
 - Model fields use the `x-widget: 'model-select'` custom widget.
 - The `baseUrl` setting supports custom proxies or compatible API services.
 
+Model defaults as of 2026-11-05 — source: [platform.claude.com models overview](https://platform.claude.com/docs/en/about-claude/models/overview) (retirement dates: [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Simple moved from `claude-haiku-4-5-20251001` to `claude-haiku-5-5`, standard from `claude-sonnet-4-5-20250929` (deprecated, retires 2026-11-30) to `claude-sonnet-5-5`; default and complex stay on `claude-opus-5-5`.
+
 ## Capabilities
 
 | Capability        | Supported      | Details                                                 |
@@ -60,7 +64,7 @@ interface AnthropicSettings {
 | Tool calling      | Yes            | Tool use for structured data extraction                 |
 | Vision            | Yes            | Image analysis with Claude models                       |
 | Embeddings        | No             | Throws `Error('Embeddings not supported by Anthropic')` |
-| Max context       | 200,000 tokens | Claude's extended context window                        |
+| Max context       | 200,000 tokens | Plugin-wide context hint; Claude 5.5 models accept 1M   |
 
 **Important**: Anthropic does not offer an embeddings API. The `createEmbedding` method throws an explicit error. If you need embeddings alongside Anthropic for chat, use a secondary provider (e.g., OpenAI) for embedding generation.
 
@@ -93,10 +97,10 @@ interface AnthropicSettings {
 
 The inherited `resolveConfig()` method resolves the appropriate Claude model for the task tier:
 
-- **Simple tier**: `claude-haiku-4-5-20251001` -- optimized for speed; handles tags, short descriptions, quick classifications.
-- **Medium tier**: `claude-sonnet-4-5-20250929` -- balanced speed and quality; handles listings, summaries, content reformatting.
+- **Simple tier**: `claude-haiku-5-5` -- the vendor's fastest model; handles tags, short descriptions, quick classifications.
+- **Medium tier**: `claude-sonnet-5-5` -- balanced speed and quality; handles listings, summaries, content reformatting.
 - **Complex tier**: `claude-opus-5-5` -- highest quality; handles full page generation and multi-step analysis.
-- **Default**: `claude-opus-5-5` -- fallback for unspecified tiers.
+- **Default**: `claude-opus-5-5` -- fallback for unspecified tiers; also the `onLoad` bootstrap and `getDefaultModelId()`.
 
 ### No Embedding Support
 
@@ -112,7 +116,7 @@ Works that require semantic search should pair Anthropic (for generation) with a
 
 ### 200K Context Window
 
-Claude models support up to 200,000 tokens of context, which is reported via `getCapabilities()`. This allows processing large source documents or entire website contents in a single request during work generation.
+`getCapabilities()` reports a static 200,000-token context hint. The current Claude 5.5 models accept 1M tokens of context (the legacy 4.5 snapshots 200K), which allows processing large source documents or entire website contents in a single request during work generation.
 
 ## Usage Examples
 
@@ -144,8 +148,8 @@ const available = await anthropicPlugin.isAvailable({ apiKey: userApiKey });
 ## Rate Limiting & Quotas
 
 - **Anthropic API limits**: Depend on the user's usage tier. Tier 1 starts at 50 RPM and 40,000 TPM; higher tiers increase these limits significantly.
-- **Max tokens**: Defaults to 4,096 per response. Claude models support up to 8,192 output tokens; configurable via the `maxTokens` setting.
-- **Context window**: Up to 200,000 tokens input.
+- **Max tokens**: Defaults to 4,096 per response, configurable via the `maxTokens` setting. The Claude 5.5 models accept up to 128K output tokens (vendor models overview, 2026-11-05).
+- **Context window**: 1M tokens input for the Claude 5.5 models, 200K for the legacy 4.5 snapshots; the plugin's static hint is 200,000.
 - The plugin does not implement internal rate-limit tracking. Anthropic returns `429` errors which propagate to callers.
 
 ## Error Handling

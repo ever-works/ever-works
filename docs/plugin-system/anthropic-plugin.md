@@ -45,8 +45,8 @@ graph TD
 | -------------- | -------- | -------- | ------------------------------- | -------- | -------------- | ---------------------------------------------------- |
 | `apiKey`       | `string` | Yes      | --                              | `user`   | --             | Anthropic API key. Secret.                           |
 | `defaultModel` | `string` | Yes      | `claude-opus-5-5`               | `global` | `model-select` | Default model for all AI tasks.                      |
-| `simpleModel`  | `string` | No       | `claude-haiku-4-5-20251001`     | `global` | `model-select` | Model for tags, descriptions, classifications.       |
-| `mediumModel`  | `string` | No       | `claude-sonnet-4-5-20250929`    | `global` | `model-select` | Model for listings, summaries, reformatting.         |
+| `simpleModel`  | `string` | No       | `claude-haiku-5-5`              | `global` | `model-select` | Model for tags, descriptions, classifications.       |
+| `mediumModel`  | `string` | No       | `claude-sonnet-5-5`             | `global` | `model-select` | Model for listings, summaries, reformatting.         |
 | `complexModel` | `string` | No       | `claude-opus-5-5`               | `global` | `model-select` | Model for full page generation, multi-step analysis. |
 | `baseUrl`      | `string` | No       | `https://api.anthropic.com/v1/` | --       | --             | Custom API endpoint for proxies. Hidden.             |
 | `temperature`  | `number` | No       | `0.7`                           | --       | --             | Sampling temperature (0--2). Hidden.                 |
@@ -56,17 +56,23 @@ graph TD
 
 The Anthropic plugin maps Claude model families to task complexity tiers:
 
-| Tier     | Default Model     | Use Case                                        |
-| -------- | ----------------- | ----------------------------------------------- |
-| Simple   | Claude 4.5 Haiku  | Tags, short descriptions, quick classifications |
-| Standard | Claude 4.5 Sonnet | Listings, summaries, content reformatting       |
-| Complex  | Claude 4.5 Sonnet | Full page generation, multi-step analysis       |
+Model defaults as of 2026-11-05 — source: [platform.claude.com models overview](https://platform.claude.com/docs/en/about-claude/models/overview) (retirement dates: [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+| Tier     | Default Model                           | Use Case                                        |
+| -------- | --------------------------------------- | ----------------------------------------------- |
+| Simple   | Claude Haiku 5.5 (`claude-haiku-5-5`)   | Tags, short descriptions, quick classifications |
+| Standard | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | Listings, summaries, content reformatting       |
+| Complex  | Claude Opus 5.5 (`claude-opus-5-5`)     | Full page generation, multi-step analysis       |
+
+The default model, the `onLoad` bootstrap and `getDefaultModelId()` all use `claude-opus-5-5`, the model the vendor recommends starting with.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The simple tier moved from `claude-haiku-4-5-20251001` to `claude-haiku-5-5` and the standard tier from `claude-sonnet-4-5-20250929` to `claude-sonnet-5-5`; the default and complex tiers stay on `claude-opus-5-5`. `claude-sonnet-4-5-20250929` is deprecated and retires on 2026-11-30, so a config that saved it should switch before then.
 
 ```mermaid
 graph LR
-    A[Simple Tasks] -->|Haiku| B[Fast + Cheap]
-    C[Standard Tasks] -->|Sonnet| D[Balanced]
-    E[Complex Tasks] -->|Sonnet/Opus| F[High Quality]
+    A[Simple Tasks] -->|Haiku 5.5| B[Fast + Cheap]
+    C[Standard Tasks] -->|Sonnet 5.5| D[Balanced]
+    E[Complex Tasks] -->|Opus 5.5| F[High Quality]
 ```
 
 ## Capabilities
@@ -83,15 +89,15 @@ getCapabilities(): AiModelCapabilities {
 }
 ```
 
-| Capability        | Supported | Description                                           |
-| ----------------- | --------- | ----------------------------------------------------- |
-| Structured Output | Yes       | JSON mode and tool use for typed responses            |
-| Streaming         | Yes       | Server-sent events for real-time token delivery       |
-| Tool Calling      | Yes       | Tool use for agent-based workflows                    |
-| Vision            | Yes       | Image understanding with Claude's vision capabilities |
-| Max Context       | 200,000   | Maximum tokens in a single context window             |
+| Capability        | Supported | Description                                              |
+| ----------------- | --------- | -------------------------------------------------------- |
+| Structured Output | Yes       | JSON mode and tool use for typed responses               |
+| Streaming         | Yes       | Server-sent events for real-time token delivery          |
+| Tool Calling      | Yes       | Tool use for agent-based workflows                       |
+| Vision            | Yes       | Image understanding with Claude's vision capabilities    |
+| Max Context       | 200,000   | Plugin-wide context hint returned by `getCapabilities()` |
 
-The 200K context window is the largest among the platform's AI providers, allowing Claude to process significantly more source material per request.
+The 200K figure is the plugin's static hint. The current Claude 5.5 models themselves accept a 1M-token context and 128K output tokens (vendor models overview, 2026-11-05).
 
 ## Core Methods
 
@@ -127,7 +133,7 @@ Anthropic does not offer an embedding API. If embeddings are needed, use the Ope
 async listModels(settings?: PluginSettings): Promise<readonly AiModel[]>
 ```
 
-Fetches the available Claude models from the API. Used to populate model selection in the CLI and web dashboard.
+Fetches the available Claude models from the API (`GET https://api.anthropic.com/v1/models` with `Authorization: Bearer <your key>`). The endpoint returns active and deprecated models, newest first, 20 per page by default, and the picker reads only the first page, so enter an older id as a custom model id. Used to populate model selection in the CLI and web dashboard.
 
 ### Availability Check
 
@@ -150,7 +156,7 @@ Tests the connection by calling `aiOps.testConnection()` with the resolved confi
 ```typescript
 this.aiOps = new AiOperations({
 	apiKey: '',
-	model: 'claude-opus-5-5',
+	model: DEFAULT_MODEL, // 'claude-opus-5-5', also returned by getDefaultModelId()
 	baseURL: 'https://api.anthropic.com/v1/',
 	temperature: 0.7,
 	maxTokens: 4096,
@@ -171,14 +177,14 @@ The `providerType: 'anthropic'` tells `AiOperations` (and the underlying LangCha
 
 ## Differences from OpenAI Plugin
 
-| Aspect         | Anthropic               | OpenAI               |
-| -------------- | ----------------------- | -------------------- |
-| Context window | 200K tokens             | 128K tokens          |
-| Embeddings     | Not supported           | Supported            |
-| Default model  | Claude Sonnet 4.5       | GPT-5.1              |
-| Base URL       | `api.anthropic.com/v1/` | `api.openai.com/v1`  |
-| Provider type  | `anthropic`             | `openai`             |
-| API format     | Messages API            | Chat Completions API |
+| Aspect         | Anthropic                           | OpenAI                      |
+| -------------- | ----------------------------------- | --------------------------- |
+| Context window | 200K tokens (hint)                  | 128K tokens (fallback hint) |
+| Embeddings     | Not supported                       | Supported                   |
+| Default model  | Claude Opus 5.5 (`claude-opus-5-5`) | GPT-6 Astra (`gpt-6-astra`) |
+| Base URL       | `api.anthropic.com/v1/`             | `api.openai.com/v1`         |
+| Provider type  | `anthropic`                         | `openai`                    |
+| API format     | Messages API                        | Chat Completions API        |
 
 Both plugins share the same `BaseAiProvider` base class and `AiOperations` abstraction, making them interchangeable from the platform's perspective. The `AiFacadeService` can switch between them based on user configuration.
 

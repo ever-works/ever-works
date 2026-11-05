@@ -70,14 +70,36 @@ The plugin runs 6 sequential steps:
 
 ### Settings Schema
 
-| Setting        | Type      | Default | Description                                         |
-| -------------- | --------- | ------- | --------------------------------------------------- |
-| `oauthToken`   | `string`  | --      | Claude Code OAuth token (from `claude setup-token`) |
-| `apiKey`       | `string`  | --      | Anthropic API key (from console.anthropic.com)      |
-| `version`      | `string`  | Latest  | Claude Code CLI version to use (hidden)             |
-| `maxTurns`     | `integer` | Default | Maximum number of agentic turns (1--100, hidden)    |
-| `maxBudgetUsd` | `number`  | --      | Maximum budget in USD per generation (hidden)       |
-| `model`        | `string`  | --      | Model alias (`sonnet`, `opus`) or full name         |
+| Setting        | Type      | Default   | Description                                         |
+| -------------- | --------- | --------- | --------------------------------------------------- |
+| `oauthToken`   | `string`  | --        | Claude Code OAuth token (from `claude setup-token`) |
+| `apiKey`       | `string`  | --        | Anthropic API key (from console.anthropic.com)      |
+| `version`      | `string`  | `2.1.311` | Claude Code CLI version to use (hidden)             |
+| `maxTurns`     | `integer` | Default   | Maximum number of agentic turns (1--100, hidden)    |
+| `maxBudgetUsd` | `number`  | --        | Maximum budget in USD per generation (hidden)       |
+| `model`        | `string`  | `sonnet`  | Model alias (`sonnet`, `opus`, `haiku`) or full id  |
+
+### Models
+
+Model list as of 2026-11-05 — source: [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and the [Claude models overview](https://platform.claude.com/docs/en/about-claude/models/overview). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+| Model id                     | Notes                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `sonnet`                     | **Default.** CLI alias; on the Anthropic API it resolves to Sonnet 5.5   |
+| `opus`                       | CLI alias; resolves to Opus 5.5                                          |
+| `haiku`                      | CLI alias; resolves to Haiku 5.5                                         |
+| `claude-opus-5-5`            | Most capable                                                             |
+| `claude-sonnet-5-5`          | Balance of speed, cost and intelligence                                  |
+| `claude-haiku-5-5`           | Fastest, lowest cost                                                     |
+| `claude-fable-5-1`           | Frontier model, premium pricing ($10 / $50 per MTok); needs CLI 2.1.257+ |
+| `claude-sonnet-4-5-20250929` | Legacy, retires 2026-11-30 (200K context)                                |
+| `claude-haiku-4-5-20251001`  | Legacy (200K context)                                                    |
+
+`claude-opus-4-1-20250805` retired on 2026-08-05 and is no longer listed; a config that saved it keeps it as a custom id. Limited-availability `claude-mythos-*` models are not listed.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default stays the `sonnet` alias, but the CLI pin moved from `2.1.76` to `2.1.311` (npm `stable`), so `sonnet` now resolves to Sonnet 5.5.
+
+These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
 
 ### Authentication
 

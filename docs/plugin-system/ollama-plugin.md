@@ -44,18 +44,23 @@ The plugin talks to Ollama through its OpenAI-compatible `/v1` API endpoint. Thi
 
 ### Settings Schema
 
-| Setting        | Type     | Default                     | Scope    | Description                                                  |
-| -------------- | -------- | --------------------------- | -------- | ------------------------------------------------------------ |
-| `baseUrl`      | `string` | `http://localhost:11434/v1` | `user`   | Address of the Ollama instance                               |
-| `apiKey`       | `string` | `ollama`                    | `user`   | Only needed for secured Ollama instances                     |
-| `defaultModel` | `string` | `ministral-3:8b`            | `global` | Used for all AI tasks unless a tier-specific model is set    |
-| `simpleModel`  | `string` | `ministral-3:8b`            | `global` | Handles tags, short descriptions, and quick classifications  |
-| `mediumModel`  | `string` | `ministral-3:8b`            | `global` | Handles listings, summaries, and content reformatting        |
-| `complexModel` | `string` | `ministral-3:8b`            | `global` | Handles full page generation and multi-step analysis         |
-| `temperature`  | `number` | `0.7`                       | hidden   | Controls output randomness (0 = deterministic, 2 = creative) |
-| `maxTokens`    | `number` | `4096`                      | hidden   | Maximum length of each AI-generated response                 |
+| Setting          | Type     | Default                     | Scope    | Description                                                                               |
+| ---------------- | -------- | --------------------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `baseUrl`        | `string` | `http://localhost:11434/v1` | `user`   | Address of the Ollama instance                                                            |
+| `apiKey`         | `string` | `ollama`                    | `user`   | Only needed for secured Ollama instances                                                  |
+| `defaultModel`   | `string` | `qwen3.5:4b`                | `global` | Used for all AI tasks unless a tier-specific model is set                                 |
+| `simpleModel`    | `string` | `qwen3.5:4b`                | `global` | Handles tags, short descriptions, and quick classifications                               |
+| `mediumModel`    | `string` | `qwen3.5:4b`                | `global` | Handles listings, summaries, and content reformatting                                     |
+| `complexModel`   | `string` | `qwen3.5:4b`                | `global` | Handles full page generation and multi-step analysis                                      |
+| `embeddingModel` | `string` | --                          | `global` | Model for semantic-search embeddings (e.g. `nomic-embed-text`); only needed for KB search |
+| `temperature`    | `number` | `0.7`                       | hidden   | Controls output randomness (0 = deterministic, 2 = creative)                              |
+| `maxTokens`      | `number` | `4096`                      | hidden   | Maximum length of each AI-generated response                                              |
 
 Model fields use the `x-widget: model-select` extension, which renders the model-select dropdown in the dashboard UI. The dropdown is populated by calling `listModels()` against the configured Ollama instance.
+
+Default model as of 2026-11-05: `qwen3.5:4b` on every tier — source: [ollama.com/library/qwen3.5](https://ollama.com/library/qwen3.5) (a 3.3 GB download with a 256K context and tool support). Availability depends on the models you have pulled; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05): no default changed.** `qwen3.5:4b` was verified current in the Ollama library and stays the default for every tier, the `onLoad` bootstrap and `getDefaultModelId()`. Configs that never saved a model keep using it, and saved selections are kept.
 
 ### Required Fields
 
@@ -69,7 +74,7 @@ Model fields use the `x-widget: model-select` extension, which renders the model
 	"defaultModel": {
 		"type": "string",
 		"title": "Default Model",
-		"default": "ministral-3:8b",
+		"default": "qwen3.5:4b",
 		"x-widget": "model-select",
 		"x-scope": "global"
 	}
@@ -126,11 +131,15 @@ flowchart LR
     C --> CM
 ```
 
-| Tier    | Use Cases                                 | Recommended Models              |
-| ------- | ----------------------------------------- | ------------------------------- |
-| Simple  | Tags, short descriptions, classifications | `ministral-3:8b`, `gemma2:2b`   |
-| Medium  | Listings, summaries, content reformatting | `ministral-3:8b`, `llama3.1:8b` |
-| Complex | Full page generation, multi-step analysis | `llama3.1:70b`, `mistral-large` |
+Models as of 2026-11-05 — source: [ollama.com/library](https://ollama.com/library). Availability depends on the models you have pulled; the picker accepts a custom model id and keeps existing saved selections.
+
+| Tier    | Use Cases                                 | Default      | Other small tool-capable models in the library |
+| ------- | ----------------------------------------- | ------------ | ---------------------------------------------- |
+| Simple  | Tags, short descriptions, classifications | `qwen3.5:4b` | `qwen3.5:2b`, `gemma4:e2b`, `ministral-3:3b`   |
+| Medium  | Listings, summaries, content reformatting | `qwen3.5:4b` | `gemma4:e4b`, `qwen3:4b`                       |
+| Complex | Full page generation, multi-step analysis | `qwen3.5:4b` | `qwen3.5:9b`, `gpt-oss:20b`                    |
+
+`gemma3`, `gemma2`, `phi4` and `deepseek-coder-v2` carry no tools badge in the library, so they are poor fits for the structured-output and tool-calling steps.
 
 If a tier-specific model is not set, the `defaultModel` is used for all tiers.
 
@@ -143,7 +152,7 @@ async onLoad(context: PluginContext): Promise<void> {
     await super.onLoad(context);
     this.aiOps = new AiOperations({
         apiKey: 'ollama',
-        model: 'ministral-3:8b',
+        model: 'qwen3.5:4b',
         baseURL: 'http://localhost:11434/v1',
         temperature: 0.7,
         maxTokens: 4096,
@@ -173,7 +182,7 @@ The `isAvailable()` method calls `AiOperations.testConnection()` with the resolv
 ## Getting Started
 
 1. Install and run Ollama from [ollama.com](https://ollama.com) or connect to an existing instance.
-2. Pull at least one model: `ollama pull ministral-3:8b`.
+2. Pull at least one model: `ollama pull qwen3.5:4b` (the default).
 3. Enable the Ollama plugin in the Ever Works dashboard under **Settings > Plugins**.
 4. Set the **Ollama Server URL** to your instance address (defaults to `http://localhost:11434/v1`).
 5. Select your preferred models for each task complexity tier.

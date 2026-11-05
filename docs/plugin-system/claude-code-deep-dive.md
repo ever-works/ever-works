@@ -58,30 +58,37 @@ The plugin downloads the Claude Code CLI binary from a versioned distribution UR
 
 ```typescript
 const CLAUDE_CODE_DIST_URL = 'https://...'; // Distribution endpoint
-const DEFAULT_CLI_VERSION = '2.1.37';
+const DEFAULT_CLI_VERSION = '2.1.311';
 ```
 
-The binary is cached locally and reused across generations. Version can be overridden via settings.
+The binary is cached locally and reused across generations. Version can be overridden via settings. The default is `2.1.311`, the npm `stable` dist-tag on 2026-10-26 (it was `2.1.76`); Opus 5.5 needs 2.1.280+, Sonnet 5.5 2.1.284+, Haiku 5.5 2.1.293+ and the `fable` alias 2.1.257+ ([CHANGELOG](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)).
 
 ## Configuration
 
 ### Settings Schema
 
-| Field          | Type     | Default    | Description                                                              |
-| -------------- | -------- | ---------- | ------------------------------------------------------------------------ |
-| `oauthToken`   | `string` | -          | OAuth token for Claude Code authentication (`x-secret`, `x-scope: user`) |
-| `apiKey`       | `string` | -          | API key alternative for authentication (`x-secret`, `x-scope: user`)     |
-| `version`      | `string` | `'2.1.37'` | Claude Code CLI version to use                                           |
-| `maxTurns`     | `number` | `500`      | Maximum conversation turns for the CLI                                   |
-| `maxBudgetUsd` | `number` | -          | Maximum budget in USD for the generation                                 |
-| `model`        | `string` | -          | Model to use (overrides CLI default)                                     |
+| Field          | Type     | Default     | Description                                                              |
+| -------------- | -------- | ----------- | ------------------------------------------------------------------------ |
+| `oauthToken`   | `string` | -           | OAuth token for Claude Code authentication (`x-secret`, `x-scope: user`) |
+| `apiKey`       | `string` | -           | API key alternative for authentication (`x-secret`, `x-scope: user`)     |
+| `version`      | `string` | `'2.1.311'` | Claude Code CLI version to use                                           |
+| `maxTurns`     | `number` | `500`       | Maximum conversation turns for the CLI                                   |
+| `maxBudgetUsd` | `number` | -           | Maximum budget in USD for the generation                                 |
+| `model`        | `string` | `'sonnet'`  | CLI alias (`sonnet`, `opus`, `haiku`) or full model id                   |
+
+Model defaults as of 2026-11-05 — source: [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and the [Claude models overview](https://platform.claude.com/docs/en/about-claude/models/overview). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. On the Anthropic API, `sonnet` resolves to Sonnet 5.5, `opus` to Opus 5.5 and `haiku` to Haiku 5.5; the picker also lists `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1` and the legacy `claude-sonnet-4-5-20250929` (retires 2026-11-30) and `claude-haiku-4-5-20251001`.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The default stays the `sonnet` alias, but with the CLI pin moved from `2.1.76` to `2.1.311` it now resolves to Sonnet 5.5.
+
+These values ship with the CLI-agents models refresh, [PR #3087](https://github.com/ever-co/ever-works/pull/3087).
 
 ### Constants
 
 | Constant              | Value                          | Description                       |
 | --------------------- | ------------------------------ | --------------------------------- |
 | `BASE_TEMP_DIR`       | `'/tmp/claude-code-generator'` | Root work for workspaces          |
-| `DEFAULT_CLI_VERSION` | `'2.1.37'`                     | Default CLI binary version        |
+| `DEFAULT_CLI_VERSION` | `'2.1.311'`                    | Default CLI binary version        |
+| `DEFAULT_MODEL`       | `'sonnet'`                     | Default model (CLI alias)         |
 | `DEFAULT_MAX_TURNS`   | `500`                          | Default max conversation turns    |
 | `MAX_BUFFER_SIZE`     | `10 * 1024 * 1024` (10 MB)     | Max stdout/stderr buffer size     |
 | `KILL_TIMEOUT_MS`     | `5000`                         | Timeout for graceful CLI shutdown |
@@ -231,7 +238,7 @@ const settings = {
 ```typescript
 const settings = {
 	apiKey: 'sk-ant-...',
-	model: 'claude-sonnet-4-20250514',
+	model: 'claude-opus-5-5',
 	maxTurns: 300,
 	maxBudgetUsd: 3.0
 };
