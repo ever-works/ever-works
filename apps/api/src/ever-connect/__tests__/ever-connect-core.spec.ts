@@ -1,7 +1,8 @@
-import { ProblemError } from '@ever-co/connect-sdk';
+import { ProblemError, publicJwkOf } from '@ever-co/connect-sdk';
 import type { DataSource } from 'typeorm';
 import { EverConnectOutbox, EverInstance } from '@ever-works/agent/entities';
 import { EverInstanceService } from '@ever-works/agent/ever-instance';
+import { PluginSecretEncService } from '@ever-works/agent/plugins';
 import { readEverConnectConfig } from '../ever-connect.config';
 import { EverConnectFeedService } from '../ever-connect-feed.service';
 import type { EverConnectIntegrationService } from '../ever-connect-integration.service';
@@ -323,6 +324,46 @@ describe('Ever Connect core', () => {
             await keys.discard();
             expect(await keys.signer()).toBeNull();
             expect((await keys.ensure()).x).not.toBe(first.x);
+        });
+
+        it('unwraps the stored key once, not on every call (#3042 follow-up)', async () => {
+            const instances = dataSource.getRepository(EverInstance);
+            const maker = new EverConnectKeyService(instances, new EverInstanceService(instances));
+            await maker.discard();
+            await maker.ensure();
+            // A fresh service (a cold process) whose unwrapping is counted.
+            const secrets = new PluginSecretEncService();
+            const decrypt = jest.spyOn(secrets, 'decryptValue');
+            const keys = new EverConnectKeyService(
+                instances,
+                new EverInstanceService(instances),
+                secrets,
+            );
+
+            const first = await keys.signer();
+            for (let i = 0; i < 5; i += 1) expect(await keys.signer()).toBe(first);
+            expect(decrypt).toHaveBeenCalledTimes(1);
+        });
+
+        it('sees a key another replica discarded or replaced at once', async () => {
+            const instances = dataSource.getRepository(EverInstance);
+            const here = new EverConnectKeyService(instances, new EverInstanceService(instances));
+            const other = new EverConnectKeyService(instances, new EverInstanceService(instances));
+            await here.discard();
+            await here.ensure();
+            const before = await here.signer();
+            expect(before).not.toBeNull();
+
+            // Another replica discards the key: this one must stop signing with it.
+            await other.discard();
+            expect(await here.signer()).toBeNull();
+
+            // ...and makes a new one: this one must sign with the NEW key.
+            const fresh = await other.ensure();
+            const after = await here.signer();
+            expect(after?.kid).not.toBe(before?.kid);
+            expect(after?.kid).toBe((await other.signer())?.kid);
+            expect(after && publicJwkOf(after).x).toBe(fresh.x);
         });
     });
 });

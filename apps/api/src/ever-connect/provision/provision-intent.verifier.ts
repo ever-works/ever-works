@@ -353,7 +353,10 @@ export async function verifyProvisionIntent(
         throw refuse('schema_violation');
     }
     const consentId = claims.consent_id;
-    if (consentId !== undefined && !(typeof consentId === 'string' && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(consentId))) {
+    if (
+        consentId !== undefined &&
+        !(typeof consentId === 'string' && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(consentId))
+    ) {
         throw refuse('schema_violation');
     }
 
