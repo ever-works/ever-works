@@ -835,7 +835,7 @@ describe('MissionsService — templateInputs (APW-08 T39)', () => {
     let missionWorks: ReturnType<typeof makeMissionWorksMock>;
     let worksRepo: { findOne: jest.Mock };
     let git: { getFileContent: jest.Mock };
-    let goals: { create: jest.Mock; linkToMission: jest.Mock };
+    let goals: { create: jest.Mock; linkToMission: jest.Mock; delete: jest.Mock };
     let goalsWired: boolean;
 
     const moduleRef = {
@@ -897,6 +897,7 @@ describe('MissionsService — templateInputs (APW-08 T39)', () => {
                 title: goal.title,
             })),
             linkToMission: jest.fn(async () => ({})),
+            delete: jest.fn(async () => ({ deleted: true })),
         };
         goalsWired = true;
         moduleRef.get.mockClear();
@@ -1032,6 +1033,16 @@ describe('MissionsService — templateInputs (APW-08 T39)', () => {
         );
     });
 
+    it('a Goal created but not linked is removed, and the write says so (review of #3077)', async () => {
+        goals.linkToMission.mockRejectedValueOnce(new Error('link refused'));
+        const dto = await build().create('u1', input());
+        expect(goals.create).toHaveBeenCalledTimes(2);
+        // The first Goal was created (g1) and its link failed: it is deleted; g2 is linked.
+        expect(goals.delete).toHaveBeenCalledTimes(1);
+        expect(goals.delete).toHaveBeenCalledWith('u1', 'g1', undefined);
+        expect(dto.warnings).toEqual(['templateGoalsNotCreated']);
+    });
+
     describe('readTemplateManifest (APW-08 T40)', () => {
         it('answers the form’s view of the template', async () => {
             const view = await build().readTemplateManifest('u1', TEMPLATE_ID);
@@ -1065,6 +1076,19 @@ describe('MissionsService — templateInputs (APW-08 T39)', () => {
                 ],
                 warnings: [],
             });
+        });
+
+        it('shows the budget a create would store, not an out-of-range one', async () => {
+            git.getFileContent.mockResolvedValueOnce({
+                content: RUNTIME_MANIFEST.replace(
+                    'maxBudgetCentsPerRun: 1500',
+                    'maxBudgetCentsPerRun: 5000000',
+                ),
+                encoding: 'utf-8',
+            });
+            const view = await build().readTemplateManifest('u1', TEMPLATE_ID);
+            expect(view.defaults?.maxBudgetCentsPerRun).toBeNull();
+            expect(view.defaults?.requireApprovalBeforeCreate).toBe(true);
         });
 
         it('an unreadable manifest answers the warning and nothing else', async () => {

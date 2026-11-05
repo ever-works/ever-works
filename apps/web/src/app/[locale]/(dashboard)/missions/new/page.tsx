@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 /** A catalog Mission template id (the API refuses anything else with 400 / 404). */
 const TEMPLATE_ID_RE = /^[A-Za-z0-9._-]{1,120}$/;
 
-type SearchParams = Promise<{ template?: string }>;
+type SearchParams = Promise<{ template?: string | string[] }>;
 
 /**
  * `/missions/new` — dedicated manual Mission-create page.
@@ -31,7 +31,8 @@ type SearchParams = Promise<{ template?: string }>;
  */
 export default async function NewMissionPage({ searchParams }: { searchParams?: SearchParams }) {
     const params = (await searchParams) ?? {};
-    const templateId = (params.template ?? '').trim();
+    // A repeated `?template=` arrives as an array: only a single value names a template.
+    const templateId = typeof params.template === 'string' ? params.template.trim() : '';
     let template: NewMissionFormTemplate | null = null;
     let initialDescription = '';
     if (TEMPLATE_ID_RE.test(templateId)) {

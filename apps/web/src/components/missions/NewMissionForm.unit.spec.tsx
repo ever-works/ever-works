@@ -92,6 +92,7 @@ vi.mock('@/app/actions/dashboard/missions', () => ({
 }));
 
 import { NewMissionForm } from './NewMissionForm';
+import { buildProposeRulesRequest } from './BuildOnAppTemplateFields';
 import { NewPageClient } from '@/components/new/NewPageClient';
 
 const APP_WORK_ID = '11111111-1111-4111-8111-111111111111';
@@ -134,7 +135,9 @@ beforeEach(() => {
 function chooseAppWork() {
     const select = screen.getByTestId('build-on-app-work');
     // The picker offers App Works only.
-    expect(workSelectProps).toHaveBeenLastCalledWith(expect.objectContaining({ kinds: ['app'] }));
+    expect(workSelectProps).toHaveBeenLastCalledWith(
+        expect.objectContaining({ kinds: ['app'], ownedOnly: true }),
+    );
     expect(select.querySelector(`option[value="${APP_WORK_ID}"]`)).not.toBeNull();
     expect(select.querySelector('option[value="w-site"]')).toBeNull();
     fireEvent.change(select, { target: { value: APP_WORK_ID } });
@@ -221,6 +224,37 @@ describe('NewMissionForm — Build on an open-source app (APW-08 T40)', () => {
             target: { value: '22222222-2222-4222-8222-222222222222' },
         });
         expect(screen.getByTestId('build-on-app-propose-rules')).not.toBeDisabled();
+    });
+
+    it('offers Propose these rules for recommended paths even without a line limit', () => {
+        render(
+            <NewMissionForm
+                createMission={vi.fn()}
+                template={{
+                    ...TEMPLATE,
+                    manifest: {
+                        ...MANIFEST,
+                        appWork: { ...MANIFEST.appWork!, maxPullRequestChangedLines: null },
+                    },
+                }}
+            />,
+        );
+        expect(screen.queryByTestId('build-on-app-rules')).toBeNull();
+        expect(screen.getByTestId('build-on-app-propose-rules')).toBeInTheDocument();
+    });
+
+    it('the largest request a manifest allows fits the evolve limit whole', () => {
+        // The manifest schema allows 12 paths of 120 characters per list.
+        const path = (n: number) => `${'p'.repeat(116)}/${String(n).padStart(2, '0')}*`;
+        const request = buildProposeRulesRequest({
+            requiredRelation: 'improves',
+            maxPullRequestChangedLines: 100_000,
+            requireHumanMergePaths: Array.from({ length: 12 }, (_, i) => path(i)),
+            protectedPaths: Array.from({ length: 12 }, (_, i) => path(i + 12)),
+        });
+        expect(request.length).toBeLessThanOrEqual(4000);
+        // Nothing is cut: the last path of the last list is there.
+        expect(request).toContain(path(23));
     });
 
     it('by default Propose these rules is the App change request action, called once', async () => {

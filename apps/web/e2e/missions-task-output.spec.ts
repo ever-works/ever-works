@@ -239,7 +239,9 @@ test.describe('APW-08 T42 — Use this Template: Build on an open-source app', (
             headers: authedHeaders(token),
         });
         expect(works.status()).toBe(200);
-        const relations = (await works.json()) as Array<{ workId: string; relation: string }>;
+        const { relations } = (await works.json()) as {
+            relations: Array<{ workId: string; relation: string }>;
+        };
         expect(relations).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ workId: work.workId, relation: 'improves' }),

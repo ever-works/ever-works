@@ -74,7 +74,9 @@ export function buildProposeRulesRequest(
                 .join(', ')}.`,
         );
     }
-    return lines.join('\n').slice(0, 4000);
+    // Never cut: the manifest's limits (12 paths × 120 characters per list) keep it under the
+    // evolve endpoint's 4,000 characters, and an over-long request is refused whole, not filed short.
+    return lines.join('\n');
 }
 
 function fill(text: string, value: BuildOnAppTemplateValue, appWorkName: string | null): string {
@@ -216,6 +218,7 @@ export function BuildOnAppTemplateFields({
                     onValueChange={(appWorkId) => set({ appWorkId })}
                     noneLabel={t('appWorkPlaceholder')}
                     kinds={['app']}
+                    ownedOnly
                     onLoaded={setAppWorkCount}
                     testId="build-on-app-work"
                     disabled={disabled}
@@ -254,11 +257,17 @@ export function BuildOnAppTemplateFields({
                         </ul>
                     </div>
                 )}
-                {appWork.maxPullRequestChangedLines !== null && (
+                {(appWork.maxPullRequestChangedLines !== null ||
+                    appWork.requireHumanMergePaths.length > 0 ||
+                    appWork.protectedPaths.length > 0) && (
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                        <p data-testid="build-on-app-rules">
-                            {t('rules', { lines: appWork.maxPullRequestChangedLines })}
-                        </p>
+                        {appWork.maxPullRequestChangedLines !== null ? (
+                            <p data-testid="build-on-app-rules">
+                                {t('rules', { lines: appWork.maxPullRequestChangedLines })}
+                            </p>
+                        ) : (
+                            <span />
+                        )}
                         <Button
                             type="button"
                             variant="ghost"

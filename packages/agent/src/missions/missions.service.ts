@@ -680,14 +680,15 @@ export class MissionsService {
         if (!manifest) return view;
         const defaults = manifest.defaults;
         if (defaults) {
+            // The form shows what a create would store (review of #3077): the same narrowing.
+            const guardrails = sanitizeTemplateGuardrails(defaults.guardrails) ?? {};
             view.defaults = {
                 cadence: defaults.cadence ?? null,
                 outputMode: defaults.outputMode ?? null,
                 tasksPerTick: defaults.taskOutput?.tasksPerTick ?? null,
                 openTasksCap: defaults.taskOutput?.openTasksCap ?? null,
-                maxBudgetCentsPerRun: defaults.guardrails?.maxBudgetCentsPerRun ?? null,
-                requireApprovalBeforeCreate:
-                    defaults.guardrails?.requireApprovalBeforeCreate ?? null,
+                maxBudgetCentsPerRun: guardrails.maxBudgetCentsPerRun ?? null,
+                requireApprovalBeforeCreate: guardrails.requireApprovalBeforeCreate ?? null,
                 outstandingIdeasCap: defaults.outstandingIdeasCap ?? null,
             };
         }
@@ -864,6 +865,7 @@ export class MissionsService {
         }
         let failed = false;
         for (const goal of goals) {
+            let createdId: string | null = null;
             try {
                 const created = await goalsService.create(
                     userId,
@@ -879,6 +881,7 @@ export class MissionsService {
                     },
                     scope,
                 );
+                createdId = created.id;
                 await goalsService.linkToMission(userId, missionId, created.id, false, scope);
             } catch (error) {
                 failed = true;
@@ -887,6 +890,21 @@ export class MissionsService {
                         error instanceof Error ? error.message : String(error)
                     }`,
                 );
+                // Review of #3077 — a Goal created but not linked would sit in the Goals list
+                // belonging to no Mission while the answer says it was not created: remove it.
+                if (createdId) {
+                    await goalsService
+                        .delete(userId, createdId, scope)
+                        .catch((deleteError) =>
+                            this.logger.warn(
+                                `Mission ${missionId}: the unlinked template Goal ${createdId} could not be removed: ${
+                                    deleteError instanceof Error
+                                        ? deleteError.message
+                                        : String(deleteError)
+                                }`,
+                            ),
+                        );
+                }
             }
         }
         if (failed) warnings.push(MISSION_TEMPLATE_GOALS_NOT_CREATED);

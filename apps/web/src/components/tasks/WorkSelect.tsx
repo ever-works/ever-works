@@ -14,6 +14,7 @@ interface WorkOption {
     id: string;
     name: string;
     kind: string | null;
+    userRole?: string;
 }
 
 const NO_WORK_ICON = 'none';
@@ -50,6 +51,8 @@ export interface WorkSelectProps {
     readonly kinds?: readonly string[];
     /** APW-08 T40 — told how many Works the picker offers once they are loaded. */
     readonly onLoaded?: (count: number) => void;
+    /** APW-08 T40 — only Works the caller owns (`userRole: owner`), not ones shared with them. */
+    readonly ownedOnly?: boolean;
 }
 
 export function WorkSelect({
@@ -63,6 +66,7 @@ export function WorkSelect({
     id,
     kinds,
     onLoaded,
+    ownedOnly = false,
 }: WorkSelectProps) {
     const [works, setWorks] = useState<WorkOption[]>([]);
     const [loading, setLoading] = useState(true);
@@ -85,8 +89,10 @@ export function WorkSelect({
                             id: w.id,
                             name: w.name,
                             kind: w.kind ?? null,
+                            userRole: w.userRole,
                         }))
-                        .filter((w) => !kinds || (w.kind !== null && kinds.includes(w.kind)));
+                        .filter((w) => !kinds || (w.kind !== null && kinds.includes(w.kind)))
+                        .filter((w) => !ownedOnly || w.userRole === 'owner');
                     setWorks(loaded);
                     onLoaded?.(loaded.length);
                 } else {

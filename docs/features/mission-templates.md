@@ -48,7 +48,9 @@ Your own create-time values **override** template defaults — the manifest is a
 
 ### How the defaults are read
 
-The platform reads the template's `.works/mission.yml` when the Mission is created, through the git provider, at the branch the template's catalog row records, with **your own** git connection. If the file cannot be read — no git connection, no such repository or file, or a manifest that is not valid — the Mission is still created with exactly the values you gave, and the answer carries one warning, `templateManifestUnreadable`. Nothing is guessed.
+For the **built-in** templates, the platform reads the template's `.works/mission.yml` when the Mission is created, through the git provider, at the branch the template's catalog row records, with **your own** git connection. If the file cannot be read — no git connection, no such repository or file, or a manifest that is not valid — the Mission is still created with exactly the values you gave, and the answer carries one warning, `templateManifestUnreadable`. Nothing is guessed.
+
+A custom template's manifest is not read yet: a Mission made from one keeps exactly the values you give.
 
 You can also open the plain Mission form on a template: `/missions/new?template=<id>`.
 

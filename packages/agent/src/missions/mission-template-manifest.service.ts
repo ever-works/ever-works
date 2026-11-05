@@ -155,7 +155,7 @@ const kbSchema = z
 const appSpecPathSchema = z
     .string()
     .min(1)
-    .max(300)
+    .max(120)
     .regex(/^[^\s`\\]+$/, 'App spec paths may not contain whitespace, backticks or backslashes');
 
 /**
@@ -177,13 +177,15 @@ const appWorkSchema = z
                             .positive()
                             .max(100_000)
                             .optional(),
-                        requireHumanMergePaths: z.array(appSpecPathSchema).max(100).optional(),
+                        // ≤ 12 × 120 characters per list, so the generated change request always
+                        // fits the evolve endpoint's 4,000-character limit whole (review of #3077).
+                        requireHumanMergePaths: z.array(appSpecPathSchema).max(12).optional(),
                     })
                     .passthrough()
                     .optional(),
                 display: z
                     .object({
-                        protectedPaths: z.array(appSpecPathSchema).max(100).optional(),
+                        protectedPaths: z.array(appSpecPathSchema).max(12).optional(),
                     })
                     .passthrough()
                     .optional(),
