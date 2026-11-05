@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     cancelEverIdSignUp: vi.fn(),
     refresh: vi.fn(),
     readEverIdPending: vi.fn(),
+    readProvisionCookie: vi.fn(),
     getRequiredTerms: vi.fn(),
 }));
 
@@ -26,6 +27,11 @@ vi.mock('@/app/actions/ever-id', () => ({
     cancelEverIdSignUp: mocks.cancelEverIdSignUp,
 }));
 vi.mock('@/lib/auth/ever-id-cookies', () => ({ readEverIdPending: mocks.readEverIdPending }));
+// The company-request cookie (Ever Connect) the page reads beside the pending
+// one: `next/headers` has no request scope here, so it is mocked the same way.
+vi.mock('@/lib/auth/ever-connect-provision-cookie', () => ({
+    readProvisionCookie: mocks.readProvisionCookie,
+}));
 vi.mock('@/lib/api', () => ({ authAPI: { getRequiredTerms: mocks.getRequiredTerms } }));
 vi.mock('@/i18n/navigation', () => ({
     Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
@@ -247,6 +253,7 @@ describe('EverIdCreateAccountPage', () => {
             accountEmail: null,
         });
         mocks.getRequiredTerms.mockResolvedValue(TERMS);
+        mocks.readProvisionCookie.mockResolvedValue(null);
 
         render(await EverIdCreateAccountPage());
 
@@ -254,6 +261,32 @@ describe('EverIdCreateAccountPage', () => {
         expect(mocks.getRequiredTerms).toHaveBeenCalledWith('en');
         expect(screen.getByTestId('auth-subtitle')).toHaveTextContent(
             'Signed in to Ever ID as Alice Martin · alice@example.com',
+        );
+        // No company request from Ever: nothing says the account will be linked.
+        expect(
+            screen.queryByTestId('ever-id-create-account-linked-handle'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('names the Ever handle the account will be linked to when a company request is in flight', async () => {
+        mocks.readEverIdPending.mockResolvedValue({
+            kind: 'signUp',
+            pending: 'sealed',
+            email: 'alice@example.com',
+            name: 'Alice Martin',
+            accountEmail: null,
+        });
+        mocks.getRequiredTerms.mockResolvedValue(TERMS);
+        mocks.readProvisionCookie.mockResolvedValue({
+            provisionTxn: 'txn-1',
+            jti: 'jti-1',
+            handle: 'acme',
+        });
+
+        render(await EverIdCreateAccountPage());
+
+        expect(screen.getByTestId('ever-id-create-account-linked-handle')).toHaveTextContent(
+            'This account will be linked to ever.co/acme',
         );
     });
 
