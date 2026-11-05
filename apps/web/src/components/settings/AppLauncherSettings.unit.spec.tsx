@@ -79,6 +79,30 @@ import { AppLauncherSettings, FILTER_DEBOUNCE_MS, SAVE_DEBOUNCE_MS } from './App
 const saveAction = vi.mocked(saveAppLauncherPreferencesAction);
 const readAction = vi.mocked(readAppLauncherListAction);
 
+/**
+ * The budget of a case that renders a page of ~200 rows (FR-28's one-save cap, FR-63's 200-row
+ * page), instead of the suite's 30 s.
+ *
+ * Measured, not guessed: those cases cost 1.5-4.3 s each on a developer machine, against
+ * 0.2-0.9 s for the small-fixture cases here, because every render and re-render builds the whole
+ * table in jsdom. On a saturated CI runner (stage run 41605694347, where even one-line component
+ * specs took 2 s) the cheapest of them, the one-save cap, ran past 30 s. A timeout inside one of
+ * the async `act` scopes below also leaves that scope open, so every later case in this file
+ * renders into an empty container: that run reported ten failures for one slow case. The
+ * small-fixture cases keep the suite's budget, so a real hang in them still fails at 30 s.
+ */
+const LARGE_LIST_TIMEOUT_MS = 120_000;
+
+/** `describe` whose cases get {@link LARGE_LIST_TIMEOUT_MS}. */
+function describeLargeList(name: string, factory: () => void): void {
+    describe(name, factory, LARGE_LIST_TIMEOUT_MS);
+}
+
+/** `it` with {@link LARGE_LIST_TIMEOUT_MS}. */
+function itLargeList(name: string, fn: () => Promise<void> | void): void {
+    it(name, fn, LARGE_LIST_TIMEOUT_MS);
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -581,7 +605,7 @@ describe('AppLauncherSettings — reordering writes the whole section (FR-62, AC
         expect(orderedKeys(saveChanges(0) ?? [])).toEqual([workKey(2), workKey(3), workKey(1)]);
     });
 
-    it('never emits more changes than one save may carry (FR-28)', async () => {
+    itLargeList('never emits more changes than one save may carry (FR-28)', async () => {
         const many = Array.from({ length: 199 }, (_, index) => workItem(index + 1));
         saveAction.mockImplementation(async (changes) =>
             savedResponse(applyChanges(many, changes)),
@@ -599,7 +623,7 @@ describe('AppLauncherSettings — reordering writes the whole section (FR-62, AC
 // Past 200 items (FR-63, ACC-11-47)
 // ---------------------------------------------------------------------------
 
-describe('AppLauncherSettings — past 200 eligible items (FR-63, ACC-11-47)', () => {
+describeLargeList('AppLauncherSettings — past 200 eligible items (FR-63, ACC-11-47)', () => {
     /** One Ever app plus 204 Works: 205 eligible, and the response carries 200. */
     function truncatedFixture(): {
         items: AppLauncherItem[];
