@@ -120,6 +120,10 @@ jobs:
             if [ "$SHARDS" -ne 32 ]; then
               NOT_GREEN="$NOT_GREEN  missing: only $SHARDS of the 32 shards reported"
             fi
+            JOBS=$(printf '%s' "$LEGS" | jq '[.[].context | select(. == "ci-builds/e2e.yml:e2e-prod-build" or . == "ci-builds/e2e.yml:e2e-app-works-flags-on")] | unique | length')
+            if [ "$JOBS" -ne 2 ]; then
+              NOT_GREEN="$NOT_GREEN  missing: only $JOBS of e2e-prod-build and e2e-app-works-flags-on reported"
+            fi
             if [ -z "$NOT_GREEN" ]; then
               echo "E2E is green for the commit being promoted ($LEG_TOTAL in-cluster jobs and shards)."
               exit 0
