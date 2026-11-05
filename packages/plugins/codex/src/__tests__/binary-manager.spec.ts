@@ -42,30 +42,42 @@ vi.mock('fs/promises', () => ({
 	mkdtemp: vi.fn().mockResolvedValue('/tmp/codex-generator/bin/codex-download-abc'),
 	writeFile: vi.fn().mockResolvedValue(undefined),
 	readFile: vi.fn().mockResolvedValue(Buffer.from('archive-bytes')),
-	readdir: vi.fn().mockResolvedValue([{ name: 'codex', isFile: () => true, isDirectory: () => false }]),
+	// Each archive is extracted into its own sub-directory; answer with the entry it holds.
+	readdir: vi.fn(async (dir: string) =>
+		String(dir).includes('extract-bwrap')
+			? [{ name: 'bwrap-x86_64-unknown-linux-musl', isFile: () => true, isDirectory: () => false }]
+			: [{ name: 'codex-x86_64-unknown-linux-musl', isFile: () => true, isDirectory: () => false }]
+	),
+	lstat: vi.fn().mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
 	chmod: vi.fn().mockResolvedValue(undefined),
 	copyFile: vi.fn().mockResolvedValue(undefined),
 	rm: vi.fn().mockResolvedValue(undefined),
 	constants: { X_OK: 1 }
 }));
 
+// Fixtures follow the 2026-11-05 pin: rust-v0.166.0 publishes Linux only as musl builds, plus
+// the separate bubblewrap asset the Linux sandbox needs next to the binary.
 vi.mock('../utils/platform.js', () => ({
 	detectPlatform: vi.fn().mockResolvedValue({
 		os: 'linux',
 		arch: 'x64',
 		platformString: 'linux-x64',
-		assetName: 'codex-x86_64-unknown-linux-gnu.tar.gz',
+		assetName: 'codex-x86_64-unknown-linux-musl.tar.gz',
+		bwrapAssetName: 'bwrap-x86_64-unknown-linux-musl.tar.gz',
 		isMusl: false
 	}),
-	getBinaryPath: vi.fn().mockReturnValue('/tmp/codex-generator/bin/codex-0.120.0-linux-x64')
+	getBinaryPath: vi.fn().mockReturnValue('/tmp/codex-generator/bin/codex-0.166.0-linux-x64/codex')
 }));
 
 import { spawn } from 'child_process';
 
 import { ensureBinary } from '../utils/binary-manager.js';
 
-const ASSET_NAME = 'codex-x86_64-unknown-linux-gnu.tar.gz';
-const ARCHIVE_URL = `https://github.com/openai/codex/releases/download/rust-v0.120.0/${ASSET_NAME}`;
+const ASSET_NAME = 'codex-x86_64-unknown-linux-musl.tar.gz';
+const ARCHIVE_URL = `https://github.com/openai/codex/releases/download/rust-v0.166.0/${ASSET_NAME}`;
+const BWRAP_ASSET_NAME = 'bwrap-x86_64-unknown-linux-musl.tar.gz';
+const BWRAP_URL = `https://github.com/openai/codex/releases/download/rust-v0.166.0/${BWRAP_ASSET_NAME}`;
+const RELEASE_URL = 'https://api.github.com/repos/openai/codex/releases/tags/rust-v0.166.0';
 const GOOD_SHA = 'a'.repeat(64);
 
 class MockResponse extends EventEmitter {
@@ -104,10 +116,10 @@ function installHttpResponder(bodyByUrl: Record<string, string>): void {
 
 function releaseJson(assets: Array<{ name: string; digest?: string }>): string {
 	return JSON.stringify({
-		tag_name: 'rust-v0.120.0',
+		tag_name: 'rust-v0.166.0',
 		assets: assets.map((a) => ({
 			name: a.name,
-			browser_download_url: `https://github.com/openai/codex/releases/download/rust-v0.120.0/${a.name}`,
+			browser_download_url: `https://github.com/openai/codex/releases/download/rust-v0.166.0/${a.name}`,
 			...(a.digest ? { digest: a.digest } : {})
 		}))
 	});
@@ -134,10 +146,12 @@ describe('codex binary-manager integrity verification', () => {
 
 	it('installs the binary when the published digest matches the archive hash', async () => {
 		installHttpResponder({
-			[`https://api.github.com/repos/openai/codex/releases/tags/rust-v0.120.0`]: releaseJson([
-				{ name: ASSET_NAME, digest: `sha256:${GOOD_SHA}` }
+			[RELEASE_URL]: releaseJson([
+				{ name: ASSET_NAME, digest: `sha256:${GOOD_SHA}` },
+				{ name: BWRAP_ASSET_NAME, digest: `sha256:${GOOD_SHA}` }
 			]),
-			[ARCHIVE_URL]: 'archive-bytes'
+			[ARCHIVE_URL]: 'archive-bytes',
+			[BWRAP_URL]: 'bwrap-bytes'
 		});
 		// canExecute(binaryPath) must report runnable so ensureBinary returns the managed path.
 		vi.mocked(spawn).mockImplementation(() => {
@@ -147,31 +161,35 @@ describe('codex binary-manager integrity verification', () => {
 			return child as unknown as ReturnType<typeof spawn>;
 		});
 
-		const result = await ensureBinary('0.120.0');
-		expect(result).toBe('/tmp/codex-generator/bin/codex-0.120.0-linux-x64');
+		const result = await ensureBinary('0.166.0');
+		expect(result).toBe('/tmp/codex-generator/bin/codex-0.166.0-linux-x64/codex');
 	});
 
 	it('refuses to install when the archive hash does not match the published digest (MITM/trojan)', async () => {
 		hashDigestMock.mockReturnValue('b'.repeat(64)); // attacker-swapped archive hashes differently
 		installHttpResponder({
-			[`https://api.github.com/repos/openai/codex/releases/tags/rust-v0.120.0`]: releaseJson([
-				{ name: ASSET_NAME, digest: `sha256:${GOOD_SHA}` }
+			[RELEASE_URL]: releaseJson([
+				{ name: ASSET_NAME, digest: `sha256:${GOOD_SHA}` },
+				{ name: BWRAP_ASSET_NAME, digest: `sha256:${GOOD_SHA}` }
 			]),
-			[ARCHIVE_URL]: 'tampered-bytes'
+			[ARCHIVE_URL]: 'tampered-bytes',
+			[BWRAP_URL]: 'bwrap-bytes'
 		});
 
-		await expect(ensureBinary('0.120.0')).rejects.toThrow(/Checksum mismatch|Failed to resolve a runnable Codex/);
+		await expect(ensureBinary('0.166.0')).rejects.toThrow(/Checksum mismatch|Failed to resolve a runnable Codex/);
 	});
 
 	it('fails closed when the release publishes no checksum at all', async () => {
 		installHttpResponder({
-			[`https://api.github.com/repos/openai/codex/releases/tags/rust-v0.120.0`]: releaseJson([
-				{ name: ASSET_NAME } // no digest, no .sha256 sibling asset
+			[RELEASE_URL]: releaseJson([
+				{ name: ASSET_NAME }, // no digest, no .sha256 sibling asset
+				{ name: BWRAP_ASSET_NAME, digest: `sha256:${GOOD_SHA}` }
 			]),
-			[ARCHIVE_URL]: 'archive-bytes'
+			[ARCHIVE_URL]: 'archive-bytes',
+			[BWRAP_URL]: 'bwrap-bytes'
 		});
 
-		await expect(ensureBinary('0.120.0')).rejects.toThrow(
+		await expect(ensureBinary('0.166.0')).rejects.toThrow(
 			/No checksum|refusing to install an unverified binary|Failed to resolve a runnable Codex/
 		);
 	});
@@ -189,6 +207,6 @@ describe('codex binary-manager integrity verification', () => {
 			return req;
 		});
 
-		await expect(ensureBinary('0.120.0')).rejects.toThrow(/disallowed host|Failed to resolve a runnable Codex/);
+		await expect(ensureBinary('0.166.0')).rejects.toThrow(/disallowed host|Failed to resolve a runnable Codex/);
 	});
 });

@@ -40,14 +40,21 @@ export function isOpenCodeStepId(value: string): value is OpenCodeStepId {
 export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'opencode-generator').replace(/\\/g, '/');
 
 /**
- * GitHub repository for OpenCode CLI distribution
+ * GitHub repository for OpenCode CLI distribution. The project moved from `sst/opencode`
+ * to `anomalyco/opencode`; the old paths only answer with 301 redirects
+ * (https://github.com/anomalyco/opencode, checked 2026-11-05). Release assets are served from
+ * github.com / release-assets.githubusercontent.com, which the binary-manager host allow-list
+ * already covers.
  */
-export const OPENCODE_GITHUB_REPO = 'sst/opencode';
+export const OPENCODE_GITHUB_REPO = 'anomalyco/opencode';
 
 /**
- * Default CLI version to download
+ * Default CLI version to download: v1.19.5, the GitHub "Latest" release of the v1 line
+ * (2026-10-28; https://github.com/anomalyco/opencode/releases/tag/v1.19.5). The v2.x line is a
+ * separate `@opencode/cli` package that the official installer skips. Asset names are
+ * unchanged since v1.0.223 and every asset carries a sha256 digest.
  */
-export const DEFAULT_CLI_VERSION = 'v1.0.223';
+export const DEFAULT_CLI_VERSION = 'v1.19.5';
 
 /**
  * Maximum stdout/stderr buffer size (10MB) to prevent OOM

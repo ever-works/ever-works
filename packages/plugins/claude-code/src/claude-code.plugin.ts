@@ -36,7 +36,7 @@ import * as path from 'path/posix';
 import * as https from 'https';
 
 import type { ClaudeCodeStepId } from './types.js';
-import { CLAUDE_CODE_STEP_IDS, DEFAULT_CLI_VERSION, DEFAULT_MAX_TURNS, BASE_TEMP_DIR } from './types.js';
+import { CLAUDE_CODE_STEP_IDS, DEFAULT_CLI_VERSION, DEFAULT_MAX_TURNS, DEFAULT_MODEL, BASE_TEMP_DIR } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import { ensureBinary } from './utils/binary-manager.js';
 import {
@@ -49,6 +49,7 @@ import {
 	ensureOnboardingConfig
 } from './utils/workspace-manager.js';
 import { executeClaudeCode, type ExecuteResult } from './utils/process-runner.js';
+import { toAnthropicApiModelId } from './utils/model-aliases.js';
 import { buildDefaultCodeEditSystemPrompt } from '@ever-works/plugin';
 import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 import {
@@ -81,74 +82,81 @@ import {
 	DEFAULT_TARGET_ITEMS
 } from './form-schema.js';
 
+/**
+ * Claude Code model catalog, as of 2026-11-05. Sources:
+ * - https://code.claude.com/docs/en/model-config (CLI aliases and what they resolve to)
+ * - https://platform.claude.com/docs/en/about-claude/models/overview (ids, limits)
+ * - https://platform.claude.com/docs/en/about-claude/model-deprecations (retirements)
+ *
+ * Availability depends on the account, plan and region. The picker also accepts a custom id. A
+ * saved id that is no longer listed is still accepted and passed through unchanged to `--model`;
+ * Anthropic rejects retired ids at run time.
+ *
+ * Legacy handling (models refresh decision 2): Sonnet 4.5 and Haiku 4.5 are still served, so
+ * they stay, labelled "(legacy)". `claude-opus-4-1-20250805` retired on 2026-08-05 (D2) and is
+ * no longer listed. Limited-availability `claude-mythos-*` ids are not listed (decision 4).
+ */
 const CLAUDE_CODE_SUPPORTED_MODELS: readonly AiModel[] = [
-	{
-		id: 'sonnet',
-		name: 'Claude Sonnet',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'opus',
-		name: 'Claude Opus',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'haiku',
-		name: 'Claude Haiku',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'claude-sonnet-4-5-20250929',
-		name: 'Claude Sonnet 4.5',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'claude-opus-4-1-20250805',
-		name: 'Claude Opus 4.1',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'claude-haiku-4-5-20251001',
-		name: 'Claude Haiku 4.5',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	}
+	buildClaudeCodeModel(
+		'sonnet',
+		'Claude Sonnet (alias)',
+		'Claude Code alias for the latest Sonnet. On the Anthropic API it resolves to Sonnet 5.5. Default.'
+	),
+	buildClaudeCodeModel(
+		'opus',
+		'Claude Opus (alias)',
+		'Claude Code alias for the latest Opus. On the Anthropic API it resolves to Opus 5.5.'
+	),
+	buildClaudeCodeModel(
+		'haiku',
+		'Claude Haiku (alias)',
+		'Claude Code alias for the latest Haiku. On the Anthropic API it resolves to Haiku 5.5.'
+	),
+	buildClaudeCodeModel('claude-opus-5-5', 'Claude Opus 5.5', 'Most capable Claude model for complex agentic work.'),
+	buildClaudeCodeModel('claude-sonnet-5-5', 'Claude Sonnet 5.5', 'Balance of speed, cost and intelligence.'),
+	buildClaudeCodeModel('claude-haiku-5-5', 'Claude Haiku 5.5', 'Fastest, lowest-cost Claude model.'),
+	buildClaudeCodeModel(
+		'claude-fable-5-1',
+		'Claude Fable 5.1',
+		'Frontier model with premium pricing ($10 / $50 per million input / output tokens); thinking is always on. Needs Claude Code 2.1.257+.'
+	),
+	buildClaudeCodeModel(
+		'claude-sonnet-4-5-20250929',
+		'Claude Sonnet 4.5 (legacy, retires 2026-11-30)',
+		'Deprecated; Anthropic retires it on 2026-11-30. Successor: claude-sonnet-5-5.',
+		200_000,
+		64_000
+	),
+	buildClaudeCodeModel(
+		'claude-haiku-4-5-20251001',
+		'Claude Haiku 4.5 (legacy)',
+		'Previous Haiku generation, still served. Successor: claude-haiku-5-5.',
+		200_000,
+		64_000
+	)
 ] as const;
+
+function buildClaudeCodeModel(
+	id: string,
+	name: string,
+	description: string,
+	maxContextLength = 1_000_000,
+	maxOutputTokens = 128_000
+): AiModel {
+	return {
+		id,
+		name,
+		description,
+		capabilities: {
+			supportsStructuredOutput: true,
+			supportsStreaming: true,
+			supportsToolCalling: true,
+			supportsVision: true,
+			maxContextLength,
+			maxOutputTokens
+		}
+	};
+}
 
 const LOG_MESSAGE_MAX_LENGTH = 500;
 const STEP_CONTEXT_BY_ID = new Map(
@@ -238,9 +246,9 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				title: 'Model',
 				'x-scope': 'global',
 				'x-widget': 'model-select',
-				default: 'sonnet',
+				default: DEFAULT_MODEL,
 				description:
-					"Model for the session. Provide an alias for the latest model (e.g. 'sonnet' or 'opus') or a model's full name (e.g. 'claude-sonnet-4-5-20250929')."
+					"Model for the session. Use a Claude Code alias for the latest model (e.g. 'sonnet', 'opus' or 'haiku'; on the Anthropic API they resolve to Sonnet 5.5, Opus 5.5 and Haiku 5.5) or a model's full id (e.g. 'claude-sonnet-5-5'). Availability depends on your account and plan; custom ids are accepted."
 			}
 		},
 		'x-requiredGroups': [
@@ -298,7 +306,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			return result.valid;
 		}
 
-		return this.validateApiKey(apiKey!, (resolved.model as string | undefined) || 'sonnet');
+		return this.validateApiKey(apiKey!, (resolved.model as string | undefined) || DEFAULT_MODEL);
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
@@ -319,7 +327,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 					};
 		}
 
-		const model = (settings.model as string | undefined) || 'sonnet';
+		const model = (settings.model as string | undefined) || DEFAULT_MODEL;
 		const valid = await this.validateApiKey(apiKey!, model);
 		return valid
 			? { success: true, message: 'Anthropic API key verified.' }
@@ -406,8 +414,16 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 	}
 
 	private async validateApiKey(apiKey: string, model: string): Promise<boolean> {
+		// D3: the Messages API takes API model ids, not Claude Code CLI aliases such as `sonnet`,
+		// so map the saved value for this probe only. The CLI run still receives it unchanged.
+		// No `temperature`/`top_p`/`top_k`: API version 2026-10-21 removed them.
+		// `max_tokens: 8` stays safe on always-thinking models (Opus 5.5, Fable 5.1): thinking
+		// counts toward max_tokens, the API documents no minimum, and a response that reaches the
+		// cap ends with stop_reason "max_tokens" (HTTP 200), which is all this check reads. No
+		// `thinking` field: those models reject thinking "disabled" with a 400.
+		// https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting (2026-11-06)
 		const payload = JSON.stringify({
-			model,
+			model: toAnthropicApiModelId(model),
 			max_tokens: 8,
 			messages: [{ role: 'user', content: 'Reply with OK.' }]
 		});
