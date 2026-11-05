@@ -95,6 +95,100 @@ describe('AiProviderRegistryService', () => {
             expect(anthropic.models).toContain(anthropic.defaults.model);
         });
 
+        // Models refresh (checked 2026-11-05 on each vendor's model list / live API;
+        // sheet: homelab projects/ever-works/knowledge/notes/2026-09-17-app-works/
+        // handover-2026-09-26/models-refresh-source-sheet-2026-11-05.md).
+        it('defaults each hosted provider to the vendor current model', () => {
+            expect(service.getProvider('openai')?.defaults.model).toBe('gpt-6.1-sol');
+            expect(service.getProvider('google')?.defaults.model).toBe('gemini-3.8-flash');
+            expect(service.getProvider('anthropic')?.defaults.model).toBe('claude-opus-5-5');
+            expect(service.getProvider('openrouter')?.defaults.model).toBe('openai/gpt-6.1-sol');
+            expect(service.getProvider('groq')?.defaults.model).toBe('openai/gpt-oss-120b');
+            expect(service.getProvider('ollama')?.defaults.model).toBe('qwen3.5');
+        });
+
+        it('offers each provider default in its own picker', () => {
+            for (const p of service.getAllProviders()) {
+                // lm-studio / vllm / custom default to whatever the local server loaded.
+                if (['lm-studio', 'vllm', 'custom'].includes(p.name)) continue;
+                expect(p.models).toContain(p.defaults.model);
+            }
+        });
+
+        it('offers the current flagship of each hosted vendor', () => {
+            expect(service.getProvider('openai')?.models).toEqual(
+                expect.arrayContaining([
+                    'gpt-6-astra',
+                    'gpt-6.1-sol',
+                    'gpt-6.1-terra',
+                    'gpt-6-luna',
+                ]),
+            );
+            expect(service.getProvider('google')?.models).toEqual(
+                expect.arrayContaining([
+                    'gemini-4-argon',
+                    'gemini-3.8-flash',
+                    'gemini-3.5-flash-lite',
+                ]),
+            );
+            expect(service.getProvider('anthropic')?.models).toEqual(
+                expect.arrayContaining([
+                    'claude-opus-5-5',
+                    'claude-sonnet-5-5',
+                    'claude-haiku-5-5',
+                    'claude-fable-5-1',
+                ]),
+            );
+            expect(service.getProvider('openrouter')?.models).toEqual(
+                expect.arrayContaining([
+                    'openai/gpt-6-astra',
+                    'anthropic/claude-opus-5.5',
+                    'google/gemini-4-argon',
+                    'x-ai/grok-4.7',
+                ]),
+            );
+            expect(service.getProvider('groq')?.models).toEqual(
+                expect.arrayContaining(['openai/gpt-oss-120b', 'openai/gpt-oss-20b']),
+            );
+        });
+
+        it('offers no retired or non-API model id', () => {
+            const retired = [
+                // OpenAI: retired 2026-10-23 / 2025-10-27.
+                'o3-mini',
+                'o1-mini',
+                // Gemini API: shut down, or never Gemini API ids.
+                'gemini-2.0-flash',
+                'gemini-3-pro',
+                'gemini-3-flash',
+                // Claude API: retired snapshots/aliases, and dotted names that were never API ids.
+                'claude-3-5-sonnet-latest',
+                'claude-3-5-haiku-latest',
+                'claude-3-haiku-20240307',
+                'claude-sonnet-4.5',
+                'claude-haiku-4.5',
+                // Groq: retired (console.groq.com/docs/deprecations).
+                'qwen/qwen3-32b',
+                'llama-3.3-70b-specdec',
+                'llama-3.2-90b-vision-preview',
+                'qwen-qwq-32b',
+                'qwen-2.5-coder-32b',
+                'deepseek-r1-distill-qwen-32b',
+                // OpenRouter: absent from https://openrouter.ai/api/v1/models.
+                'google/gemini-3-flash',
+                'google/gemini-2.0-flash-001',
+                'meta-llama/llama-3.3-70b-instruct:free',
+                'deepseek/deepseek-r1',
+                'x-ai/grok-3-mini-beta',
+            ];
+            for (const p of service.getAllProviders()) {
+                for (const id of retired) {
+                    expect(p.models, `${p.name} offers ${id}`).not.toContain(id);
+                    expect(p.defaults.model).not.toBe(id);
+                }
+            }
+        });
+
         it('every non-custom provider has at least one model in its catalog', () => {
             for (const p of service.getAllProviders()) {
                 if (p.name === 'custom') continue;
@@ -116,7 +210,7 @@ describe('AiProviderRegistryService', () => {
         it('includes the displayName + " - " + description in each choice name', () => {
             const choices = service.getProviderChoices();
             const openAi = choices.find((c) => c.value === 'openai');
-            expect(openAi?.name).toBe('OpenAI - OpenAI GPT models (GPT-5, GPT-4o, o1/o3)');
+            expect(openAi?.name).toBe('OpenAI - OpenAI GPT models (GPT-6, GPT-6.1, GPT-5.x)');
         });
     });
 

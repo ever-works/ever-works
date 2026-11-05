@@ -5601,7 +5601,7 @@
                 "workName": "Ordnername",
                 "generationPrompt": "Worker-Prompt",
                 "modelOverride": "KI-Modell überschreiben",
-                "modelOverridePlaceholder": "z. B. openai/gpt-4.1 oder openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "z. B. openai/gpt-6.1-sol oder openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Optional. Verwendet standardmäßig das importierte oder vorherige Modell, es sei denn, Sie überschreiben es hier.",
                 "modelOverrideUnavailable": "Wählen Sie zunächst einen konfigurierten KI-Anbieter aus, um ein Modell aus der verfügbaren Liste auszuwählen.",
                 "websiteTemplateHelperText": "Wählen Sie die Werk-Vorlage aus, die beim ersten Erstellen des Werk-Repositorys verwendet werden soll.",

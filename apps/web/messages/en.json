@@ -7685,7 +7685,7 @@
                 "workName": "Work Name",
                 "generationPrompt": "Worker Prompt",
                 "modelOverride": "AI Model Override",
-                "modelOverridePlaceholder": "e.g. openai/gpt-4.1 or openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "e.g. openai/gpt-6.1-sol or openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Optional. Uses the imported or previous model by default unless you override it here.",
                 "modelOverrideUnavailable": "Select a configured AI provider first to choose a model from the available list.",
                 "websiteTemplateHelperText": "Choose the Work template that will be used when the Work repository is first created.",

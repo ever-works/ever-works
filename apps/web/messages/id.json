@@ -5532,7 +5532,7 @@
                 "workName": "Nama Karya",
                 "generationPrompt": "Prompt Worker",
                 "modelOverride": "Penggantian Model AI",
-                "modelOverridePlaceholder": "misalnya openai/gpt-4.1 atau openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "misalnya openai/gpt-6.1-sol atau openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Opsional. Secara default menggunakan model yang diimpor atau model sebelumnya kecuali Anda menimpa di sini.",
                 "modelOverrideUnavailable": "Pilih penyedia AI yang sudah dikonfigurasi terlebih dahulu untuk memilih model dari daftar yang tersedia.",
                 "websiteTemplateHelperText": "Pilih template Karya yang akan digunakan saat repositori Karya pertama kali dibuat.",

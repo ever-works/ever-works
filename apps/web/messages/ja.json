@@ -5532,7 +5532,7 @@
                 "workName": "ワーク名",
                 "generationPrompt": "Worker プロンプト",
                 "modelOverride": "AI モデル上書き",
-                "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "例: openai/gpt-6.1-sol または openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "オプションです。デフォルトではインポートされたモデルまたは以前のモデルを使用しますが、ここで上書きできます。",
                 "modelOverrideUnavailable": "利用可能なリストからモデルを選択する前に、まず設定済みの AI プロバイダーを選択してください。",
                 "websiteTemplateHelperText": "ワークリポジトリが最初に作成されるときに使用されるワークテンプレートを選択してください。",

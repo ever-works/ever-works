@@ -310,3 +310,59 @@ describe('AiOperations — a parameter the provider rejects in backticks', () =>
 		expect(result.error).toMatch(/claude-sonnet-4-5-20250514/);
 	});
 });
+
+/**
+ * Groq rejects reasoning parameters a model does not support — e.g. "the
+ * `reasoning_format` parameter is not supported" for the gpt-oss models
+ * (https://console.groq.com/docs/reasoning, checked 2026-11-05). Any reasoning
+ * parameter named in the rejection drops the reasoning kwargs and retries.
+ */
+describe('AiOperations — a reasoning parameter the provider rejects', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const groqOps = () =>
+		new AiOperations({
+			apiKey: 'gsk-test',
+			model: 'openai/gpt-oss-120b',
+			baseURL: 'https://api.groq.com/openai/v1',
+			temperature: 0.7,
+			maxTokens: 64,
+			providerType: 'groq'
+		});
+
+	it.each(['reasoning_format', 'include_reasoning'])(
+		'retries without the reasoning kwargs when `%s` is rejected',
+		async (param) => {
+			const sent: Sent[] = [];
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async (_url: unknown, init: { body: string }) => {
+					const body = JSON.parse(init.body) as Record<string, unknown>;
+					sent.push({ body });
+					if (param in body || 'reasoning_effort' in body) {
+						return new Response(
+							JSON.stringify({
+								error: {
+									type: 'invalid_request_error',
+									message: `\`${param}\` is not supported with this model`
+								}
+							}),
+							{ status: 400, headers: { 'content-type': 'application/json' } }
+						);
+					}
+					return okCompletion({ role: 'assistant', content: 'OK' });
+				})
+			);
+
+			// The registry adds reasoning kwargs for gpt-oss on Groq; the stub rejects
+			// any request that still carries one, naming the parameter under test.
+			const response = await groqOps().createChatCompletion({ messages: [{ role: 'user', content: 'hi' }] });
+
+			expect(response.choices[0].message.content).toBe('OK');
+			expect(sent.length).toBeGreaterThanOrEqual(2);
+			expect(sent[sent.length - 1].body).not.toHaveProperty('reasoning_effort');
+		}
+	);
+});
