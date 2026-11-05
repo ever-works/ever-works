@@ -84,11 +84,11 @@ jobs:
     # BUILD as well as the tests, and the build is what varies: 25-38 min
     # normally, 65 min on a contended runner (stage run 41605694388, shard 13
     # and e2e-app-works-flags-on), which left shard 13 cancelled at the old
-    # 90-min cap 17 min into its tests. 120 absorbs a slow build; genuine
-    # hangs are still killed fast by the Playwright step's own 50-min cap
-    # below (a shard's tests take 7-20 min).
-    # Bump back to ~150 if you reduce shard count below 4.
-    timeout-minutes: 120
+    # 90-min cap 17 min into its tests; 74 min on dispatch run 42021294792
+    # (shard 11 reached its tests 90 min in). 150 absorbs a slow build; a
+    # genuine hang in the tests is still killed by the Playwright step's own
+    # 50-min cap below (a shard's tests take 7-20 min).
+    timeout-minutes: 150
 
     strategy:
       # Shard the Playwright suite across multiple machines. Each shard
@@ -701,9 +701,10 @@ jobs:
     # job into "exceeded the maximum execution time" — a pure-infra red with no
     # failing test (observed on run 30154911523). The cap is a runaway backstop,
     # not a performance budget; 90m keeps it that way as the build keeps growing.
-    # 120m since stage run 41605694388, where a contended runner took 65 min for
-    # the same build (shard 13 was cancelled at the matrix's then-90m cap).
-    timeout-minutes: 120
+    # 150m since stage run 41605694388, where a contended runner took 65 min for
+    # the same build (shard 13 was cancelled at the matrix's then-90m cap), and
+    # 74 min on dispatch run 42021294792.
+    timeout-minutes: 150
 
     strategy:
       fail-fast: false
@@ -872,9 +873,9 @@ jobs:
   e2e-app-works-flags-on:
     runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     # One shard of ~12 tests, but the same cold `pnpm build` + dev-stack boot
-    # as every matrix shard and the prod-build job — the same 120-minute cap (this
+    # as every matrix shard and the prod-build job — the same 150-minute cap (this
     # job's build alone took 65 min on stage run 41605694388).
-    timeout-minutes: 120
+    timeout-minutes: 150
 
     strategy:
       fail-fast: false
