@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { join } from 'path';
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
-import { buildCheckEnv } from './check-env';
+import { buildCheckEnv, refusedPassthroughNames } from './check-env';
 
 /**
  * Acceptance-check EXECUTION — the one place a check command becomes a
@@ -97,6 +97,14 @@ export function executeAcceptanceCheck(
         ceiling,
     );
     const startedAt = Date.now();
+    // A refused passthrough name is dropped silently by `buildCheckEnv`; say
+    // so in the check's own log (names only), or the run fails later on a
+    // registry / auth error with nothing pointing at the cause.
+    const refused = refusedPassthroughNames(check.envPassthrough);
+    const refusedNote =
+        refused.length > 0
+            ? `[ever-works] envPassthrough not granted (platform configuration or a host credential): ${refused.join(', ')}`
+            : '';
 
     return new Promise<TaskCheckResult>((resolve) => {
         let settled = false;
@@ -108,12 +116,16 @@ export function executeAcceptanceCheck(
             if (settled) return;
             settled = true;
             if (timer) clearTimeout(timer);
+            const separator = tail && !tail.endsWith('\n') ? '\n' : '';
+            const logTail = refusedNote
+                ? `${tail}${separator}${refusedNote}`.slice(-CHECK_LOG_TAIL_BYTES)
+                : tail;
             resolve({
                 id: check.id,
                 exitCode,
                 status,
                 durationMs: Date.now() - startedAt,
-                ...(tail.length > 0 ? { logTail: tail } : {}),
+                ...(logTail.length > 0 ? { logTail } : {}),
             });
         };
 

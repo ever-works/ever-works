@@ -150,7 +150,8 @@ export interface TaskAcceptanceCheck {
 	 *
 	 * Values are read from the parent environment at spawn time; a name
 	 * that is unset there is simply absent. Platform-owned configuration
-	 * (database/auth/trigger/plugin credentials) is never grantable — see
+	 * (database/auth/trigger/plugin credentials) and the host's own
+	 * credentials (`HOST_CREDENTIAL_ENV_PATTERN`) are never grantable — see
 	 * `buildCheckEnv` in `@ever-works/agent`. Optional, defaults to none.
 	 */
 	envPassthrough?: string[];
