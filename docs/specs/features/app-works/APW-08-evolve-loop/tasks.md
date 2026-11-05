@@ -1165,7 +1165,7 @@ _Delivers FR-56…FR-60._
       `appWork`; every other template keeps the prompt composer). The form starts on the template's cadence and
       sends only what the person sees, so the manifest supplies the rest (FR-57) and their edits win (FR-60).
       `GET /api/me/missions/templates/:templateId/manifest` (declared before `GET :id`, 30/min, `404
-  templateNotFound`) answers the form's view. Copy `dashboard.missionsPage.buildOnApp` (plan §6 verbatim plus
+templateNotFound`) answers the form's view. Copy `dashboard.missionsPage.buildOnApp` (plan §6 verbatim plus
       five leaves) in all 21 locales. Specs: `NewMissionForm.unit` 9/9 (new), `app-works-evolve-messages` 8/8,
       `NewPageClient.unit` unchanged.
 
