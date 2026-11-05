@@ -218,6 +218,46 @@ jobs:
       # depends on it), so a bad merge cannot reach a pushed image first.
       - uses: ./.github/actions/assert-no-analytics-key
 
+  # D-5: actionlint over every file in .github/workflows.
+  #
+  # Nothing checked the workflow files themselves. A mistyped expression, a
+  # `steps.<id>` or `needs.<job>` that does not exist, an unknown action input
+  # or a bad `runs-on` label only showed up when that path ran, and for most of
+  # these files that means a push to stage or main. actionlint finds those
+  # statically. It reads `.github/actionlint.yaml` (the self-hosted runner
+  # labels) and, where shellcheck is installed, checks every `run:` script.
+  #
+  # GitHub-hosted for the same reason as `release-tooling` above: no install and
+  # no build, so it finishes in seconds instead of queueing for the pool. The
+  # binary is pinned by version AND by the sha256 GitHub records for that
+  # release asset, so a replaced asset fails the step instead of running.
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install actionlint (version- and sha256-pinned)
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: actionlint
+        run: |
+          shellcheck --version | head -2 || echo "shellcheck not installed: run: scripts are not checked"
+          actionlint -color
+
 
   # W (EW-779, self-build finding OPS-21) — THE NODE-CONTRACT GATE.
   #
