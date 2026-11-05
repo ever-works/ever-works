@@ -88,6 +88,8 @@ env:
   EVER_WORKS_WEB_IMAGE: ever-works-web:egress-audit
   AUDIT_CONFIG: tools/egress-audit/egress-audit.config.json
   AUDIT_ARTIFACTS: egress-audit-artifacts
+  # GHCR owner of the published dev image used as a build cache (pinned; see k8s-build.yml).
+  IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}
 
 jobs:
   routes:
@@ -192,7 +194,7 @@ jobs:
           platforms: linux/amd64
           tags: ${{ env.EVER_WORKS_API_IMAGE }}
           # The published dev image carries an inline cache; layers that did not change are reused.
-          cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-api-dev:latest
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/ever-works-api-dev:latest
           build-args: |
             BUILD_VERSION=${{ steps.meta.outputs.version }}
             GIT_SHA=${{ github.sha }}

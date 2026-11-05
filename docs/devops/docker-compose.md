@@ -22,7 +22,7 @@ The infra file is `include:`d by both `docker-compose.yml` and `docker-compose.b
 ## Quick start (demo path)
 
 ```bash
-git clone https://github.com/ever-works/ever-works.git
+git clone https://github.com/ever-co/ever-works.git
 cd ever-works
 
 docker compose -f docker-compose.demo.yml --env-file .env.demo.compose up -d

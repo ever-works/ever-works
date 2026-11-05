@@ -133,6 +133,24 @@ green.
 
 **Secrets Used:** `DIGITALOCEAN_ACCESS_TOKEN`, `GITHUB_TOKEN`, `CW_DOCKER_REGISTRY`, `CW_DOCKER_USER`, `CW_DOCKER_USER_PASSWORD`
 
+### GHCR image owner
+
+The images live under `ghcr.io/ever-works/<image>` although the repository is
+`ever-co/ever-works` (moved on 2026-11-05). `k8s-build.yml`, `docker-build-publish-*.yml`,
+`docker-hub-publish.yml` and `egress-audit.yml` build every GHCR path from one workflow-level
+variable, `IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}`, instead of the repository
+owner, so the clusters, ArgoCD Image Updater and the pull secrets keep reading the same paths.
+Set `GHCR_IMAGE_OWNER` (lower case) only together with the matching k8s-gitops change.
+
+A `GITHUB_TOKEN` can write only the packages of its own repository's organization, and a package
+cannot be connected to a repository in another organization. So a GitHub-hosted run of this
+repository cannot push to `ghcr.io/ever-works/*` (or publish `@ever-works/*` to GitHub Packages)
+with its own token. Set the secret `GH_PACKAGES_TOKEN` (a classic PAT with `write:packages` on
+`ever-works`) and the variable `GH_PACKAGES_USER` (that PAT's login). The GHCR logins of
+`k8s-build.yml`, `docker-build-publish-*.yml` and `docker-hub-publish.yml`, and the GitHub
+Packages leg of `publish-plugins.yml`, use them when they are set and `GITHUB_TOKEN` otherwise.
+Without them such a push fails with 403; it never falls back to publishing under `ever-co`.
+
 ## Docker Hub Publish Workflow (`docker-hub-publish.yml`)
 
 Publishes the platform images to Docker Hub under the **`everco`** organisation (the org Ever
@@ -194,7 +212,7 @@ dependencies are published as caret ranges.
 `@ever-works` scope, "bypass 2FA", at most 90 days (npm's cap for write tokens; classic tokens
 were revoked on 2025-12-09). Rotate it when the job fails with 401 or `E404 PUT`. npm tries
 trusted publishing (OIDC) first, so packages configured with
-`npm trust github <name> --file publish-plugins.yml --repo ever-works/ever-works --allow-publish`
+`npm trust github <name> --file publish-plugins.yml --repo ever-co/ever-works --allow-publish`
 need no token at all. `GITHUB_TOKEN` covers GitHub Packages.
 
 ## Kubernetes Deploy Workflows

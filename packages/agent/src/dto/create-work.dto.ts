@@ -168,12 +168,12 @@ export class CreateWorkDto {
     @ApiPropertyOptional({
         description:
             'Repository Work (`kind: "repo"`) or App Work (`kind: "app"`) — the existing code repository this ' +
-            'Work wraps, e.g. `https://github.com/ever-works/ever-works`. Becomes the data repository of the ' +
+            'Work wraps, e.g. `https://github.com/ever-co/ever-works`. Becomes the data repository of the ' +
             'Work verbatim, so Tasks, Goals and fleet runs attach to it. Required when `kind` is `repo`; ' +
             'ignored otherwise. ' +
             'For `app` it is the UPSTREAM this Work links, forks or privately copies — required there too, with ' +
             'the mode in `repositoryMode` and, for fork/private-copy, the account in `targetOwner`.',
-        example: 'https://github.com/ever-works/ever-works',
+        example: 'https://github.com/ever-co/ever-works',
         maxLength: 400,
     })
     @IsOptional()

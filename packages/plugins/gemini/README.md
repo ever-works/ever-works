@@ -143,7 +143,7 @@ pnpm test:coverage
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Gemini CLI homepage](https://github.com/google-gemini/gemini-cli)
 - [Google AI Studio (API keys)](https://aistudio.google.com/apikey)

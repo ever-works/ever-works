@@ -71,7 +71,7 @@ pnpm --filter @ever-works/hermes-agent-plugin test
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Hermes Agent homepage](https://github.com/NousResearch/hermes-agent)
 - [Hermes setup guide](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart)

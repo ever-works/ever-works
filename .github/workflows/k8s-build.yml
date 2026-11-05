@@ -26,6 +26,15 @@ concurrency:
 permissions:
   contents: read
   packages: write
+# 🛑 The images stay under ghcr.io/ever-works/<image> whichever org hosts the
+# repository. The repo moved to ever-co/ever-works on 2026-11-05; every
+# Deployment, ArgoCD Image Updater rule and pull secret still reads
+# ghcr.io/ever-works/*, and the in-cluster CI runs this file with its own
+# GITHUB_REPOSITORY. Deriving the owner from the repository would silently move
+# the images, so it is pinned. Set the variable GHCR_IMAGE_OWNER (lower case)
+# only together with the matching k8s-gitops change.
+env:
+  IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}
 jobs:
   build:
     # 🛑 Deliberately the x64-16 pool, not x64-4. `ever-works-linux-x64-4` is ORG-scoped with
@@ -95,11 +104,17 @@ jobs:
       # Docker Hub, so the analytics-key gate runs here too, before any build.
       - uses: ./.github/actions/assert-no-analytics-key
       - uses: docker/setup-buildx-action@v4.4.1
+      # GITHUB_TOKEN can write only the packages of its own repository's org,
+      # and this repository (ever-co) is not in IMAGE_OWNER's org (ever-works).
+      # Wherever the run's own token cannot push there, set the secret
+      # GH_PACKAGES_TOKEN (classic PAT with write:packages on IMAGE_OWNER) and
+      # the variable GH_PACKAGES_USER (that PAT's login). Without them such a
+      # push fails with 403; it never falls back to the repository's own org.
       - uses: docker/login-action@v4.7.0
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ vars.GH_PACKAGES_USER || github.actor }}
+          password: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
       - id: t
         run: |
           set -uo pipefail
@@ -111,7 +126,7 @@ jobs:
           esac
           echo "tag=${MOVING}" >> "$GITHUB_OUTPUT"
 
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/${MATRIX_IMAGE}"
+          IMAGE="ghcr.io/${IMAGE_OWNER}/${MATRIX_IMAGE}"
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
           {
             echo "tags<<__TAGS__"
@@ -132,15 +147,16 @@ jobs:
       # First build + push attempt. ghcr.io can return `403 Forbidden` on the
       # blob HEAD for TWO different reasons, which need different fixes:
       #
-      #   1. PERMISSION — the GHCR package is not linked to this repository
-      #      (`repository: NONE`), so GITHUB_TOKEN has no write access to it.
+      #   1. PERMISSION — the login token has no write access to the package.
       #      This fails on EVERY run, always the same image, and the retry
-      #      below CANNOT fix it. The package has to be connected to the repo
-      #      in the GitHub UI (Package settings -> Connect repository); there
-      #      is no REST endpoint for it with our scopes. This is exactly what
-      #      was wrong with `ever-works-docs` until it was linked 2026-07-20,
-      #      after which the build went green first try on an unmodified
-      #      GITHUB_TOKEN.
+      #      below CANNOT fix it. Since the move to ever-co (2026-11-05) the
+      #      usual cause is a GITHUB_TOKEN from this repository pushing to an
+      #      ever-works package: a package cannot be connected to a repository
+      #      in another org, so set GH_PACKAGES_TOKEN / GH_PACKAGES_USER (login
+      #      step above). Within one org the fix is connecting the package to
+      #      the repo in the GitHub UI (Package settings -> Connect repository);
+      #      that is what was wrong with `ever-works-docs` until it was linked
+      #      2026-07-20.
       #   2. TRANSIENT — a genuine registry rate-limit / session race when
       #      several matrix images push concurrently under the same
       #      GITHUB_TOKEN. The tell is that a DIFFERENT image fails on each
@@ -177,8 +193,8 @@ jobs:
           # moving env tag after re-reading the branch tip, closing the hours-long
           # check-then-build race.
           tags: ${{ steps.t.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache,mode=max
       # Back off to let the transient ghcr rate-limit window clear.
       - if: steps.buildpush.outcome == 'failure'
         run: sleep 45
@@ -205,8 +221,8 @@ jobs:
             NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
           # Build only the immutable tag; promotion happens after this retry too.
           tags: ${{ steps.t.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/${{ matrix.image }}:buildcache,mode=max
 
       # 🛑 Re-check only AFTER the hours-long build has published its immutable
       # sha tag. Checking before the build is a TOCTOU bug: a newer commit can

@@ -19,15 +19,15 @@ unpin) — five minutes, no side effects on the platform.
 Everything below is needed **before** an incident. Check them during a rehearsal,
 not during an outage.
 
-| You need                      | Concretely                                                                                                             |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| A checkout on ONE machine     | `ever-works/ever-works`, `develop` up to date, `pnpm` + Node 22, and `pnpm install --frozen-lockfile` already run once |
-| Write access to the repo      | Enough to push a branch and open a PR (`gh auth status` succeeds)                                                      |
-| A platform-admin login        | `User.isPlatformAdmin` — needed for the kill switch only                                                               |
-| The owner login for the nodes | The account the six machines are enrolled under                                                                        |
-| Console/SSH on each node      | Enough to set a machine environment variable and restart one service                                                   |
-| The two API origins           | `https://apistage.ever.works` (stage) · `https://api.ever.works` (prod)                                                |
-| Rights to `override-e2e-gate` | Label rights on the repo, for the stage → main promotion (see Step 4)                                                  |
+| You need                      | Concretely                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| A checkout on ONE machine     | `ever-co/ever-works`, `develop` up to date, `pnpm` + Node 22, and `pnpm install --frozen-lockfile` already run once |
+| Write access to the repo      | Enough to push a branch and open a PR (`gh auth status` succeeds)                                                   |
+| A platform-admin login        | `User.isPlatformAdmin` — needed for the kill switch only                                                            |
+| The owner login for the nodes | The account the six machines are enrolled under                                                                     |
+| Console/SSH on each node      | Enough to set a machine environment variable and restart one service                                                |
+| The two API origins           | `https://apistage.ever.works` (stage) · `https://api.ever.works` (prod)                                             |
+| Rights to `override-e2e-gate` | Label rights on the repo, for the stage → main promotion (see Step 4)                                               |
 
 Nothing here routes through a fleet node. If a step needs the fleet, it is not a
 break-glass step.

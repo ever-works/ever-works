@@ -12,7 +12,7 @@ Augment Code should read those files first and treat them as the source of truth
 
 ## 🔗 Quick Links
 
-- **Repository**: https://github.com/ever-works/ever-works
+- **Repository**: https://github.com/ever-co/ever-works
 - **Documentation**: https://docs.ever.works (source: `apps/docs/` + `docs/`)
 - **Website**: https://ever.works
 

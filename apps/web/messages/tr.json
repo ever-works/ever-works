@@ -8396,7 +8396,7 @@
                 "formTitle": "Yeni Work — Depo",
                 "formSubtitle": "Mevcut bir kod deposunu Work olarak kaydedin. Hiçbir şey üretilmez veya dağıtılmaz — görevler, hedefler ve filo çalıştırmaları yalnızca o depoda çalışır.",
                 "urlLabel": "Depo URL’si",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "Erişiminiz olan bir GitHub deposu. Olduğu gibi Work’ün veri deposu olur.",
                 "nameLabel": "Work Adı",
                 "slugLabel": "Work Slug’ı",

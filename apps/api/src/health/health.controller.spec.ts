@@ -87,7 +87,7 @@ describe('HealthController', () => {
             expect(info.gitRef).toBe('develop');
             expect(info.buildRun).toBe('142');
             expect(info.commitUrl).toBe(
-                'https://github.com/ever-works/ever-works/commit/abcdef1234567890',
+                'https://github.com/ever-co/ever-works/commit/abcdef1234567890',
             );
         });
 

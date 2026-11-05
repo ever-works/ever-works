@@ -4,8 +4,8 @@ Copyright © 2025-present, Ever Co. LTD. All rights reserved.
 
 This document represents official information about our licensing. Make sure you read and understand it before starting to use the software and source code.
 
-- Check more detailed information about licensing in our [Wiki](https://github.com/ever-works/ever-works/wiki/Licensing).
-- You can also ask any questions in the [Issue](https://github.com/ever-works/ever-works/issues/TODO) or [Contact Us](https://github.com/ever-works/ever-works#contact-us).
+- Check more detailed information about licensing in our [Wiki](https://github.com/ever-co/ever-works/wiki/Licensing).
+- You can also ask any questions in the [Issue](https://github.com/ever-co/ever-works/issues/TODO) or [Contact Us](https://github.com/ever-co/ever-works#contact-us).
 
 This software is available under an Open Source License ("Community Edition"). It is suitable if your business can comply with the requirements of corresponding open-source licenses, see more information below (e.g. requirements to release your modifications under the same open-source licenses for the benefit of our community).
 
@@ -19,7 +19,7 @@ We support the open-source community. If you're building awesome non-profit/open
 
 ### _Ever Works Platform Community Edition_ License
 
-Ever Works™ Platform Community Edition available at https://github.com/ever-works/ever-works released under [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.txt).
+Ever Works™ Platform Community Edition available at https://github.com/ever-co/ever-works released under [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.txt).
 
 If you decide to choose the Ever Works™ Platform Community Edition License, you must comply with the following terms:
 
@@ -39,7 +39,7 @@ For example, for AGPL v3 (the strongest copyleft license we use), conditions can
 
 Please note that some files may be automatically added or installed during the build process (for example, through npm dependencies). Such third-party components are governed by their **own respective licenses**, which may impose additional or more restrictive terms. It is your responsibility to review and comply with the license terms applicable to any third-party dependencies included in this project.
 
-Feel free to [Contact Us](https://github.com/ever-works/ever-works#contact-us) for additional information about used open-source licenses!
+Feel free to [Contact Us](https://github.com/ever-co/ever-works#contact-us) for additional information about used open-source licenses!
 
 ### _Ever Works Platform Small Business_ License
 

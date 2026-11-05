@@ -11,7 +11,7 @@ import styles from './styles.module.css';
 const HELP_LINKS = {
 	browseDocs: '/',
 	joinCommunity: 'https://discord.gg/ever',
-	stayUpToDate: 'https://github.com/ever-works/ever-works/releases'
+	stayUpToDate: 'https://github.com/ever-co/ever-works/releases'
 } as const;
 
 interface HelpItem {

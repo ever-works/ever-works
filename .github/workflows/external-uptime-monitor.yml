@@ -34,7 +34,7 @@
 # the workflow's only reason to exist, and turn it into one more probe that
 # goes red for the wrong reason.
 #
-# Cost is not a factor: `ever-works/ever-works` is a PUBLIC repository, and
+# Cost is not a factor: `ever-co/ever-works` is a PUBLIC repository, and
 # GitHub-hosted minutes are free and unlimited on public repos.
 # ===========================================================================
 #
@@ -66,7 +66,7 @@ jobs:
     # See the banner above before touching this line.
     runs-on: ubuntu-latest
     # Keeps forks that enable Actions from probing our hosts and filing issues.
-    if: github.repository == 'ever-works/ever-works'
+    if: github.repository == 'ever-co/ever-works'
     # Budget for a TOTAL outage, when every target burns its full retry budget:
     # 9 targets x (3 attempts x 20s max-time + 2 x 15s spacing) = ~13.5 min
     # absolute worst case; a realistic all-down run (TCP timeouts) is ~8 min.
@@ -82,7 +82,7 @@ jobs:
         id: probe
         env:
           # Fixed UA so these hits are identifiable in Cloudflare / ingress logs.
-          PROBE_UA: 'Mozilla/5.0 (compatible; ever-works-external-uptime; +https://github.com/ever-works/ever-works)'
+          PROBE_UA: 'Mozilla/5.0 (compatible; ever-works-external-uptime; +https://github.com/ever-co/ever-works)'
         run: |
           set -uo pipefail
 

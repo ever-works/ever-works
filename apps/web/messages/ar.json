@@ -8492,7 +8492,7 @@
                 "formTitle": "عمل جديد — مستودع",
                 "formSubtitle": "سجّل مستودع كود موجودًا كعمل. لا يتم توليد أو نشر أي شيء — المهام والأهداف وعمليات الأسطول تعمل ببساطة في ذلك المستودع.",
                 "urlLabel": "رابط المستودع",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "مستودع GitHub يمكنك الوصول إليه. يصبح مستودع بيانات العمل كما هو.",
                 "nameLabel": "اسم العمل",
                 "slugLabel": "معرّف العمل",

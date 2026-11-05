@@ -7,7 +7,7 @@ sidebar_position: 40
 
 # Agents API
 
-User-defined AI Agents — the surface introduced in PR [#1017](https://github.com/ever-works/ever-works/pull/1017)
+User-defined AI Agents — the surface introduced in PR [#1017](https://github.com/ever-co/ever-works/pull/1017)
 ("Agents / Skills / Tasks"). Each Agent carries an identity (`SOUL.md`),
 a role (`AGENTS.md`), a heartbeat directive (`HEARTBEAT.md`), tools
 (`TOOLS.md`), an agent.yml manifest, plus runtime settings (provider

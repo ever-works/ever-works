@@ -73,7 +73,7 @@ account default overrides the per-kind behaviour for every new Work.
 ## Template lookup, internally
 
 The active template registry lives at
-[`packages/agent/src/generators/website-generator/config/website-template.config.ts`](https://github.com/ever-works/ever-works/blob/main/packages/agent/src/generators/website-generator/config/website-template.config.ts).
+[`packages/agent/src/generators/website-generator/config/website-template.config.ts`](https://github.com/ever-co/ever-works/blob/main/packages/agent/src/generators/website-generator/config/website-template.config.ts).
 Each entry is a `WebsiteTemplateConfig`:
 
 ```ts
@@ -120,7 +120,7 @@ Templates the Works platform supports:
   creating a Work, or via the website-template selector in Work settings.
 - **Enable in API:** set the `WEBSITE_TEMPLATE_MINIMAL_REPO` env var to
   `directory-web-minimal-template` to register it in
-  [`website-template.config.ts`](https://github.com/ever-works/ever-works/blob/main/packages/agent/src/generators/website-generator/config/website-template.config.ts).
+  [`website-template.config.ts`](https://github.com/ever-co/ever-works/blob/main/packages/agent/src/generators/website-generator/config/website-template.config.ts).
 
 ### 3. `web` — web-template (Next.js, general-purpose)
 

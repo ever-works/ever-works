@@ -263,7 +263,7 @@ export function workspaceRange(spec, version) {
  * @param {string} ctx.version      version to publish
  * @param {Map<string,string>} ctx.releaseVersions  name → version for every package in this release
  * @param {Set<string>} ctx.workspaceNames          every package name in the monorepo
- * @param {string} ctx.repositoryUrl                e.g. https://github.com/ever-works/ever-works
+ * @param {string} ctx.repositoryUrl                e.g. https://github.com/ever-co/ever-works
  * @param {string} ctx.directory                    package dir relative to the repo root (posix)
  */
 export function buildPublishManifest(pkg, ctx) {
@@ -727,9 +727,15 @@ function parseArgs(argv) {
  * is public and 404 when it is private — or missing.
  */
 export async function githubVisibility(names) {
-	const owner = process.env.GITHUB_REPOSITORY_OWNER ?? process.env.GITHUB_REPOSITORY?.split('/')[0] ?? 'ever-works';
+	// GitHub Packages files an npm package under the account its scope names
+	// (`@ever-works/x` → `ever-works`), not under the org that hosts the
+	// repository: the platform repo moved to ever-co/ever-works on 2026-11-05
+	// while the packages stayed under ever-works.
+	const fallbackOwner =
+		process.env.GITHUB_REPOSITORY_OWNER ?? process.env.GITHUB_REPOSITORY?.split('/')[0] ?? 'ever-works';
 	const privateOnes = [];
 	for (const name of names) {
+		const owner = /^@([^/]+)\//.exec(name)?.[1] ?? fallbackOwner;
 		const bare = name.replace(/^@[^/]+\//, '');
 		try {
 			const res = await fetchWithRetry(
@@ -749,7 +755,7 @@ export async function githubVisibility(names) {
 async function main() {
 	const opts = parseArgs(process.argv.slice(2));
 	const env = process.env;
-	const repository = env.GITHUB_REPOSITORY ?? 'ever-works/ever-works';
+	const repository = env.GITHUB_REPOSITORY ?? 'ever-co/ever-works';
 	const repositoryUrl = `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repository}`;
 	const provenance = opts.provenance && env.GITHUB_ACTIONS === 'true' && Boolean(env.ACTIONS_ID_TOKEN_REQUEST_URL);
 	const selected = opts.registries.map((id) => REGISTRIES[id]);
