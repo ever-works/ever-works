@@ -103,7 +103,7 @@ jobs:
           # answer, so a single match proves nothing.
           for attempt in $(seq 1 90); do
             streak=0
-            for i in 1 2 3 4 5; do
+            for _ in 1 2 3 4 5; do
               got=$(curl -s --max-time 15 -A "$UA" "$API/api/version" | jq -r '.gitSha // ""' || echo "")
               if [ "$got" = "$WANT" ]; then streak=$((streak+1)); else streak=0; break; fi
               sleep 2

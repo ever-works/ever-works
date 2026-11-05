@@ -68,7 +68,7 @@ jobs:
       - name: Build all packages
         run: pnpm build --filter './packages/**'
 
-      - name: ðŸš€ Verify Trigger.dev is available
+      - name: 🚀 Verify Trigger.dev is available
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
