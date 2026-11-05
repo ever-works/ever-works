@@ -21,9 +21,20 @@ import type {
  * vendor's docs recommend starting with
  * (https://platform.claude.com/docs/en/about-claude/models/overview, checked
  * 2026-10-28). The old default, `claude-sonnet-4-5-20250514`, never existed.
- * The simple and medium tiers keep their own ids.
  */
 const DEFAULT_MODEL = 'claude-opus-5-5';
+
+/**
+ * The simple and medium tiers, as of 2026-11-05: the vendor's current Haiku
+ * (fastest) and Sonnet (https://platform.claude.com/docs/en/about-claude/models/overview).
+ * They replace `claude-haiku-4-5-20251001` and `claude-sonnet-4-5-20250929`;
+ * the Sonnet 4.5 snapshot is deprecated and retires 2026-11-30
+ * (https://platform.claude.com/docs/en/about-claude/model-deprecations, Q176).
+ * A config that saved either old id keeps it; only configs that never saved a
+ * model move to these defaults (owner decision, 2026-11-05).
+ */
+const SIMPLE_MODEL = 'claude-haiku-5-5';
+const MEDIUM_MODEL = 'claude-sonnet-5-5';
 
 /**
  * Anthropic AI provider plugin
@@ -62,7 +73,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'claude-haiku-4-5-20251001',
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -70,7 +81,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'claude-sonnet-4-5-20250929',
+				default: MEDIUM_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},

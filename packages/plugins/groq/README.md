@@ -16,12 +16,12 @@ Groq AI provider plugin for Ever Works platform
 
 ## What is the Groq plugin?
 
-Groq provides ultra-fast AI inference using custom LPU (Language Processing Unit) hardware. It runs open-source models such as Llama and Mixtral at significantly higher speeds than conventional cloud providers.
+Groq provides ultra-fast AI inference using custom LPU (Language Processing Unit) hardware. It runs open-weight models such as OpenAI's gpt-oss-120b and gpt-oss-20b at significantly higher speeds than conventional cloud providers.
 
 ## Why use it?
 
 - **Exceptional speed** — responses arrive in milliseconds thanks to Groq's purpose-built hardware
-- **Open-source models** — access Llama, Mixtral, and other leading open-weight models
+- **Open-weight models** — access OpenAI's gpt-oss family and the other open-weight models Groq serves
 - **Free tier available** — generous free usage limits for evaluation and small-scale use
 - **Rapid iteration** — fast inference enables quick experimentation when refining work content
 
@@ -46,6 +46,22 @@ When selected as the AI provider, Groq handles content generation during work cr
 - **Base URL** — custom API endpoint for proxies or compatible services (hidden, advanced).
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
+
+## Model defaults
+
+Model defaults as of 2026-11-05 — source: [console.groq.com/docs/models](https://console.groq.com/docs/models) (retirements: [deprecations](https://console.groq.com/docs/deprecations)). Availability depends on your account/plan/region; the picker lists the vendor's live models, accepts a custom model id, and keeps existing saved selections.
+
+| Setting                                                  | Default (2026-11-05)  | Previous default                      |
+| -------------------------------------------------------- | --------------------- | ------------------------------------- |
+| Default Model                                            | `openai/gpt-oss-120b` | `qwen/qwen3-32b` (retired 2026-07-17) |
+| Simple Tasks Model                                       | `openai/gpt-oss-20b`  | `qwen/qwen3-32b` (retired 2026-07-17) |
+| Standard Tasks Model                                     | `openai/gpt-oss-120b` | `qwen/qwen3-32b` (retired 2026-07-17) |
+| Complex Tasks Model                                      | `openai/gpt-oss-120b` | `qwen/qwen3-32b` (retired 2026-07-17) |
+| Bootstrap and fallback (`onLoad`, `getDefaultModelId()`) | `openai/gpt-oss-120b` | `qwen/qwen3-32b` (retired 2026-07-17) |
+
+Both defaults are Groq production models: `openai/gpt-oss-120b` (featured; 131,072-token context, $0.15 / $0.60 per million input / output tokens on 2026-11-05) and the smaller `openai/gpt-oss-20b` ($0.075 / $0.30).
+
+**Default shift.** This is a fix: Groq retired `qwen/qwen3-32b` on 2026-07-17, so every config that never saved a model was broken. Upgrading moves those configs to the defaults above. A model you saved explicitly is kept and still sent to Groq unchanged, even a retired one, whose error then tells you to pick another model. Nothing is migrated: Ever Works has no production users yet, and the owner accepted the shift on 2026-11-05.
 
 ## Troubleshooting
 

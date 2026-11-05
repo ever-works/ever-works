@@ -16,6 +16,26 @@ import type {
 } from '@ever-works/plugin';
 
 /**
+ * Tier defaults as of 2026-11-05, from the vendor's models, deprecations and
+ * changelog pages (https://aistudio.google.com/docs/models; the
+ * ai.google.dev/gemini-api/docs pages redirect there). Simple is Gemini 3.5
+ * Flash-Lite (the fastest, most cost-effective), medium is Gemini 3.8 Flash and
+ * complex is the flagship Gemini 4 Argon (GA 2026-10-13). The default model,
+ * the onLoad bootstrap and getDefaultModelId() equal the medium tier, the
+ * shape this plugin has always had. Ids keep the `models/` prefix.
+ *
+ * Replaced: `models/gemini-2.0-flash` (simple) was shut down on 2026-06-01, so
+ * it was a broken default; `models/gemini-2.5-flash` and `models/gemini-2.5-pro`
+ * are deprecated since 2026-11-02 (https://aistudio.google.com/docs/deprecations).
+ * A config that saved one of them keeps it; only configs that never saved a
+ * model move to these defaults (owner decision, 2026-11-05).
+ */
+const SIMPLE_MODEL = 'models/gemini-3.5-flash-lite';
+const MEDIUM_MODEL = 'models/gemini-3.8-flash';
+const COMPLEX_MODEL = 'models/gemini-4-argon';
+const DEFAULT_MODEL = MEDIUM_MODEL;
+
+/**
  * Google Gemini AI provider plugin
  *
  * Provides AI capabilities through Google's Gemini API.
@@ -44,7 +64,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'models/gemini-2.5-flash',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -52,7 +72,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'models/gemini-2.0-flash',
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -60,7 +80,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'models/gemini-2.5-flash',
+				default: MEDIUM_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -68,7 +88,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'models/gemini-2.5-pro',
+				default: COMPLEX_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -106,7 +126,7 @@ export class GooglePlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'models/gemini-2.5-flash',
+			model: DEFAULT_MODEL,
 			baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -161,7 +181,7 @@ export class GooglePlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'models/gemini-2.5-flash';
+		return DEFAULT_MODEL;
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
@@ -202,7 +222,7 @@ export class GooglePlugin extends BaseAiProvider {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When selected as the AI provider, Gemini handles content generation during work creation, powers the conversational AI assistant, and produces text embeddings for semantic search. Gemini Flash is well-suited for simple pipeline tasks, while Gemini Pro handles complex content generation.',
+				'When selected as the AI provider, Gemini handles content generation during work creation, powers the conversational AI assistant, and produces text embeddings for semantic search. Gemini Flash-Lite and Flash are well-suited for simple and standard pipeline tasks, while Gemini 4 Argon handles complex content generation.',
 				'',
 				'## Getting started',
 				'',

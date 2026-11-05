@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GrokPlugin } from '../grok.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
 
 vi.mock('@ever-works/plugin/ai', () => {
 	const MockAiOperations = vi.fn().mockImplementation(function () {
@@ -135,6 +136,105 @@ describe('GrokPlugin', () => {
 				expect(typed.description, `${key} description should not be empty`).not.toBe('');
 				expect(typed.title, `${key} should have a title`).toBeDefined();
 			}
+		});
+	});
+
+	/**
+	 * Model defaults as of 2026-11-05 (models refresh), read on
+	 * https://docs.x.ai/developers/models that day. Each tier gets the vendor's
+	 * current model for its role: simple = Grok 4.3 ("Fast, reliable", $1.25 /
+	 * $2.50 per MTok, 1M context), medium and complex = Grok 4.7 (the model the
+	 * page recommends "for everything else, including code"). The default keeps
+	 * its shape (it equals the complex tier).
+	 *
+	 * Intentional spec change: the simple tier used to share Grok 4.7 with the
+	 * other tiers; each tier is now pinned to its exact id. The list-membership
+	 * test above is unchanged and still holds. Update from that page, never from
+	 * memory.
+	 */
+	describe('model defaults (as of 2026-11-05)', () => {
+		const EXPECTED_TIER_DEFAULTS: Record<string, string> = {
+			defaultModel: 'grok-4.7',
+			simpleModel: 'grok-4.3',
+			mediumModel: 'grok-4.7',
+			complexModel: 'grok-4.7'
+		};
+		const EXPECTED_BOOTSTRAP_MODEL = 'grok-4.7';
+
+		/** The id every tier shipped with until 2026-10-28 (no longer documented by xAI). */
+		const LEGACY_SAVED_MODELS: Record<string, string> = {
+			defaultModel: 'grok-2-latest',
+			simpleModel: 'grok-2-latest',
+			mediumModel: 'grok-2-latest',
+			complexModel: 'grok-2-latest'
+		};
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'grok',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		const loadedAiOps = async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			return {
+				bootstrapModel: (MockAiOperations.mock.calls[0][0] as { model: string }).model,
+				aiOpsInstance: MockAiOperations.mock.results[0].value
+			};
+		};
+
+		it("defaults each tier to the vendor's current model for that role", () => {
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				expect(schemaDefault(key), key).toBe(id);
+			}
+		});
+
+		it('uses the default model for the onLoad bootstrap and getDefaultModelId()', async () => {
+			const { bootstrapModel, aiOpsInstance } = await loadedAiOps();
+
+			await plugin.validateConnection({ apiKey: 'xai-test' });
+			const fallbackModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(fallbackModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(schemaDefault('defaultModel')).toBe(EXPECTED_BOOTSTRAP_MODEL);
+		});
+
+		it('lets a saved legacy id pass settings validation (no enum or pattern on the model fields)', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const key of Object.keys(LEGACY_SAVED_MODELS)) {
+				const prop = props[key] as Record<string, unknown>;
+				expect(prop.type, key).toBe('string');
+				expect(prop, key).not.toHaveProperty('enum');
+				expect(prop, key).not.toHaveProperty('const');
+				expect(prop, key).not.toHaveProperty('pattern');
+			}
+			expect(validateSettingsConstraints({ apiKey: 'xai-test', ...LEGACY_SAVED_MODELS }, props as never)).toEqual(
+				[]
+			);
+		});
+
+		it('sends a saved legacy id to AiOperations unchanged', async () => {
+			const { aiOpsInstance } = await loadedAiOps();
+			const settings = { apiKey: 'xai-test', ...LEGACY_SAVED_MODELS };
+
+			await plugin.createChatCompletion({
+				model: 'grok-2-latest',
+				messages: [{ role: 'user', content: 'hi' }],
+				settings
+			});
+			const [options, config] = aiOpsInstance.createChatCompletion.mock.calls[0];
+			expect(options.model).toBe('grok-2-latest');
+			expect(config.model).toBe('grok-2-latest');
+
+			await plugin.validateConnection(settings);
+			const tested = aiOpsInstance.testConnection.mock.calls.map((call: unknown[]) => call[1]);
+			expect(tested).toEqual(['grok-2-latest']);
 		});
 	});
 
