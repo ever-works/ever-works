@@ -1,17 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
-import { FLEET_JOB_MAX_RESULT_BYTES } from '@ever-works/contracts';
+import {
+	FLEET_JOB_MAX_RESULT_BYTES,
+	HOST_CREDENTIAL_ENV_PATTERN,
+	PLATFORM_OWNED_ENV_NAMESPACE_PATTERN
+} from '@ever-works/contracts';
 import {
 	AcceptanceChecksPayloadError,
 	buildNodeCheckEnv,
 	CHECK_LOG_TAIL_BYTES,
 	fitNodeOutcomeToResultBudget,
+	NODE_PLATFORM_OWNED_ENV_PATTERN,
 	normalizeChecks,
+	refusedNodePassthroughNames,
 	runAcceptanceChecksJob,
 	runNodeCommandStep,
 	tailUtf8Bytes
@@ -444,6 +450,108 @@ describe("buildNodeCheckEnv — the host's own credentials are not self-grantabl
 		expect(env.GITHUB_PATH).toBe('/home/runner/work/_temp/_runner_file_commands/add_path');
 		expect(env.DOCKER_HOST).toBe('npipe:////./pipe/docker_engine');
 		expect(env.CUSTOM_BUILD_FLAG).toBe('yes');
+	});
+
+	// The 2026-11-03 sweep: credential CHANNELS (an ssh-agent socket, an
+	// editor's git-askpass bridge), POINTERS to credential files kept off
+	// the default path (a Docker config dir, a gcloud config), and the cloud
+	// SDK / forge / deploy-platform tokens the first list missed.
+	const moreHost: NodeJS.ProcessEnv = {
+		PATH: '/usr/bin',
+		SSH_AUTH_SOCK: '/run/user/1000/ssh-agent.socket',
+		GIT_ASKPASS: 'C:/Users/owner/vscode/askpass.sh',
+		VSCODE_GIT_IPC_HANDLE: '/run/user/1000/vscode-git-ipc.sock',
+		DOCKER_CONFIG: 'C:/Users/owner/.docker-registry-auth',
+		DOCKER_CERT_PATH: 'C:/Users/owner/.docker/remote-daemon-client',
+		GITLAB_TOKEN: 'glpat-host',
+		AZURE_CLIENT_SECRET: 'azure-host-secret',
+		ARM_CLIENT_SECRET: 'arm-host-secret',
+		CLOUDSDK_CONFIG: 'C:/secure/gcloud',
+		NPM_CONFIG_USERCONFIG: 'C:/secure/.npmrc',
+		VERCEL_TOKEN: 'vercel-host-token',
+		DOCKER_CONTEXT: 'desktop-linux',
+		NPM_CONFIG_REGISTRY: 'https://registry.npmjs.org/'
+	};
+	const moreCredentials = [
+		'SSH_AUTH_SOCK',
+		'GIT_ASKPASS',
+		'VSCODE_GIT_IPC_HANDLE',
+		'DOCKER_CONFIG',
+		'DOCKER_CERT_PATH',
+		'GITLAB_TOKEN',
+		'AZURE_CLIENT_SECRET',
+		'ARM_CLIENT_SECRET',
+		'CLOUDSDK_CONFIG',
+		'NPM_CONFIG_USERCONFIG',
+		'VERCEL_TOKEN'
+	];
+
+	it('drops credential channels, credential-file pointers and cloud / forge tokens too', () => {
+		const env = buildNodeCheckEnv(moreCredentials, moreHost);
+		for (const name of moreCredentials) expect(env[name], name).toBeUndefined();
+		expect(JSON.stringify(env)).not.toMatch(
+			/ssh-agent|askpass|vscode-git|registry-auth|glpat-|host-secret|gcloud|npmrc|vercel-host/
+		);
+	});
+
+	it('keeps the Docker / npm context neighbours passable (DOCKER_CONTEXT, NPM_CONFIG_REGISTRY)', () => {
+		const env = buildNodeCheckEnv(['DOCKER_CONTEXT', 'NPM_CONFIG_REGISTRY'], moreHost);
+		expect(env.DOCKER_CONTEXT).toBe('desktop-linux');
+		expect(env.NPM_CONFIG_REGISTRY).toBe('https://registry.npmjs.org/');
+	});
+
+	it('an OPERATOR grant still opens exactly one of them (DOCKER_CONFIG) and nothing adjacent', () => {
+		const env = buildNodeCheckEnv(undefined, moreHost, ['DOCKER_CONFIG']);
+		expect(env.DOCKER_CONFIG).toBe('C:/Users/owner/.docker-registry-auth');
+		expect(env.DOCKER_CERT_PATH).toBeUndefined();
+	});
+
+	it('parity: is built from exactly the two shared lists the platform uses (no local copy to drift)', () => {
+		// The platform's check-env spec pins the same equality for PLATFORM_OWNED_ENV_PATTERN.
+		expect(NODE_PLATFORM_OWNED_ENV_PATTERN.source).toBe(
+			`${PLATFORM_OWNED_ENV_NAMESPACE_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`
+		);
+		expect(NODE_PLATFORM_OWNED_ENV_PATTERN.flags).toBe('i');
+	});
+
+	it('names the refused passthrough entries in a warning (names only, never values)', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		try {
+			const env = buildNodeCheckEnv(['SSH_AUTH_SOCK', 'DOCKER_CONFIG', 'DOCKER_CONTEXT'], moreHost, [
+				'DOCKER_CONFIG'
+			]);
+			expect(env.DOCKER_CONFIG).toBe('C:/Users/owner/.docker-registry-auth');
+			const lines = warn.mock.calls.map((call) => String(call[0]));
+			const line = lines.find((text) => text.includes('envPassthrough not granted'));
+			expect(line).toContain('SSH_AUTH_SOCK');
+			// Granted per repository, so not reported as refused.
+			expect(line).not.toContain('DOCKER_CONFIG');
+			expect(line).not.toContain('DOCKER_CONTEXT');
+			expect(lines.join(' ')).not.toContain('ssh-agent.socket');
+		} finally {
+			warn.mockRestore();
+		}
+		expect(refusedNodePassthroughNames(['NPM_TOKEN', 'npm_token', 'CUSTOM_BUILD_FLAG', 'bad name'])).toEqual([
+			'NPM_TOKEN'
+		]);
+	});
+
+	it('refuses every name the shared host-credential list refuses (one list with the platform)', () => {
+		// Built from the shared pattern's own alternatives, so a name added
+		// to `HOST_CREDENTIAL_ENV_PATTERN` is checked here without editing this spec.
+		const samples = HOST_CREDENTIAL_ENV_PATTERN.source
+			.replace(/^\^\(\?:/, '')
+			.replace(/\)$/, '')
+			.replace(/\(\?:|\)\$/g, '')
+			.split('|')
+			// A name-shaped wildcard (`CARGO_REGISTRIES_<NAME>_TOKEN`) gets a sample name.
+			.map((alt) => alt.replace('[A-Z0-9_]+', 'PRIVATE'))
+			.map((alt) => (alt.endsWith('_') ? `${alt}SAMPLE` : alt));
+		expect(samples.length).toBeGreaterThan(40);
+		for (const name of samples) {
+			expect(NODE_PLATFORM_OWNED_ENV_PATTERN.test(name), name).toBe(true);
+			expect(buildNodeCheckEnv([name], { PATH: '/usr/bin', [name]: 'host-value' })[name], name).toBeUndefined();
+		}
 	});
 });
 
