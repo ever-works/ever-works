@@ -5532,7 +5532,7 @@
                 "workName": "ชื่องาน",
                 "generationPrompt": "พรอมต์ Worker",
                 "modelOverride": "แทนที่โมเดล AI",
-                "modelOverridePlaceholder": "เช่น openai/gpt-4.1 หรือ openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "เช่น openai/gpt-6.1-sol หรือ openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "ไม่บังคับ ใช้โมเดลที่นำเข้าหรือโมเดลก่อนหน้าเป็นค่าเริ่มต้น เว้นแต่จะแทนที่ที่นี่",
                 "modelOverrideUnavailable": "เลือกผู้ให้บริการ AI ที่ตั้งค่าไว้ก่อนเพื่อเลือกโมเดลจากรายการที่มี",
                 "websiteTemplateHelperText": "เลือกเทมเพลตงานที่จะใช้เมื่อสร้างคลังงานครั้งแรก",

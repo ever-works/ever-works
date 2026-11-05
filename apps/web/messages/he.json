@@ -5601,7 +5601,7 @@
                 "workName": "שם תיקייה",
                 "generationPrompt": "הנחיית Worker",
                 "modelOverride": "עקיפת מודל AI",
-                "modelOverridePlaceholder": "לדוגמה openai/gpt-4.1 או openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "לדוגמה openai/gpt-6.1-sol או openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "אופציונלי. משתמש במודל המיובא או הקודם כברירת מחדל אלא אם תעקוף אותו כאן.",
                 "modelOverrideUnavailable": "ראשית בחר ספק AI מוגדר כדי לבחור מודל מהרשימה הזמינה。",
                 "websiteTemplateHelperText": "בחר את תבנית העבודה שתשמש ביצירה הראשונה של מאגר העבודה.",
