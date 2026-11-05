@@ -13,7 +13,7 @@
  * by the client while it LOADS the kubeconfig) and YAML merge keys (applied by the client's js-yaml 4, not by
  * this plugin's js-yaml 5).
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -435,6 +435,22 @@ describe('unaffected — static-token kubeconfigs, the switch, and platform-mana
 });
 
 describe('the two client gaps closed in the §6.1 guard (App and dependency paths too)', () => {
+	/**
+	 * Pay for `@kubernetes/client-node` HERE, once, and out of the premise case's budget.
+	 *
+	 * The premise is the only case in this file that reaches the real `k8sClientLoader()`; every
+	 * other one hands the plugin a fake factory. Its first `createKubeConfig` call `require`s the
+	 * whole client package, and on a loaded runner that cold load alone blew the 10 s
+	 * `testTimeout` — stage CI runs 40725275072 and 41605694347 both timed this case out (29.4 s
+	 * in the second) while the remaining 1071 cases of the suite passed. Same remedy, and same
+	 * reasoning, as `defaultClientFactory wiring for the new APIs` in `k8s-api.service.spec.ts`:
+	 * a `beforeAll` with its own generous timeout attributes the cost to setup, and the case keeps
+	 * the suite's 10 s budget for what it asserts.
+	 */
+	beforeAll(() => {
+		defaultClientFactory.createKubeConfig(VALID);
+	}, 120_000);
+
 	it('the premise: @kubernetes/client-node reads token-file while LOADING, and applies merge keys', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'ew-k8s-token-file-'));
 		try {

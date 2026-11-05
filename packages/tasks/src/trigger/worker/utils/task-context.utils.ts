@@ -3,24 +3,13 @@ import { plainToInstance } from 'class-transformer';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { TriggerPluginHydratorService } from '../services/trigger-plugin-hydrator.service';
 import { Work, User } from '@ever-works/agent/entities';
+import { assertUuid } from './assert-uuid.utils';
 
-// H-22: any value that flows into a filesystem path component or a SQL
-// parameter on the worker side originates here, in the Trigger.dev payload.
-// The payload arrives untrusted (Trigger.dev signs delivery but doesn't
-// re-validate the body shape), so we re-assert the shape locally before
-// handing values to downstream code that builds paths like
-// `<BASE_TEMP_DIR>/<userId>/<workId>` (see `getWorkspacePath`). UUID v4 shape
-// — adjust if the platform standardises on a different ID format.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export function assertUuid(value: unknown, field: string): string {
-    if (typeof value !== 'string' || !UUID_RE.test(value)) {
-        throw new Error(
-            `Invalid ${field}: expected a UUID, got ${typeof value === 'string' ? JSON.stringify(value) : typeof value}`,
-        );
-    }
-    return value;
-}
+// H-22: the payload UUID guard lives in the dependency-free `assert-uuid.utils`
+// leaf. Import it from there, not from here: this module pulls in the entity
+// barrel and the worker services. Re-exported only so an older import keeps
+// compiling.
+export { assertUuid };
 
 /**
  * Shared bootstrap logic for both generation and import tasks:
