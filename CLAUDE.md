@@ -72,6 +72,14 @@ pnpm deploy:trigger
 
 **Package manager**: pnpm only (never npm/yarn). Node.js >=26 (matches the Docker `node:26-alpine` base image). Run `pnpm install` after adding dependencies.
 
+## Code navigation: Graphify
+
+Machines that work on this repo may keep a local [Graphify](https://github.com/Graphify-Labs/graphify) knowledge graph of the code in `graphify-out/` (per-machine build output, refreshed nightly, never committed).
+
+- When `graphify-out/graph.json` exists, answer code questions with `graphify query "<question>"`, `graphify path "<A>" "<B>"` or `graphify explain "<symbol>"` first, then open the files it points to. In a git worktree, use the primary checkout's graph: add `--graph <primary checkout>/graphify-out/graph.json`. That graph does not know the files your branch added or changed, so search those directly (`git grep`, `rg`), and fall back to a normal search whenever the graph has no answer.
+- After changing code in a checkout that has its own `graphify-out/`, run `graphify update .` (AST only: no LLM, no cost). Never build a new graph inside a worktree (a full build of this repo takes over an hour): use the primary checkout's graph and search your branch's own changes directly.
+- Never commit `graphify-out/` (it is in `.gitignore`).
+
 ## Architecture
 
 ### Monorepo Layout
