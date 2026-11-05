@@ -31,7 +31,7 @@ import {
 	type Server as HttpServer,
 	type ServerResponse
 } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { connect as realConnect, type AddressInfo, type NetConnectOpts } from 'node:net';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
@@ -122,9 +122,15 @@ interface RunnerOutcome {
  * Run `APP_RUNNER_SCRIPT` exactly as the Job would, in this process.
  *
  * `payload === null` makes the request file unreadable (the fatal path). `env` is the container
- * environment: the mounted `secretKeyRef` values live there, as they do in the cluster.
+ * environment: the mounted `secretKeyRef` values live there, as they do in the cluster. `modules`
+ * replaces what the script's `require` serves for a given id (e.g. `node:net`), for the cases whose
+ * answer would otherwise depend on the network the test runner sits on.
  */
-async function runRunner(payload: AppRunnerPayload | null, env: Record<string, string> = {}): Promise<RunnerOutcome> {
+async function runRunner(
+	payload: AppRunnerPayload | null,
+	env: Record<string, string> = {},
+	modules: Record<string, unknown> = {}
+): Promise<RunnerOutcome> {
 	const text = payload === null ? null : JSON.stringify(payload);
 	const stdoutLines: string[] = [];
 	const stderrLines: string[] = [];
@@ -170,7 +176,12 @@ async function runRunner(payload: AppRunnerPayload | null, env: Record<string, s
 
 	const context = vm.createContext({
 		process: sandboxProcess,
-		require: (id: string): unknown => (id === 'node:fs' || id === 'fs' ? fakeFs : realRequire(id)),
+		require: (id: string): unknown => {
+			if (id === 'node:fs' || id === 'fs') {
+				return fakeFs;
+			}
+			return Object.hasOwn(modules, id) ? modules[id] : realRequire(id);
+		},
 		fetch: globalThis.fetch,
 		AbortController,
 		TextDecoder,
@@ -889,13 +900,32 @@ describe('the isolation probe (plan §4.10: "opens a TCP connection … with a 3
 	});
 
 	it('falls back to kubernetes.default.svc:443 when neither a target nor the kubelet env is set', async () => {
-		// No such name outside a cluster: the probe must still TRY (a real `connected: false`) instead
-		// of reporting "no host or port to connect to".
+		// The probe must still TRY (a real `connected: false`) instead of reporting "no host or port
+		// to connect to". Where that name answers depends on the machine running this test: nowhere
+		// on a laptop, but the API server itself on an in-cluster CI runner (stage 2026-11-05). So the
+		// script's `node:net` records the target it was asked for and dials a port that was just
+		// closed instead: the refusal is real, and no longer the runner's network.
+		const closed = await startServer((_request, response) => response.end('x'));
+		const closedPort = closed.port;
+		await closed.close();
+
+		const attempts: NetConnectOpts[] = [];
+		const recordingNet = {
+			connect: (options: NetConnectOpts) => {
+				attempts.push(options);
+				return realConnect({ host: '127.0.0.1', port: closedPort });
+			}
+		};
+
 		const outcome = await runRunner(
-			payload([], { kind: 'isolation-probe', isolationProbe: { host: null, port: null, timeoutMs: 1_000 } })
+			payload([], { kind: 'isolation-probe', isolationProbe: { host: null, port: null, timeoutMs: 1_000 } }),
+			{},
+			{ 'node:net': recordingNet }
 		);
 
+		expect(attempts).toEqual([{ host: 'kubernetes.default.svc', port: 443 }]);
 		const record = only(outcome);
+		expect(outcome.exitCode).toBe(APP_RUNNER_EXIT_OK);
 		expect(record).toMatchObject({ kind: 'isolation-probe', connected: false });
 		expect(String(record.failedExpectation ?? '')).not.toContain('no host or port');
 	});
