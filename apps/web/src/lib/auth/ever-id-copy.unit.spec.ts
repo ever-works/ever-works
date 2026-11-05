@@ -193,6 +193,9 @@ describe('Ever ID copy — every message survives translation', () => {
         // The administrator settings form: a limit, and a row's position.
         max: 5,
         number: 2,
+        // The create-account page for an Ever Connect company request: the
+        // client passes the Ever handle as a plain string (`createAccount.linkedTo`).
+        handle: 'acme',
     };
 
     it.each(NAMESPACES)('every message under %s compiles as ICU in every locale', (namespace) => {

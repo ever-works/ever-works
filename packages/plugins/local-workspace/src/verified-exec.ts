@@ -1,4 +1,5 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 
 export interface VerifiedExecOptions {
 	cwd?: string;
@@ -289,10 +290,128 @@ function isProcessAlive(pid: number): boolean {
 function isProcessGroupAlive(pid: number): boolean {
 	try {
 		process.kill(-pid, 0);
-		return true;
 	} catch (error) {
 		return (error as NodeJS.ErrnoException).code !== 'ESRCH';
 	}
+	// Still signalable. On Linux that includes a group whose every member has
+	// already exited but is not reaped yet: a killed descendant is re-parented to
+	// PID 1, and a PID 1 that does not reap orphans (a container without an init,
+	// e.g. the Argo emissary of the in-cluster CI runner) keeps it a zombie in the
+	// group forever, so `kill(-pgid, 0)` never fails. A zombie runs no code and
+	// holds no memory or file descriptors, so such a group IS stopped.
+	return !(process.platform === 'linux' && linuxProcessGroupHasOnlyExitedMembers(pid));
+}
+
+/** The slice of `/proc` the exited-group check reads; injectable for tests off Linux. */
+export interface ProcFsReader {
+	readdir(path: string): string[];
+	readFile(path: string): string;
+}
+
+const NODE_PROC_FS: ProcFsReader = {
+	readdir: (path) => readdirSync(path),
+	readFile: (path) => readFileSync(path, 'utf8')
+};
+
+interface ProcStat {
+	pid: number;
+	state: string;
+	pgrp: number;
+}
+
+/**
+ * Whether every process in group `pgid` has exited (state `Z` zombie or `X`
+ * dead) and at least one such member is still listed. Fails CLOSED: anything
+ * it cannot read, parse or trust answers `false` ("not proven"), which keeps
+ * the caller on the old, stricter `kill(-pgid, 0)` verdict:
+ *
+ * - `/proc` must be this process's own PID namespace (`/proc/self/stat`
+ *   names `selfPid`), or the numbers would describe other processes;
+ * - `/proc` must not be mounted with `hidepid`, which hides processes of other
+ *   users from the listing (a live member could be invisible);
+ * - `/proc/<pid>/stat` is the thread-group LEADER's state: a leader that
+ *   exited while other threads run also reads `Z` (`ps` shows `Zl`), so an
+ *   exited member must list exactly one task;
+ * - an entry that vanished mid-scan (`ENOENT`/`ESRCH`) was reaped and is
+ *   skipped; any other read error, or a line that does not parse, refuses.
+ *
+ * A member that is still running is listed in a running state, so it keeps
+ * the group alive whichever kill reached it (on the fallback path only the
+ * direct child was signalled). And a member that a kill did reach cannot add
+ * one behind the scan: a process with a fatal signal pending cannot fork.
+ */
+export function linuxProcessGroupHasOnlyExitedMembers(
+	pgid: number,
+	proc: ProcFsReader = NODE_PROC_FS,
+	selfPid: number = process.pid
+): boolean {
+	try {
+		if (parseProcStat(proc.readFile('/proc/self/stat'))?.pid !== selfPid) return false;
+		if (procMountHidesPids(proc.readFile('/proc/self/mountinfo'))) return false;
+		let members = 0;
+		for (const entry of proc.readdir('/proc')) {
+			if (!/^\d+$/.test(entry)) continue;
+			const text = unlessVanished(() => proc.readFile(`/proc/${entry}/stat`));
+			if (text === undefined) continue;
+			const stat = parseProcStat(text);
+			if (!stat) return false;
+			if (stat.pgrp !== pgid) continue;
+			if (stat.state !== 'Z' && stat.state !== 'X') return false;
+			const tasks = unlessVanished(() => proc.readdir(`/proc/${entry}/task`));
+			if (tasks === undefined) continue;
+			if (tasks.length !== 1) return false;
+			members += 1;
+		}
+		return members > 0;
+	} catch {
+		return false;
+	}
+}
+
+/** `read()`, or `undefined` when the entry is gone (reaped mid-scan); any other error throws. */
+function unlessVanished<T>(read: () => T): T | undefined {
+	try {
+		return read();
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === 'ENOENT' || code === 'ESRCH') return undefined;
+		throw error;
+	}
+}
+
+/** `pid (comm) state ppid pgrp …`; `comm` may itself contain spaces and parentheses. */
+function parseProcStat(text: string): ProcStat | null {
+	const open = text.indexOf('(');
+	const close = text.lastIndexOf(')');
+	if (open <= 0 || close < open) return null;
+	const pid = Number(text.slice(0, open).trim());
+	const fields = text
+		.slice(close + 1)
+		.trim()
+		.split(/\s+/);
+	const pgrp = Number(fields[2]);
+	if (!Number.isSafeInteger(pid) || !Number.isSafeInteger(pgrp) || !/^[A-Za-z]$/.test(fields[0] ?? '')) {
+		return null;
+	}
+	return { pid, state: fields[0], pgrp };
+}
+
+/** Whether the `/proc` mount (per `/proc/self/mountinfo`) uses a `hidepid` other than 0/off. */
+function procMountHidesPids(mountinfo: string): boolean {
+	let found = false;
+	for (const line of mountinfo.split('\n')) {
+		const fields = line.split(' ');
+		if (fields[4] !== '/proc') continue;
+		found = true;
+		const separator = fields.indexOf('-');
+		// The per-mount options (field 6) and the superblock options (third after `-`).
+		const options = `${fields[5] ?? ''},${separator >= 0 ? (fields[separator + 3] ?? '') : ''}`;
+		for (const match of options.matchAll(/(?:^|,)hidepid=([^,]+)/g)) {
+			if (match[1] !== '0' && match[1] !== 'off') return true;
+		}
+	}
+	// No `/proc` mount listed at all: nothing to trust the listing by.
+	return !found;
 }
 
 function abortError(signal?: AbortSignal): Error {

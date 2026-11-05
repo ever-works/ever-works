@@ -246,6 +246,7 @@ export const HELP_ARTICLES = [
             { id: 'run-now', text: 'Run-now', level: 3 },
             { id: 'auto-build-works', text: 'Auto-build Works', level: 2 },
             { id: 'outstanding-ideas-cap', text: 'Outstanding-Ideas cap', level: 2 },
+            { id: 'output', text: 'Output', level: 2 },
             {
                 id: 'attached-works-and-relations',
                 text: 'Attached Works and relations',
@@ -598,6 +599,7 @@ export const HELP_ARTICLES = [
         headings: [
             { id: 'when-to-use-a-goal', text: 'When to use a Goal', level: 2 },
             { id: 'creating-a-goal', text: 'Creating a Goal', level: 2 },
+            { id: 'the-goals-work', text: 'The Goal\'s Work', level: 3 },
             { id: 'delivery-goals', text: 'Delivery goals', level: 2 },
             {
                 id: 'who-runs-a-brand-new-goal',
