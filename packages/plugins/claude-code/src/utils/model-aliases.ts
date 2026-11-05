@@ -9,8 +9,11 @@
  * value unchanged, so the CLI keeps resolving aliases on its own.
  */
 const CLI_ALIAS_TO_API_MODEL: ReadonlyMap<string, string> = new Map([
+	// `default` clears any override; for Anthropic API users it is Opus 5.5.
+	['default', 'claude-opus-5-5'],
 	['opus', 'claude-opus-5-5'],
-	// `best` is the most capable model available; `opusplan` plans with Opus. Opus 5.5 for both.
+	// `best` is Fable 5.1 where the account has it, otherwise Opus 5.5; `opusplan` plans with Opus
+	// 5.5. The probe uses Opus 5.5 for both, which every API key can call.
 	['best', 'claude-opus-5-5'],
 	['opusplan', 'claude-opus-5-5'],
 	['sonnet', 'claude-sonnet-5-5'],

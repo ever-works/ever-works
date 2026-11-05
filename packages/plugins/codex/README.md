@@ -76,7 +76,8 @@ also accepts a custom model id and keeps existing saved selections.
 | `gpt-5.4`       | Legacy: still served by the API, not offered with ChatGPT sign-in any more |
 
 All of them have a 1,050,000-token context and 128,000 output tokens. `codex-mini-latest` (retired 2026-02-12) and
-`gpt-5.2-codex` (retired 2026-07-23) are no longer listed; a config that saved one keeps it as a custom id.
+`gpt-5.2-codex` (retired 2026-07-23) are no longer listed. A config that saved one is still accepted and the id is
+passed through unchanged; OpenAI rejects retired ids at run time.
 
 **Default change (2026-11-05):** the default moved from `gpt-5.4` to `gpt-6.1-sol`. A config that never saved a model
 now runs on `gpt-6.1-sol`; there is no backfill, because Ever Works has no real users yet. Saved models are not
@@ -106,13 +107,22 @@ Both support variable substitution for work context, existing items, categories,
 
 The plugin automatically downloads and caches the Codex CLI binary:
 
-- Binaries are cached in `/tmp/codex-generator/bin/`
+- Each CLI version is installed into its own directory, `/tmp/codex-generator/bin/codex-<version>-<platform>/`, with the
+  binary at `codex` inside it
 - Supports Linux (x64/arm64) and macOS (x64/arm64). On Linux the plugin always downloads the static musl build:
   openai/codex has published no `*-unknown-linux-gnu` assets since 0.128.0, and the musl binary also runs on glibc.
 - Falls back to a system-installed `codex` command if download fails
 - Default CLI version: `0.166.0` ([`rust-v0.166.0`](https://github.com/openai/codex/releases/tag/rust-v0.166.0),
   latest stable on 2026-10-29; was `0.120.0` before 2026-11-05)
 - Sandboxed runs use `codex exec --sandbox workspace-write`. `--full-auto` was removed from `codex exec` in 0.147.0.
+- **Bubblewrap (Linux):** since `rust-v0.129.0` the Linux binary no longer compiles bubblewrap in. Its sandbox runs a
+  `bwrap` from `PATH`, or else the bundled `codex-resources/bwrap` next to the executable, and panics with
+  "bubblewrap is unavailable" when neither exists. The plugin therefore also downloads the release's
+  `bwrap-<target>.tar.gz`, verifies its published sha256 (fail closed, like the Codex archive) and installs it as
+  `codex-<version>-<platform>/codex-resources/bwrap`. Each version keeps its own copy, because codex checks bwrap
+  against the sha256 it was built with. Hosts with a system `bwrap` (for example `apk add bubblewrap`) work either way.
+  Bubblewrap needs unprivileged user namespaces; where the container forbids them, Codex sandboxing cannot work and
+  `unsafeBypassSandbox` is the operator's explicit choice.
 
 ## Error Handling
 
@@ -199,14 +209,15 @@ Requires either `OPENAI_API_KEY` in the environment or local Codex auth (`codex 
 
 ## Troubleshooting
 
-| Symptom                                                           | Likely cause                                                                          | Fix                                                                                                                                                            |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Generation never starts / stays at `0%`                           | `codex` not selected as the active pipeline plugin for this work                      | Open the work → **Plugins** → `pipeline` capability and set `codex` as the active pipeline; or set it as the global pipeline default in **Settings → Plugins** |
-| Step fails with `No AI / search / screenshot provider configured` | Pipeline depends on capability plugins that are not enabled or have no credentials    | Enable and configure the matching capability plugin (AI provider, search, screenshot, content-extractor) for the work or globally                              |
-| Step output looks wrong / generic                                 | Form-field tuning not set; pipeline using defaults that don't match the work's domain | Open the **Generator Form** for the work, set domain-specific fields (categories, target keywords, source URLs), and re-run the affected step                  |
-| Subprocess error: `command not found`                             | `Codex Generator` CLI not installed on the host running the API                       | Install the Codex Generator CLI on the API host and ensure it is on `PATH`; verify by running `which <cli>` from the same shell that launches `pnpm dev:api`   |
-| Authentication / device-auth flow stalls                          | Device-auth code never confirmed in the upstream IDE / browser                        | Re-run the device-auth flow from **Settings → Plugins → codex → Connect**, then complete the prompt in the upstream service before the code expires            |
-| Pipeline cannot resume after host restart                         | Checkpoint not persisted (only the standard pipeline persists checkpoints today)      | Cancel the stuck run and re-trigger generation; for production reliability prefer `standard-pipeline`                                                          |
+| Symptom                                                           | Likely cause                                                                                                                                   | Fix                                                                                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generation never starts / stays at `0%`                           | `codex` not selected as the active pipeline plugin for this work                                                                               | Open the work → **Plugins** → `pipeline` capability and set `codex` as the active pipeline; or set it as the global pipeline default in **Settings → Plugins**                |
+| Step fails with `No AI / search / screenshot provider configured` | Pipeline depends on capability plugins that are not enabled or have no credentials                                                             | Enable and configure the matching capability plugin (AI provider, search, screenshot, content-extractor) for the work or globally                                             |
+| Step output looks wrong / generic                                 | Form-field tuning not set; pipeline using defaults that don't match the work's domain                                                          | Open the **Generator Form** for the work, set domain-specific fields (categories, target keywords, source URLs), and re-run the affected step                                 |
+| Subprocess error: `command not found`                             | `Codex Generator` CLI not installed on the host running the API                                                                                | Install the Codex Generator CLI on the API host and ensure it is on `PATH`; verify by running `which <cli>` from the same shell that launches `pnpm dev:api`                  |
+| Authentication / device-auth flow stalls                          | Device-auth code never confirmed in the upstream IDE / browser                                                                                 | Re-run the device-auth flow from **Settings → Plugins → codex → Connect**, then complete the prompt in the upstream service before the code expires                           |
+| Run warns "bubblewrap is unavailable"                             | Linux host with no system `bwrap` and no bundled `codex-resources/bwrap` next to the Codex binary (e.g. a binary installed outside the plugin) | Let the plugin reinstall its managed CLI (it downloads the verified bwrap), or install bubblewrap on the host. Enable `unsafeBypassSandbox` only where sandboxing cannot work |
+| Pipeline cannot resume after host restart                         | Checkpoint not persisted (only the standard pipeline persists checkpoints today)                                                               | Cancel the stuck run and re-trigger generation; for production reliability prefer `standard-pipeline`                                                                         |
 
 ## Documentation
 

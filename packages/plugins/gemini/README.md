@@ -66,7 +66,8 @@ the picker also accepts a custom model id and keeps existing saved selections.
 | `gemini-2.5-flash-lite`  | Legacy: past users only                                                         |
 
 Every listed model takes 1,048,576 input and 65,536 output tokens. `gemini-3.1-flash-lite-preview` shut down on
-2026-05-25 and is no longer listed; a config that saved it keeps it as a custom id. Gemini 2.0 Flash shut down on
+2026-05-25 and is no longer listed. A config that saved it is still accepted and the id is passed through unchanged;
+Google rejects retired ids at run time. Gemini 2.0 Flash shut down on
 2026-06-01.
 
 **Default change (2026-11-05):** the default moved from `gemini-2.5-flash` to `gemini-3.8-flash`. A config that never

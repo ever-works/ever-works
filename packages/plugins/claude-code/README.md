@@ -83,8 +83,8 @@ selections.
 | `claude-sonnet-4-5-20250929` | Legacy, retires 2026-11-30 (200K context)                                |
 | `claude-haiku-4-5-20251001`  | Legacy (200K context)                                                    |
 
-`claude-opus-4-1-20250805` retired on 2026-08-05 and is no longer listed; a config that saved it keeps it as a custom
-id. Limited-availability `claude-mythos-*` models are not listed.
+`claude-opus-4-1-20250805` retired on 2026-08-05 and is no longer listed. A config that saved it is still accepted and
+the id is passed through unchanged; Anthropic rejects retired ids at run time. Limited-availability `claude-mythos-*` models are not listed.
 
 **Default and CLI pin (2026-11-05):** the default stays the `sonnet` alias. The CLI pin moved from `2.1.76` to
 `2.1.311` (npm `stable`), and with it `sonnet` now resolves to Sonnet 5.5, so a config that never saved a model runs on
@@ -92,7 +92,7 @@ Sonnet 5.5. There is no backfill, because Ever Works has no real users yet. Save
 
 When you connect with an API key, the plugin checks the key with one small `POST /v1/messages` call. That API takes
 API model ids, not CLI aliases, so the check sends `claude-sonnet-5-5` for `sonnet`, `claude-opus-5-5` for
-`opus`/`best`/`opusplan`, `claude-haiku-5-5` for `haiku` and `claude-fable-5-1` for `fable` (a `[1m]` suffix is
+`default`/`opus`/`best`/`opusplan`, `claude-haiku-5-5` for `haiku` and `claude-fable-5-1` for `fable` (a `[1m]` suffix is
 dropped). The generation run itself passes your saved value to the CLI unchanged.
 
 The plugin's **CLI binary** is managed automatically and stored under the platform's temp directory; users do not configure a binary path. **Auth mode** is implicit: if `oauthToken` is set the plugin uses OAuth, otherwise it falls back to the Anthropic API key.

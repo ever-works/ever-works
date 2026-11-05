@@ -88,8 +88,9 @@ import {
  * - https://platform.claude.com/docs/en/about-claude/models/overview (ids, limits)
  * - https://platform.claude.com/docs/en/about-claude/model-deprecations (retirements)
  *
- * Availability depends on the account, plan and region. The picker also accepts a custom id,
- * and a saved id that is no longer listed keeps working as free text (`--model` takes it as is).
+ * Availability depends on the account, plan and region. The picker also accepts a custom id. A
+ * saved id that is no longer listed is still accepted and passed through unchanged to `--model`;
+ * Anthropic rejects retired ids at run time.
  *
  * Legacy handling (models refresh decision 2): Sonnet 4.5 and Haiku 4.5 are still served, so
  * they stay, labelled "(legacy)". `claude-opus-4-1-20250805` retired on 2026-08-05 (D2) and is
@@ -416,6 +417,11 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		// D3: the Messages API takes API model ids, not Claude Code CLI aliases such as `sonnet`,
 		// so map the saved value for this probe only. The CLI run still receives it unchanged.
 		// No `temperature`/`top_p`/`top_k`: API version 2026-10-21 removed them.
+		// `max_tokens: 8` stays safe on always-thinking models (Opus 5.5, Fable 5.1): thinking
+		// counts toward max_tokens, the API documents no minimum, and a response that reaches the
+		// cap ends with stop_reason "max_tokens" (HTTP 200), which is all this check reads. No
+		// `thinking` field: those models reject thinking "disabled" with a 400.
+		// https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting (2026-11-06)
 		const payload = JSON.stringify({
 			model: toAnthropicApiModelId(model),
 			max_tokens: 8,

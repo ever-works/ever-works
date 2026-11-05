@@ -101,7 +101,8 @@ import { startTaxonomyWatcher } from './utils/taxonomy-watcher.js';
  *
  * Which ids a user can run depends on how Codex signs in: ChatGPT sign-in follows the plan,
  * API-key sessions follow the OpenAI organization and project. The picker also accepts a
- * custom id, and a saved id that is no longer listed keeps working as free text.
+ * custom id. A saved id that is no longer listed is still accepted and passed through unchanged;
+ * OpenAI rejects retired ids at run time.
  *
  * Legacy handling (models refresh decision 2): `gpt-5.4` is still GA in the API (it left
  * Codex ChatGPT sign-in on 2026-08-31), so it stays, labelled "(legacy)". `codex-mini-latest`
@@ -122,6 +123,9 @@ const CODEX_SUPPORTED_MODELS: readonly AiModel[] = [
 		'Previous generation. Still served in the OpenAI API; no longer offered with ChatGPT sign-in since 2026-08-31.'
 	)
 ] as const;
+
+/** Panic text of the Linux sandbox when neither a system nor a bundled bwrap exists (rust-v0.129.0+). */
+const BUBBLEWRAP_UNAVAILABLE = 'bubblewrap is unavailable';
 
 function buildCodexModel(id: string, name: string, description: string): AiModel {
 	return {
@@ -788,6 +792,13 @@ export class CodexPlugin
 						message:
 							'Codex reported a sandboxed file-write block; sandbox-bypass retry declined (unsafeBypassSandbox is off)'
 					});
+					if (this.reportsMissingBubblewrap(executionResult)) {
+						logger.warn(
+							'Codex could not start its Linux sandbox: bubblewrap is unavailable. Install bubblewrap (bwrap) on the ' +
+								'host, or let the plugin reinstall its managed Codex CLI, which places codex-resources/bwrap next ' +
+								'to the binary. Enable unsafeBypassSandbox only on hosts where sandboxing cannot work.'
+						);
+					}
 				}
 
 				if (items.length === 0) {
@@ -1144,6 +1155,16 @@ export class CodexPlugin
 		return contextParts;
 	}
 
+	/**
+	 * Since rust-v0.129.0 the Linux sandbox needs a system `bwrap` or the bundled
+	 * `codex-resources/bwrap`; without either, `codex-rs/linux-sandbox/src/launcher.rs` panics
+	 * "bubblewrap is unavailable: no system bwrap was found on PATH and no bundled
+	 * codex-resources/bwrap binary was found next to the Codex executable".
+	 */
+	private reportsMissingBubblewrap(result: ExecuteResult): boolean {
+		return [result.stderr, result.stdout].filter(Boolean).join('\n').toLowerCase().includes(BUBBLEWRAP_UNAVAILABLE);
+	}
+
 	private detectSandboxWriteBlock(result: ExecuteResult): boolean {
 		const combined = [result.stderr, result.stdout].filter(Boolean).join('\n').toLowerCase();
 
@@ -1163,6 +1184,7 @@ export class CodexPlugin
 			combined.includes('write the researched json files directly');
 
 		return (
+			combined.includes(BUBBLEWRAP_UNAVAILABLE) ||
 			combined.includes('sandbox issue') ||
 			combined.includes('sandboxed file-write blockage') ||
 			combined.includes('file writes were blocked') ||

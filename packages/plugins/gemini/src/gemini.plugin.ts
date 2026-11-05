@@ -85,8 +85,9 @@ import {
  * - https://github.com/google-gemini/gemini-cli (the CLI README says it is not optimized for
  *   Gemini 4+; an explicit `--model` id still passes through)
  *
- * Availability depends on the account, plan and region. The picker also accepts a custom id,
- * and a saved id that is no longer listed keeps working as free text (`--model` takes it as is).
+ * Availability depends on the account, plan and region. The picker also accepts a custom id. A
+ * saved id that is no longer listed is still accepted and passed through unchanged to `--model`;
+ * Google rejects retired ids at run time.
  *
  * Legacy handling (models refresh decision 2): `gemini-2.5-pro` and `gemini-2.5-flash` were
  * deprecated on 2026-11-02 (existing users only; re-routed from 2026-12-01) and

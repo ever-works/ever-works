@@ -10,6 +10,12 @@ export interface PlatformInfo {
 	readonly assetName: string;
 	readonly platformString: string;
 	readonly isMusl: boolean;
+	/**
+	 * Release asset with the bubblewrap helper that the Linux sandbox execs (Linux only). Since
+	 * rust-v0.129.0 Codex no longer compiles bubblewrap in; it looks for `codex-resources/bwrap`
+	 * next to the executable when no system `bwrap` is on PATH.
+	 */
+	readonly bwrapAssetName?: string;
 }
 
 async function isMuslLinux(): Promise<boolean> {
@@ -60,15 +66,31 @@ export async function detectPlatform(): Promise<PlatformInfo> {
 		throw new Error(`No Codex release asset configured for platform ${platformString}.`);
 	}
 
+	const bwrapAssetName =
+		detectedOs === 'linux'
+			? `bwrap-${detectedArch === 'arm64' ? 'aarch64' : 'x86_64'}-unknown-linux-musl.tar.gz`
+			: undefined;
+
 	return {
 		os: detectedOs,
 		arch: detectedArch,
 		assetName,
 		platformString,
-		isMusl
+		isMusl,
+		bwrapAssetName
 	};
 }
 
-export function getBinaryPath(version: string, platformString: string): string {
+/**
+ * Per-version install directory: `<bin>/codex-<version>-<platform>/`, holding `codex` and, on
+ * Linux, `codex-resources/bwrap`. Each version keeps its own bwrap because the codex binary
+ * checks it against the sha256 it was built with. (Before 2026-11-06 the binary itself was
+ * cached as a bare file at this path; the binary-manager replaces such a file.)
+ */
+export function getInstallDir(version: string, platformString: string): string {
 	return path.join(BASE_TEMP_DIR, 'bin', `codex-${version}-${platformString}`);
+}
+
+export function getBinaryPath(version: string, platformString: string): string {
+	return path.join(getInstallDir(version, platformString), 'codex');
 }

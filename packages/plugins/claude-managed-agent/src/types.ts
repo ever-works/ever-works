@@ -199,7 +199,8 @@ function buildClaudeModel(
  *   have a 1M context and 128K output; 4.5 models 200K / 64K)
  * - https://platform.claude.com/docs/en/about-claude/model-deprecations (retirements)
  *
- * The picker also accepts a custom id, and a saved id keeps working as free text. Every id this
+ * The picker also accepts a custom id; a saved id is still accepted and passed through unchanged
+ * (Anthropic rejects retired ids at run time). Every id this
  * plugin listed before stays, labelled "(legacy)" (decision 2). Limited-availability
  * `claude-mythos-*` ids are not listed (decision 4). Other supported ids not listed here
  * (`claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`, `claude-opus-4-8`,
