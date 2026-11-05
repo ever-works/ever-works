@@ -29,11 +29,11 @@ import {
  *         defaultForCapabilities:[],  // ← NOT a default-for-capability
  *         settingsSchema:{ required:['apiKey','defaultModel'],
  *           properties:{ apiKey(x-secret,x-scope:user,envVar:PLUGIN_VERCEL_AI_GATEWAY_API_KEY),
- *             defaultModel(default:'openai/gpt-5.1'), simpleModel, mediumModel,
+ *             defaultModel(default:'openai/gpt-6-astra'), simpleModel, mediumModel,
  *             complexModel, baseUrl(hidden), temperature(hidden), maxTokens(hidden) } },
- *         resolvedSettings:{ defaultModel:'openai/gpt-5.1', simpleModel:'openai/gpt-5-nano',
- *           mediumModel:'openai/gpt-4o', complexModel:'openai/gpt-5.1' },
- *         models:[ {key:'defaultModel',value:'openai/gpt-5.1',source:'default'}, … ] }.
+ *         resolvedSettings:{ defaultModel:'openai/gpt-6-astra', simpleModel:'openai/gpt-6-luna',
+ *           mediumModel:'openai/gpt-6.1-sol', complexModel:'openai/gpt-6-astra' },
+ *         models:[ {key:'defaultModel',value:'openai/gpt-6-astra',source:'default'}, … ] }.
  *   - GET /api/plugins/vercel-ai-gateway/models → `[]` (EMPTY array — the gateway
  *     proxies many upstreams and ships no static catalogue; unlike openrouter's
  *     ~343-entry catalogue). NB the per-plugin tier models live on the plugin

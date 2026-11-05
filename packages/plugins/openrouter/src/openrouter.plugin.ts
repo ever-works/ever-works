@@ -262,7 +262,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				'',
 				'## Why use it?',
 				'',
-				'- **Unified access** — switch between GPT-4o, Claude, Gemini, Llama, and others without managing separate provider accounts',
+				'- **Unified access** — switch between OpenAI GPT, Claude, Gemini, Grok, Llama, and others without managing separate provider accounts',
 				'- **Cost optimization** — assign economy models to simple tasks and premium models to complex ones',
 				'- **Provider redundancy** — OpenRouter can automatically route to an alternative if a provider is unavailable',
 				'- **Centralized billing** — track usage and spending across all models from a single dashboard',

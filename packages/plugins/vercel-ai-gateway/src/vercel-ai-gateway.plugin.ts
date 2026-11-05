@@ -262,7 +262,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 				'',
 				'## Why use it?',
 				'',
-				'- **Unified access** — switch between GPT-4o, Claude, Gemini, and others without managing separate provider accounts',
+				'- **Unified access** — switch between OpenAI GPT, Claude, Gemini, Grok, and others without managing separate provider accounts',
 				'- **OpenAI-compatible** — uses the familiar OpenAI API format for easy integration',
 				'- **Cost optimization** — assign economy models to simple tasks and premium models to complex ones',
 				'- **Vercel integration** — seamlessly integrates with Vercel deployments and infrastructure',
