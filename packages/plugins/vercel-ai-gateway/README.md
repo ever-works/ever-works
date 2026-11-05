@@ -47,6 +47,21 @@ Vercel AI Gateway handles content creation, item descriptions, categorization, a
 - **Temperature** (`temperature`, hidden) — sampling temperature, 0–2. Defaults to 0.7.
 - **Max Tokens** (`maxTokens`, hidden) — limits the length of each AI-generated response. Defaults to 4096.
 
+## Model defaults
+
+Model defaults as of 2026-11-05. Source: https://ai-gateway.vercel.sh/v1/models (each id was listed that day) and OpenAI's model guide https://developers.openai.com/api/docs/models.
+
+| Setting              | Default              | Env var                                  |
+| -------------------- | -------------------- | ---------------------------------------- |
+| Default Model        | `openai/gpt-6-astra` | `PLUGIN_VERCEL_AI_GATEWAY_DEFAULT_MODEL` |
+| Simple Tasks Model   | `openai/gpt-6-luna`  | `PLUGIN_VERCEL_AI_GATEWAY_SIMPLE_MODEL`  |
+| Standard Tasks Model | `openai/gpt-6.1-sol` | `PLUGIN_VERCEL_AI_GATEWAY_MEDIUM_MODEL`  |
+| Complex Tasks Model  | `openai/gpt-6-astra` | `PLUGIN_VERCEL_AI_GATEWAY_COMPLEX_MODEL` |
+
+- **Model picker:** the picker lists the gateway's live models, for example `anthropic/claude-opus-5.5` and `google/gemini-4-argon`. xAI models are listed under `spacexai/`. The picker also accepts a custom model id, and existing saved selections stay as they are.
+- **Availability:** depends on your Vercel account.
+- **Default shift:** these defaults replaced `openai/gpt-5.1` (default, complex), `openai/gpt-5-nano` (simple) and `openai/gpt-4o` (medium) on 2026-11-05. OpenAI has deprecated all three, and the gateway no longer lists `openai/gpt-5.1`. A configuration that never saved a model now uses the new defaults. One that saved a model keeps it.
+
 ## Troubleshooting
 
 | Symptom                                     | Likely cause                                                                                   | Fix                                                                                                                                                           |

@@ -343,13 +343,13 @@ Callback URL: `{WEB_URL}/api/oauth/github/callback/plugins`
 
 ### OpenRouter Plugin (AI Provider)
 
-| Variable                          | Description                        | Type     | Default                | Required |
-| --------------------------------- | ---------------------------------- | -------- | ---------------------- | -------- |
-| `PLUGIN_OPENROUTER_API_KEY`       | OpenRouter API key                 | `string` | --                     | No       |
-| `PLUGIN_OPENROUTER_DEFAULT_MODEL` | Default model for general use      | `string` | `openai/gpt-5-nano`    | No       |
-| `PLUGIN_OPENROUTER_SIMPLE_MODEL`  | Model for simple/fast tasks        | `string` | `openai/gpt-5-nano`    | No       |
-| `PLUGIN_OPENROUTER_MEDIUM_MODEL`  | Model for medium complexity tasks  | `string` | `moonshotai/kimi-k2.5` | No       |
-| `PLUGIN_OPENROUTER_COMPLEX_MODEL` | Model for complex generation tasks | `string` | `moonshotai/kimi-k2.5` | No       |
+| Variable                          | Description                        | Type     | Default              | Required |
+| --------------------------------- | ---------------------------------- | -------- | -------------------- | -------- |
+| `PLUGIN_OPENROUTER_API_KEY`       | OpenRouter API key                 | `string` | --                   | No       |
+| `PLUGIN_OPENROUTER_DEFAULT_MODEL` | Default model for general use      | `string` | `openai/gpt-6.1-sol` | No       |
+| `PLUGIN_OPENROUTER_SIMPLE_MODEL`  | Model for simple/fast tasks        | `string` | `openai/gpt-6-luna`  | No       |
+| `PLUGIN_OPENROUTER_MEDIUM_MODEL`  | Model for medium complexity tasks  | `string` | `openai/gpt-6.1-sol` | No       |
+| `PLUGIN_OPENROUTER_COMPLEX_MODEL` | Model for complex generation tasks | `string` | `openai/gpt-6-astra` | No       |
 
 ---
 

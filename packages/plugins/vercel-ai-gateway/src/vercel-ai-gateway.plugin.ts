@@ -22,6 +22,26 @@ import type { AiOperationsConfig } from '@ever-works/plugin/ai';
 import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /**
+ * Tier defaults as of 2026-11-05 (models refresh). Each id was on
+ * https://ai-gateway.vercel.sh/v1/models that day and is OpenAI's current model
+ * for its role (https://developers.openai.com/api/docs/models: GPT-6 Astra is the
+ * flagship, GPT-6.1 Sol balances intelligence and cost, GPT-6 Luna is for
+ * cost-sensitive, high-volume work). The default model equals the complex tier
+ * and the onLoad bootstrap / getDefaultModelId() use the simple tier, the shape
+ * this plugin has always had. The previous ids are deprecated at OpenAI
+ * (https://developers.openai.com/api/docs/deprecations: openai/gpt-5-nano shuts
+ * down 2026-12-11, openai/gpt-4o 2027-01-14, openai/gpt-5.1 2027-04-01), and the
+ * gateway's model list no longer shows openai/gpt-5.1. A config that saved a
+ * model keeps it; only configs that never saved one move to these defaults
+ * (owner decision, 2026-11-05).
+ */
+const SIMPLE_MODEL = 'openai/gpt-6-luna';
+const MEDIUM_MODEL = 'openai/gpt-6.1-sol';
+const COMPLEX_MODEL = 'openai/gpt-6-astra';
+const DEFAULT_MODEL = COMPLEX_MODEL;
+const BOOTSTRAP_MODEL = SIMPLE_MODEL;
+
+/**
  * Vercel AI Gateway provider plugin
  *
  * Provides AI capabilities through the Vercel AI Gateway, which provides
@@ -56,7 +76,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'openai/gpt-5.1',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_VERCEL_AI_GATEWAY_DEFAULT_MODEL'
@@ -65,7 +85,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'openai/gpt-5-nano',
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_VERCEL_AI_GATEWAY_SIMPLE_MODEL'
@@ -74,7 +94,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'openai/gpt-4o',
+				default: MEDIUM_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_VERCEL_AI_GATEWAY_MEDIUM_MODEL'
@@ -83,7 +103,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'openai/gpt-5.1',
+				default: COMPLEX_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_VERCEL_AI_GATEWAY_COMPLEX_MODEL'
@@ -130,7 +150,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'openai/gpt-5-nano',
+			model: BOOTSTRAP_MODEL,
 			baseURL: 'https://ai-gateway.vercel.sh/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -148,7 +168,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 	// BaseAiProvider abstract implementations
 
 	protected getDefaultModelId(): string {
-		return 'openai/gpt-5-nano';
+		return BOOTSTRAP_MODEL;
 	}
 
 	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
@@ -242,7 +262,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 				'',
 				'## Why use it?',
 				'',
-				'- **Unified access** — switch between GPT-4o, Claude, Gemini, and others without managing separate provider accounts',
+				'- **Unified access** — switch between OpenAI GPT, Claude, Gemini, Grok, and others without managing separate provider accounts',
 				'- **OpenAI-compatible** — uses the familiar OpenAI API format for easy integration',
 				'- **Cost optimization** — assign economy models to simple tasks and premium models to complex ones',
 				'- **Vercel integration** — seamlessly integrates with Vercel deployments and infrastructure',
@@ -279,6 +299,13 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 
 		if (s.apiKey && typeof s.apiKey === 'string') {
 			config.apiKey = s.apiKey;
+		}
+
+		// The saved default model, as the base implementation passes it. Without
+		// it, any call that does not name a model (isAvailable, direct plugin
+		// calls) ran on the bootstrap model instead of the configured one.
+		if (s.defaultModel && typeof s.defaultModel === 'string') {
+			config.model = s.defaultModel;
 		}
 
 		if (s.baseUrl && typeof s.baseUrl === 'string') {

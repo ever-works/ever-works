@@ -32,7 +32,7 @@ import { getPluginViaAPI, patchPluginSettingsViaAPI, enablePluginViaAPI } from '
  *         maxTokens are STRIPPED and never surfaced).
  *       • each property's x-* extensions are re-emitted WITHOUT the x- prefix:
  *         apiKey      → { type:'string', secret:true,  envVar:'PLUGIN_OPENROUTER_API_KEY', scope:'user' }
- *         defaultModel→ { type:'string', envVar:'PLUGIN_OPENROUTER_DEFAULT_MODEL', scope:'global', widget:'model-select', default:'openai/gpt-5-mini' }
+ *         defaultModel→ { type:'string', envVar:'PLUGIN_OPENROUTER_DEFAULT_MODEL', scope:'global', widget:'model-select', default:'openai/gpt-6.1-sol' }
  *
  *   - PATCH /api/plugins/openrouter/settings — required-field validation
  *     (validateSettingsOrThrow → settingsValidator.validate, scope 'user'):
@@ -83,7 +83,8 @@ import { getPluginViaAPI, patchPluginSettingsViaAPI, enablePluginViaAPI } from '
 
 const PLUGIN_ID = 'openrouter';
 const ENV_DEFAULT_MODEL = 'openai/gpt-4o-mini'; // PLUGIN_OPENROUTER_DEFAULT_MODEL (local stack)
-const SCHEMA_DEFAULT_MODEL = 'openai/gpt-5-mini'; // raw schema `default` for defaultModel
+const SCHEMA_DEFAULT_MODEL = 'openai/gpt-6.1-sol'; // raw schema `default` for defaultModel (models refresh 2026-11-05)
+const SCHEMA_SIMPLE_MODEL = 'openai/gpt-6-luna'; // raw schema `default` for simpleModel
 const FIXED_SECRET_MASK = '••••••••'; // resolvedSettings x-secret mask (8×U+2022)
 const BULLET = '••••'; // partialReveal infix
 
@@ -432,7 +433,7 @@ test.describe('AI-plugin settings schema validation — OpenRouter', () => {
                 'a no-env tier model falls back to its schema default',
             ).toBe('default');
             expect(simpleBefore.value, 'the fallback value is the schema default').toBe(
-                SCHEMA_DEFAULT_MODEL,
+                SCHEMA_SIMPLE_MODEL,
             );
         }
 

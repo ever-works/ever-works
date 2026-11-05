@@ -50,6 +50,10 @@ LM Studio exposes the same OpenAI-compatible `/v1` API as the other AI providers
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
 
+## Models
+
+There is no built-in default model. The picker lists whatever your LM Studio server has loaded (`GET /v1/models`), and accepts a custom model id. Existing saved selections stay as they are. As of 2026-11-05, see https://lmstudio.ai/models for the models LM Studio can download.
+
 ## Troubleshooting
 
 | Symptom                               | Likely cause                                                       | Fix                                                                                                          |
