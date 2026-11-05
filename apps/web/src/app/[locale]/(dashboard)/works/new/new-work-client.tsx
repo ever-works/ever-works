@@ -107,7 +107,7 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
         'e.g. "Awesome list of agent frameworks (LangChain, AutoGen, CrewAI…) with pros/cons"',
     ],
     repo: [
-        'e.g. "https://github.com/ever-works/ever-works — the platform monorepo"',
+        'e.g. "https://github.com/ever-co/ever-works — the platform monorepo"',
         'e.g. "https://github.com/ever-works/directory-web-template — the directory template"',
         'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
         'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',

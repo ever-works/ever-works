@@ -14,7 +14,7 @@ Welcome to the Ever Works support center. We're here to help you get the most ou
 
 ### Community Support
 
-- **[GitHub Issues](https://github.com/ever-works/ever-works/issues)** - Report bugs, request features, or ask technical questions
+- **[GitHub Issues](https://github.com/ever-co/ever-works/issues)** - Report bugs, request features, or ask technical questions
 - **[Discord Community](https://discord.gg/ever)** - Join our active Discord server for real-time support
 - **[Stack Overflow](https://stackoverflow.com/questions/tagged/ever-works)** - Ask technical questions with the `ever-works` tag
 
@@ -47,8 +47,8 @@ Welcome to the Ever Works support center. We're here to help you get the most ou
 
 ### Self-Hosted Options
 
-- **[GitHub Repository](https://github.com/ever-works/ever-works)** - Clone and self-host your instance
-- **[Docker Deployment](https://github.com/ever-works/ever-works#docker)** - Container-based installation
+- **[GitHub Repository](https://github.com/ever-co/ever-works)** - Clone and self-host your instance
+- **[Docker Deployment](https://github.com/ever-co/ever-works#docker)** - Container-based installation
 
 ## Troubleshooting
 
@@ -85,9 +85,9 @@ NODE_ENV=development
 
 We welcome contributions from the community! Here's how you can help:
 
-- **[Submit Pull Requests](https://github.com/ever-works/ever-works/pulls)** - Contribute code improvements
-- **[Feature Requests](https://github.com/ever-works/ever-works/issues)** - Submit your ideas
-- **[Roadmap](https://github.com/ever-works/ever-works/projects)** - See what's planned
+- **[Submit Pull Requests](https://github.com/ever-co/ever-works/pulls)** - Contribute code improvements
+- **[Feature Requests](https://github.com/ever-co/ever-works/issues)** - Submit your ideas
+- **[Roadmap](https://github.com/ever-co/ever-works/projects)** - See what's planned
 
 When submitting contributions, we require a [Contributor Assignment Agreement (CAA)](https://gist.github.com/evereq/95f74ae09510766ffa9379006715ccfd).
 
@@ -114,7 +114,7 @@ Ever Works Platform is available under dual licensing:
 - **Website**: [ever.co](https://ever.co)
 - **Email**: [works@ever.co](mailto:works@ever.co)
 - **Twitter**: [@everworks](https://twitter.com/everworks)
-- **GitHub**: [ever-works/ever-works](https://github.com/ever-works/ever-works)
+- **GitHub**: [ever-co/ever-works](https://github.com/ever-co/ever-works)
 
 ---
 

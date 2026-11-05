@@ -60,7 +60,7 @@ There is no download page yet, so pick one of these two paths.
 
 ### Take an installer from CI
 
-1. Open the **Desktop App Build** workflow in the [`ever-works/ever-works`](https://github.com/ever-works/ever-works) repository on GitHub.
+1. Open the **Desktop App Build** workflow in the [`ever-co/ever-works`](https://github.com/ever-co/ever-works) repository on GitHub.
 2. Choose a run on `main`, `develop` or `stage` — pushes are the runs that matter, because pull-request cells build the shell alone to keep feedback fast.
 3. Download the artifact for your OS: `ever-works-desktop-windows`, `ever-works-desktop-macos` or `ever-works-desktop-linux`. Artifacts are kept for **14 days**.
 4. Check what you got. On a push, only the **Linux** cell stages the self-contained runtime payload; the Windows and macOS artifacts from that same run carry a `bundled: false` manifest and therefore offer **client mode only**. A `workflow_dispatch` run with `bundle_runtime: true` stages the payload on all three.

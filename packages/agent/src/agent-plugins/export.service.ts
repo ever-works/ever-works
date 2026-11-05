@@ -133,7 +133,7 @@ export function everWorksMcpDescriptorFiles(
             ...(options.version ? { version: options.version } : {}),
             description: 'Manage Ever Works works, items and deployments over MCP.',
             homepage: 'https://ever.works',
-            repository: 'https://github.com/ever-works/ever-works',
+            repository: 'https://github.com/ever-co/ever-works',
             license: 'AGPL-3.0',
             keywords: ['ever-works', 'mcp', 'works'],
         }),

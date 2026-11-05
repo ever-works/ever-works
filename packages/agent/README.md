@@ -105,7 +105,7 @@ pnpm --filter @ever-works/agent test:cov
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Repository](https://github.com/ever-works/ever-works)
+- [Repository](https://github.com/ever-co/ever-works)
 - [Plugin system contracts](../plugin/README.md)
 - [Shared types](../contracts/README.md)
 

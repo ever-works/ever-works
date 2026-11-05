@@ -15,7 +15,7 @@ There are two ways to start with Ever Works, and they end up in the same product
 | Path                    | What you do                                                                                        | Pick it when                                                                                                       |
 | ----------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | **Hosted platform**     | Open `https://app.ever.works/register`, walk the setup wizard, describe what you want. No install. | You want to build Works, not operate infrastructure. Keeping the Ever Works defaults means you supply no API keys. |
-| **Local / self-hosted** | Clone `ever-works/ever-works`, configure a git provider and an AI provider, run the apps yourself. | You are developing on the platform, or you want everything on machines you control, under AGPLv3.                  |
+| **Local / self-hosted** | Clone `ever-co/ever-works`, configure a git provider and an AI provider, run the apps yourself.    | You are developing on the platform, or you want everything on machines you control, under AGPLv3.                  |
 
 ### The hosted path
 
@@ -42,7 +42,7 @@ The rest of this page is the **local** path.
 ### 2. Clone and Install
 
 ```bash
-git clone https://github.com/ever-works/ever-works.git
+git clone https://github.com/ever-co/ever-works.git
 cd ever-works
 pnpm install
 ```

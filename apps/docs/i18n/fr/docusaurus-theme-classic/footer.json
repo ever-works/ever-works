@@ -41,7 +41,7 @@
 	},
 	"link.item.label.GitHub": {
 		"message": "GitHub",
-		"description": "The label of footer link with label=GitHub linking to https://github.com/ever-works/ever-works"
+		"description": "The label of footer link with label=GitHub linking to https://github.com/ever-co/ever-works"
 	},
 	"copyright": {
 		"message": "Copyright © 2024-Présent <a href=\"https://ever.co/\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color: inherit; text-decoration: underline;\">Ever Co. LTD.</a> Tous droits réservés.",

@@ -11,19 +11,19 @@ Thank you for your interest in contributing to Ever Works. This guide covers eve
 
 ## Repositories
 
-Ever Works is split across multiple repositories under the [ever-works](https://github.com/ever-works) GitHub organization:
+Ever Works is split across multiple repositories. The platform monorepo lives in the [ever-co](https://github.com/ever-co) GitHub organization; the templates and other Ever Works repositories live in the [ever-works](https://github.com/ever-works) organization:
 
-| Repository                                                                              | Description                                                      |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [ever-works](https://github.com/ever-works/ever-works)                                  | Platform monorepo (API, Web Dashboard, CLI, AI agents, plugins)  |
-| [directory-web-template](https://github.com/ever-works/directory-web-template)          | Standalone Next.js work website template                         |
-| [ever-works/apps/docs](https://github.com/ever-works/ever-works/tree/develop/apps/docs) | Documentation site (this site), built from the platform monorepo |
+| Repository                                                                           | Description                                                      |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| [ever-works](https://github.com/ever-co/ever-works)                                  | Platform monorepo (API, Web Dashboard, CLI, AI agents, plugins)  |
+| [directory-web-template](https://github.com/ever-works/directory-web-template)       | Standalone Next.js work website template                         |
+| [ever-works/apps/docs](https://github.com/ever-co/ever-works/tree/develop/apps/docs) | Documentation site (this site), built from the platform monorepo |
 
 Each repository has its own issue tracker. File issues in the repository most relevant to your contribution.
 
 :::note The documentation is not a separate repository
 
-Every page on **docs.ever.works** is a Markdown file under `docs/` in the `ever-works` monorepo, rendered by the Docusaurus app in `apps/docs/`. `apps/docs/docusaurus.config.ts` sets `path: '../../docs/'` and `routeBasePath: '/'`, and points `editUrl` at `https://github.com/ever-works/ever-works/tree/main/` — which is why the **Edit this page** link at the bottom of any page opens the exact source file in `ever-works`. Run the site locally with `pnpm dev:docs`, and open documentation issues and PRs against `ever-works`.
+Every page on **docs.ever.works** is a Markdown file under `docs/` in the `ever-works` monorepo, rendered by the Docusaurus app in `apps/docs/`. `apps/docs/docusaurus.config.ts` sets `path: '../../docs/'` and `routeBasePath: '/'`, and points `editUrl` at `https://github.com/ever-co/ever-works/tree/main/` — which is why the **Edit this page** link at the bottom of any page opens the exact source file in `ever-works`. Run the site locally with `pnpm dev:docs`, and open documentation issues and PRs against `ever-works`.
 
 :::
 
@@ -57,7 +57,7 @@ npm install -g pnpm
 ### Platform (Monorepo)
 
 ```bash
-git clone https://github.com/ever-works/ever-works.git
+git clone https://github.com/ever-co/ever-works.git
 cd ever-works
 pnpm install
 
@@ -380,7 +380,7 @@ All contributors are expected to follow the project's Code of Conduct. Be respec
 
 If you have questions about contributing:
 
-- Open a [GitHub Discussion](https://github.com/ever-works/ever-works/discussions) for general questions
+- Open a [GitHub Discussion](https://github.com/ever-co/ever-works/discussions) for general questions
 - Join the [Discord community](https://discord.gg/ever) for real-time help
 - Email [ever@ever.co](mailto:ever@ever.co) for private inquiries
 

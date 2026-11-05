@@ -10729,7 +10729,7 @@
                 "formTitle": "New Work — Repository",
                 "formSubtitle": "Register an existing code repository as a Work. Nothing is generated or deployed — Tasks, Goals and fleet runs simply work in that repository.",
                 "urlLabel": "Repository URL",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "A GitHub repository you can access. It becomes the Work’s data repository as-is.",
                 "nameLabel": "Work Name",
                 "slugLabel": "Work Slug",

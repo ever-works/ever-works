@@ -99,7 +99,7 @@ When upgrading the Template to a newer version:
 
 Both repositories publish releases on GitHub:
 
-- **Platform:** [github.com/ever-works/ever-works/releases](https://github.com/ever-works/ever-works/releases)
+- **Platform:** [github.com/ever-co/ever-works/releases](https://github.com/ever-co/ever-works/releases)
 - **Template:** [github.com/ever-works/ever-works-website-template/releases](https://github.com/ever-works/ever-works-website-template/releases)
 
 Each release includes:

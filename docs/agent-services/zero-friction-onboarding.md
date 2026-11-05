@@ -13,7 +13,7 @@ invocation), with no prior account, no UI, and no human in the loop.
 
 This page documents the public surface. For the architecture and the
 manifest schema, see the feature spec under
-[`docs/specs/features/agent-zero-friction-onboarding/`](https://github.com/ever-works/ever-works/tree/develop/docs/specs/features/agent-zero-friction-onboarding).
+[`docs/specs/features/agent-zero-friction-onboarding/`](https://github.com/ever-co/ever-works/tree/develop/docs/specs/features/agent-zero-friction-onboarding).
 
 ## What you get
 
@@ -236,4 +236,4 @@ as we observe traffic; the response shape will not change.
 
 - [Manifest schema reference](./works-yml-schema.md)
 - [Works API](../api/works.md)
-- Feature spec: [`docs/specs/features/agent-zero-friction-onboarding/spec.md`](https://github.com/ever-works/ever-works/tree/develop/docs/specs/features/agent-zero-friction-onboarding)
+- Feature spec: [`docs/specs/features/agent-zero-friction-onboarding/spec.md`](https://github.com/ever-co/ever-works/tree/develop/docs/specs/features/agent-zero-friction-onboarding)
