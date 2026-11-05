@@ -898,6 +898,24 @@
                 "error": "Impossibile creare la missione. Riprova.",
                 "chatUnavailable": "La chat non è disponibile — usa «Crea manualmente»."
             },
+            "buildOnApp": {
+                "product": "Prodotto",
+                "business": "Attività",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Scegli un App Work",
+                "noAppWorks": "Non hai ancora un App Work. Aggiungine uno da Works.",
+                "summary": "Ogni lunedì alle 08:00 UTC · fino a {count} task a settimana · {amount} per esecuzione",
+                "backlogNote": "I nuovi task attendono la tua approvazione nel Backlog.",
+                "suggestedGoals": "Obiettivi suggeriti (creati come bozze):",
+                "rules": "Regole dell’app consigliate: modifiche allo schema unite da una persona, PR da massimo {lines} righe",
+                "proposeRules": "Proponi queste regole",
+                "proposeNeedsAppWork": "Scegli prima un App Work.",
+                "rulesProposed": "È stato aperto un task sull’App Work per modificare le regole dell’app.",
+                "rulesFailed": "Impossibile aprire il task. Riprova.",
+                "create": "Crea missione",
+                "templateUnreadable": "Impossibile leggere il modello: sono stati usati solo i valori che hai inserito.",
+                "templatePartial": "La missione è stata creata, ma non è stato possibile applicare una parte del suo modello."
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",
