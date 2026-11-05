@@ -13,10 +13,15 @@ import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
  *      resolution; the #29 fix additionally upgraded the mutating id-addressed
  *      handlers (closeSession / deleteEntry) from ensureCanView to
  *      ensureCanEdit and made the per-resource ownerUserId stamp check
- *      unconditional. (The stamp-403 itself needs a live agent-memory backend
- *      — none in e2e — so this file pins the e2e-reachable layers: the
- *      work-gate matrix incl. the VIEW-vs-EDIT role split, and the exact
- *      no-provider envelope that proves the gate fired FIRST.)
+ *      unconditional. PR #2769 (commit bf0962228, 2026-10-18, finding #5 —
+ *      "agent-memory `save` needed only view access") then made the WRITES
+ *      (`save`, `openSession`) need EDIT access too: opening a session writes
+ *      into the Work's memory project, so a viewer is refused; the reads
+ *      (search/context/listSessions) stay VIEW. (The stamp-403 itself needs a
+ *      live agent-memory backend — none in e2e — so this file pins the
+ *      e2e-reachable layers: the work-gate matrix incl. the VIEW-vs-EDIT role
+ *      split, and the exact no-provider envelope that proves the gate fired
+ *      FIRST.)
  *   2. agent export scope-ownership (EW-711 #8 —
  *      packages/agent/src/agents/agent-export.service.ts `exportOne()` resolves
  *      via findByIdAndUser): cross-user export masks as the same 404 a
@@ -79,10 +84,12 @@ import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
  *       { status:'error', message:'You do not have permission to access this work' }
  *     same verbs with an ABSENT workId → 404
  *       { status:'error', message:"Work with id '<id>' not found" }
- *     VIEWER member: open/search → 400 no-provider (view gate passed), but
- *       close/delete → 403 { status:'error', message:'You do not have the
- *       required permission level for this action' }  (the #29 EDIT upgrade)
- *     EDITOR member: close/delete → 400 no-provider (edit gate passed).
+ *     VIEWER member: search → 400 no-provider (view gate passed), but
+ *       open/close/delete → 403 { status:'error', message:'You do not have the
+ *       required permission level for this action' }  (close/delete: the #29
+ *       EDIT upgrade; open: the #2769 write gate — re-probed on stage CI run
+ *       41605694388, where a viewer POST /sessions got exactly this 403)
+ *     EDITOR member: open/close/delete → 400 no-provider (edit gate passed).
  *     unscoped no-provider envelope: 400 { status:'error', message:'No
  *       agent-memory provider is enabled. Install + enable an agent-memory
  *       plugin (e.g. `@ever-works/agentmemory-plugin`).', operation:'<op>' }
@@ -281,7 +288,7 @@ test.describe('SEC PIN: agent-memory work-scope gates (EW-711 #29, Wave B)', () 
         }
     });
 
-    test('role matrix: a VIEWER passes the view gate but is 403-blocked on close/delete; an EDITOR passes the edit gate (#29 upgrade)', async ({
+    test('role matrix: a VIEWER passes the view gate (search) but is 403-blocked on open/close/delete; an EDITOR passes the edit gate (#29 upgrade + #2769 write gate)', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -291,7 +298,7 @@ test.describe('SEC PIN: agent-memory work-scope gates (EW-711 #29, Wave B)', () 
         const viewer = await addMember(request, owner.access_token, work.id, 'viewer');
         const editor = await addMember(request, owner.access_token, work.id, 'editor');
 
-        // VIEWER + read/open verbs: ensureCanView passes, so the request falls
+        // VIEWER + read verb: ensureCanView passes, so the request falls
         // through to the facade and surfaces the deterministic no-provider 400
         // (fresh users have no agent-memory plugin enabled, also true in CI).
         const verbs = memoryVerbs(work.id);
@@ -299,19 +306,26 @@ test.describe('SEC PIN: agent-memory work-scope gates (EW-711 #29, Wave B)', () 
         const close = verbs[1];
         const del = verbs[2];
         const search = verbs[3];
-        for (const verb of [open, search]) {
-            const { status, body } = await fire(request, viewer.token, verb);
-            expect(status, `viewer ${verb.label}: view gate passes → provider gate`).toBe(400);
-            expect(body.message, `viewer ${verb.label}: no-provider envelope`).toBe(
+        {
+            const { status, body } = await fire(request, viewer.token, search);
+            expect(status, `viewer ${search.label}: view gate passes → provider gate`).toBe(400);
+            expect(body.message, `viewer ${search.label}: no-provider envelope`).toBe(
                 NO_MEMORY_PROVIDER_400,
             );
-            expect(body.operation, `viewer ${verb.label}: operation echoed`).toBe(verb.label);
+            expect(body.operation, `viewer ${search.label}: operation echoed`).toBe(search.label);
         }
 
-        // VIEWER + mutating id-addressed verbs: the #29 fix upgraded these
-        // from ensureCanView to ensureCanEdit — a viewer must NOT be able to
-        // end sessions or forget records.
-        for (const verb of [close, del]) {
+        // VIEWER + write verbs, all refused by the work ROLE gate
+        // (ensureCanEdit) before any provider resolution:
+        //   - closeSession / deleteEntry: the #29 fix upgraded these mutating
+        //     id-addressed verbs from ensureCanView to ensureCanEdit — a viewer
+        //     must NOT be able to end sessions or forget records;
+        //   - openSession: PR #2769 (bf0962228, "edit access for memory
+        //     writes") — opening a session is a WRITE into the Work's memory
+        //     project, so it needs EDIT like `save` (it was a VIEW verb when
+        //     this file was first written). Pinned by the controller unit
+        //     spec "openSession requires EDIT access …".
+        for (const verb of [open, close, del]) {
             const { status, body } = await fire(request, viewer.token, verb);
             expect(status, `viewer ${verb.label}: edit gate → 403`).toBe(403);
             expect(body.status, `viewer ${verb.label}: error envelope`).toBe('error');
@@ -322,7 +336,7 @@ test.describe('SEC PIN: agent-memory work-scope gates (EW-711 #29, Wave B)', () 
 
         // EDITOR: passes ensureCanEdit and reaches the owner-stamp/provider
         // seam (the 400 proves the role gate, not ownership masking, decided).
-        for (const verb of [close, del]) {
+        for (const verb of [open, close, del]) {
             const { status, body } = await fire(request, editor.token, verb);
             expect(status, `editor ${verb.label}: edit gate passes → provider gate`).toBe(400);
             expect(body.message, `editor ${verb.label}: no-provider envelope`).toBe(

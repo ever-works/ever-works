@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { API_BASE, authedHeaders } from './helpers/api';
 import { gotoDashboard, seedAppWork, seededToken } from './helpers/app-works-evolve';
+import { clickUntil } from './helpers/nav';
 
 /**
  * APW-08 P2 T37 (FR-45; ACC-08-25 surface half) — a Goal names one Work.
@@ -40,8 +41,14 @@ test.describe('APW-08 T37 — a Goal scoped to one Work', () => {
         expect(await read.json()).toMatchObject({ workId, workName: name });
 
         await gotoDashboard(page, `/en/goals/${goal.id}`);
+        // The Work section sits in the Goal page's "Progress log" panel; the page opens on
+        // "Definition of Done" (#2093), so open that tab first. A click landing before hydration
+        // is swallowed, so re-click until the section is on screen (helpers/nav.ts).
         const section = page.getByTestId('goal-work-section');
-        await expect(section).toBeVisible({ timeout: 45_000 });
+        await clickUntil(page.getByRole('tab', { name: 'Progress log' }), () =>
+            section.isVisible(),
+        );
+        await expect(section).toBeVisible();
         const chip = section.getByTestId('goal-work-chip');
         await expect(chip).toHaveText(name);
         await expect(chip).toHaveAttribute('href', new RegExp(`/works/${workId}$`));

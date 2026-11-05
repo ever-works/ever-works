@@ -751,6 +751,7 @@ export function GoalDetailClient({
                                 onValueChange={overrideOutcome}
                                 disabled={pendingOutcome}
                                 placeholder={t('outcome.none')}
+                                data-testid="goal-detail-outcome-select"
                             >
                                 <option value="">{t('outcome.none')}</option>
                                 {OUTCOMES.map((o) => (

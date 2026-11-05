@@ -6,6 +6,7 @@ import {
     createWorkViaAPI,
     loginViaAPI,
 } from './helpers/api';
+import { loginViaUI } from './helpers/auth';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 
 /**
@@ -14,33 +15,39 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *
  * ── Probed live (127.0.0.1:3100) before writing ───────────────────────────────
  *
- * THERE IS NO SELF-DELETE REST ENDPOINT. Every conventional shape 404s (verified
- * live, authed AND unauthed):
+ * THERE IS NO CONVENTIONAL SELF-DELETE REST ENDPOINT. Every conventional shape
+ * 404s (verified live, authed AND unauthed):
  *   DELETE /api/account              → 404
  *   POST   /api/account/delete       → 404
  *   POST   /api/auth/delete-account  → 404
  *   DELETE /api/auth/profile         → 404
  * The `api/account` controller (apps/api/src/account/account.controller.ts) is
- * export / import / github-sync ONLY — deletion is intentionally not wired
- * server-side. Because nothing deletes, the account is fully PRESERVED: login
- * keeps returning 200, profile keeps resolving, owned Works survive.
+ * export / import / github-sync ONLY. The ONE delete path is the account-deletion
+ * module (#2986): `POST /api/account-deletion/me` with the typed email (what the
+ * Danger Zone calls), plus the emailed-link flow (`request` / `verify` /
+ * `confirm`). None of the conventional shapes above delete anything, so an
+ * account they are fired at is fully PRESERVED: login keeps returning 200,
+ * profile keeps resolving, owned Works survive.
  *
- * THE DANGER-ZONE UI IS A DELIBERATE NO-OP. apps/web/src/components/settings/
- * DangerZone.tsx renders under /{locale}/settings/danger (i18n ns
+ * THE DANGER-ZONE UI DELETES FOR REAL (since #2986). apps/web/src/components/
+ * settings/DangerZone.tsx renders under /{locale}/settings/danger (i18n ns
  * `dashboard.dangerZone`). The destructive button is double-gated:
- *   - `Delete My Account` (delete.button) reveals a confirm panel with 5 items.
+ *   - `Delete My Account` (delete.button) reveals a confirm panel that lists
+ *     what goes (account, Works, …).
  *   - The final `Yes, Delete My Account` (delete.confirmButton) stays DISABLED
- *     until the typed value === the REAL fresh-profile email.
- *   - On confirm, the server action `deleteAccount()` (apps/web/src/app/actions/
- *     settings.ts) returns { success:false, error:"Account deletion is disabled
- *     in demo" }. A *successful* delete would router.push(ROUTES.AUTH_REGISTER =
- *     '/register'); because it's refused, the user STAYS on /settings/danger.
+ *     until the typed value matches the REAL fresh-profile email.
+ *   - On confirm, the `deleteMyAccount()` server action calls the API, which
+ *     revokes every session and removes the row; the browser then does a full
+ *     load of `/login?accountDeleted=1`.
  *   - A `Cancel` (delete.cancel) button collapses the panel and clears the
  *     typed email.
+ * Because the confirm is real, it is only ever clicked as a DISPOSABLE user in
+ * its own browser context — never as the shard's seeded storageState user, whose
+ * deletion would sign every later spec in the shard out.
  *
- * RE-REGISTER AFTER "DELETION": since the email is never freed, re-registering
- * the same email → 409 { message:"User with this email already exists" }. The
- * original credentials still authenticate.
+ * RE-REGISTER AFTER A FAILED DELETE ATTEMPT: the conventional shapes never free
+ * the email, so re-registering the same email → 409 { message:"User with this
+ * email already exists" }. The original credentials still authenticate.
  *
  * ANONYMIZATION + GRACE WINDOW (the platform's only real "soft account
  * lifecycle"): POST /api/auth/anonymous mints a session whose profile carries
@@ -57,8 +64,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * logout-all invalidates EVERY session for the user (all tokens → 401). Neither
  * deletes the account: a fresh login re-issues a working session.
  *
- * Mutations run on FRESH registerUserViaAPI() users; the seeded storageState
- * user is used ONLY for UI-driven assertions. Assertions tolerate pre-existing
+ * Mutations — the real delete included — run on FRESH registerUserViaAPI()
+ * users; the seeded storageState user is used ONLY for non-destructive
+ * UI-driven assertions (the CANCEL flow). Assertions tolerate pre-existing
  * rows (toContain / >= / .or()), use generous timeouts + toPass retry loops for
  * the next-dev hydration race, and never hard-require a delivered email.
  */
@@ -75,89 +83,103 @@ function originFrom(baseURL: string | undefined): string {
 }
 
 test.describe('flow: account deletion — initiate/confirm/grace + anonymization contract', () => {
-    test('deletion is DOUBLE-GATED in the UI then SERVER-REFUSED — the grace contract preserves the account end-to-end', async ({
-        page,
+    test('deletion is DOUBLE-GATED in the UI, then the confirmed delete really removes the account', async ({
+        browser,
         request,
     }) => {
-        // The danger-zone page reads the user from GET /api/auth/profile/fresh,
-        // so the confirm-email gate is wired to the REAL account email of the
-        // seeded (storageState) user.
-        const seeded = loadSeededTestUser();
-        const { access_token } = await loginViaAPI(request, {
-            email: seeded.email,
-            password: seeded.password,
+        // Since #2986 the Danger Zone calls the real `POST /api/account-deletion/me`, so the
+        // confirm step deletes. This test used to confirm as the shard's SEEDED storageState
+        // user against a no-op action; against the real delete it removed the seeded account
+        // mid-shard (stage run 41605694388, shard 3: its retries then hit 401 on loginViaAPI,
+        // and the seeded-user CANCEL test below lost its session). It now signs a disposable
+        // user in, in its own browser context, and deletes THAT account.
+        const user = await registerUserViaAPI(request);
+        await request.post(`${API_BASE}/api/onboarding/dismiss`, {
+            headers: authedHeaders(user.access_token),
         });
+
+        // The danger-zone page reads the user from GET /api/auth/profile/fresh, so the
+        // confirm-email gate is wired to the REAL account email.
         const fresh = await request.get(`${API_BASE}/api/auth/profile/fresh`, {
-            headers: authedHeaders(access_token),
+            headers: authedHeaders(user.access_token),
         });
         expect(fresh.status(), 'account exists before any deletion attempt').toBe(200);
         const profileEmail = (await fresh.json()).email as string;
-        expect(profileEmail, 'fresh profile carries the seeded email').toBe(seeded.email);
+        expect(profileEmail, 'fresh profile carries the registered email').toBe(user.email);
 
-        // Step 1 — open the danger zone (hydration-racey under next dev).
-        await page.goto('/en/settings/danger', { waitUntil: 'domcontentloaded' });
-        const deleteBtn = page.getByRole('button', { name: /delete my account/i }).first();
-        await expect(deleteBtn, 'destructive entry button mounts').toBeVisible({ timeout: 30_000 });
+        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        try {
+            const page = await context.newPage();
+            await loginViaUI(page, { email: user.email, password: user.password });
 
-        // Step 2 — reveal the confirm panel. Retry-to-open: the first click is
-        // frequently swallowed pre-hydration.
-        const confirmInput = page.getByPlaceholder(/enter your email/i);
-        await expect(async () => {
-            if (!(await confirmInput.isVisible().catch(() => false))) {
-                await deleteBtn.click();
-            }
-            await expect(confirmInput).toBeVisible({ timeout: 3_000 });
-        }).toPass({ timeout: 20_000 });
+            // Step 1 — open the danger zone (hydration-racey under next dev).
+            await page.goto('/en/settings/danger', { waitUntil: 'domcontentloaded' });
+            const deleteBtn = page.getByRole('button', { name: /delete my account/i }).first();
+            await expect(deleteBtn, 'destructive entry button mounts').toBeVisible({
+                timeout: 30_000,
+            });
 
-        // Step 3 — the confirm panel enumerates EXACTLY what a real delete would
-        // destroy. We assert the cascade copy is present (account/profile +
-        // works), proving the destructive scope is surfaced to the user.
-        const panelText = (await page.locator('body').innerText()).toLowerCase();
-        expect(
-            panelText.includes('permanently delete') || panelText.includes('this will permanently'),
-            'confirm panel states the destructive, irreversible scope',
-        ).toBe(true);
-        expect(
-            panelText.includes('account') && panelText.includes('works'),
-            'cascade scope enumerates account + works (owned-resource destruction)',
-        ).toBe(true);
+            // Step 2 — reveal the confirm panel. Retry-to-open: the first click is
+            // frequently swallowed pre-hydration.
+            const confirmInput = page.getByPlaceholder(/enter your email/i);
+            await expect(async () => {
+                if (!(await confirmInput.isVisible().catch(() => false))) {
+                    await deleteBtn.click();
+                }
+                await expect(confirmInput).toBeVisible({ timeout: 3_000 });
+            }).toPass({ timeout: 20_000 });
 
-        // Step 4 — Gate #1: the final button is DISABLED before any input, and
-        // stays disabled for a WRONG email (no navigation occurs).
-        const confirmBtn = page.getByRole('button', { name: /yes, delete my account/i }).first();
-        await expect(confirmBtn, 'destructive button gated before input').toBeDisabled();
-        await confirmInput.fill('definitely-not-the-account@example.com');
-        await expect(confirmBtn, 'wrong email keeps it disabled').toBeDisabled();
-        await expect(page, 'no navigation on a mismatch').toHaveURL(/\/settings\/danger/);
+            // Step 3 — the confirm panel enumerates EXACTLY what the delete destroys. We
+            // assert the cascade copy is present (account/profile + works), proving the
+            // destructive scope is surfaced to the user.
+            const panelText = (await page.locator('body').innerText()).toLowerCase();
+            expect(
+                panelText.includes('permanently delete') ||
+                    panelText.includes('this will permanently'),
+                'confirm panel states the destructive, irreversible scope',
+            ).toBe(true);
+            expect(
+                panelText.includes('account') && panelText.includes('works'),
+                'cascade scope enumerates account + works (owned-resource destruction)',
+            ).toBe(true);
 
-        // Step 5 — Gate #2: typing the EXACT fresh-profile email un-gates it.
-        await confirmInput.fill(profileEmail);
-        await expect(confirmBtn, 'exact-email match enables deletion').toBeEnabled({
-            timeout: 10_000,
-        });
+            // Step 4 — Gate #1: the final button is DISABLED before any input, and stays
+            // disabled for a WRONG email (no navigation occurs).
+            const confirmBtn = page
+                .getByRole('button', { name: /yes, delete my account/i })
+                .first();
+            await expect(confirmBtn, 'destructive button gated before input').toBeDisabled();
+            await confirmInput.fill('definitely-not-the-account@example.com');
+            await expect(confirmBtn, 'wrong email keeps it disabled').toBeDisabled();
+            await expect(page, 'no navigation on a mismatch').toHaveURL(/\/settings\/danger/);
 
-        // Step 6 — confirm. The SERVER action is a no-op → { success:false }. The
-        // UI surfaces an error toast and DOES NOT redirect to /register (which a
-        // *successful* delete would do). The durable invariant is the absence of
-        // that navigation; toast copy is transient/i18n-dependent.
-        await confirmBtn.click();
-        await page.waitForTimeout(1_500);
-        await expect(page, 'deletion refused server-side — NOT redirected to /register').toHaveURL(
-            /\/settings\/danger/,
-        );
-        await expect(page, 'still NOT on the register page').not.toHaveURL(/\/register(\/|$|\?)/);
+            // Step 5 — Gate #2: typing the EXACT fresh-profile email un-gates it.
+            await confirmInput.fill(profileEmail);
+            await expect(confirmBtn, 'exact-email match enables deletion').toBeEnabled({
+                timeout: 10_000,
+            });
 
-        // Step 7 — END-TO-END grace proof: the account is fully intact. Login
-        // still works and the profile still resolves to the same email.
+            // Step 6 — confirm. The delete is real (#2986): the session cookie is cleared and
+            // the browser does a full load of the login page with the "account deleted" notice.
+            await confirmBtn.click();
+            await expect(page, 'a real delete signs the user out to the login page').toHaveURL(
+                /\/login\?accountDeleted=1/,
+                { timeout: 30_000 },
+            );
+        } finally {
+            await context.close();
+        }
+
+        // Step 7 — END-TO-END proof the account is gone: its credentials no longer sign in,
+        // and the bearer it held no longer resolves a profile.
         const reLogin = await request.post(`${API_BASE}/api/auth/login`, {
-            data: { email: seeded.email, password: seeded.password },
+            data: { email: user.email, password: user.password },
         });
-        expect(reLogin.status(), 'account survived the deletion attempt — login works').toBe(200);
-        const reFresh = await request.get(`${API_BASE}/api/auth/profile/fresh`, {
-            headers: authedHeaders((await reLogin.json()).access_token),
+        expect(reLogin.status(), 'the deleted account can no longer sign in').not.toBe(200);
+        const staleProfile = await request.get(`${API_BASE}/api/auth/profile/fresh`, {
+            headers: authedHeaders(user.access_token),
         });
-        expect(reFresh.status()).toBe(200);
-        expect((await reFresh.json()).email, 'same surviving account').toBe(seeded.email);
+        expect(staleProfile.status(), 'the deleted account no longer has a session').toBe(401);
     });
 
     test('a user with OWNED resources (Works + API key) cannot be cascade-deleted — every endpoint 404s and nothing is partially destroyed', async ({

@@ -94,11 +94,18 @@ export function ChatInput({
         if (mentions) highlightRef.current?.repaint();
     }, [mentions, candidateVersion]);
 
-    // Auto-focus when AI finishes generating
+    // Re-focus the composer when the AI finishes generating — the person is mid-conversation.
+    // Only on that streaming → idle transition, never on mount: the chat panel's view stack
+    // mounts on every dashboard page load and stays mounted (transparent) while the panel is
+    // closed, so a mount-time focus() moved keyboard focus off whatever the page had focused
+    // and onto a composer that may not even be visible (stage E2E run 41605694388: a focused
+    // Work tab lost focus to it, so Enter typed into the chat instead of following the link).
+    const wasStreaming = useRef(isStreaming);
     useEffect(() => {
-        if (!isStreaming && textareaRef.current) {
-            textareaRef.current.focus();
+        if (wasStreaming.current && !isStreaming) {
+            textareaRef.current?.focus();
         }
+        wasStreaming.current = isStreaming;
     }, [isStreaming]);
 
     const autoResize = () => {
