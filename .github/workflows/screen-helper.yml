@@ -9,9 +9,10 @@ name: Screen Helper
 # on demand against any branch:
 #   gh workflow run screen-helper.yml --ref <branch>
 # It is NOT a required check, and the path filter keeps it off every other
-# pull request, so it can never block one. GitHub-hosted runners (the crate
-# needs no secrets and no self-hosted pool; rustup is preinstalled on all
-# three images). History: the crate was written without a Rust toolchain and
+# pull request, so it can never block one. Linux and macOS: GitHub-hosted
+# runners (rustup is preinstalled on both images). Windows: our own machines
+# since 2026-11-05 (see runs-on below); the setup step gives them rustup and
+# PowerShell 7. The crate needs no secrets. History: the crate was written without a Rust toolchain and
 # first compiled on 2026-10-27; until then this workflow was dispatch-only.
 on:
   pull_request:
@@ -39,7 +40,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    # Windows runs on our own Windows machines (ever-co org variable
+    # RUNNER_WINDOWS_X64, a JSON label list, owner rule 2026-11-04), except for
+    # a pull request from a fork: that code never runs on our machines and
+    # takes the hosted image, as do forks themselves (no variable there).
+    runs-on: ${{ matrix.os == 'windows-latest' && vars.RUNNER_WINDOWS_X64 && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.RUNNER_WINDOWS_X64) || matrix.os }}
     timeout-minutes: 30
     defaults:
       run:
@@ -52,6 +57,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+
+      # Git Bash, PowerShell 7 and rustup on our own Windows runners; a no-op
+      # on GitHub-hosted ones.
+      - name: Self-hosted Windows setup
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/self-hosted-windows-setup
+        with:
+          pwsh: 'true'
+          rust: 'true'
 
       - name: Install the pinned toolchain (rust-toolchain.toml)
         run: |

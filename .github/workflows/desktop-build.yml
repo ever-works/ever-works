@@ -28,9 +28,10 @@ name: Desktop App Build
 # still runs the whole thing on demand against any branch:
 #   gh workflow run <this-file> --ref <your-branch>
 #
-# Note for whoever reads the queue: this matrix runs on ubuntu-latest,
-# windows-latest and macos-latest — GitHub-hosted, NOT the self-hosted ARC
-# pool — so it was never part of the homelab starvation. It is narrowed here
+# Note for whoever reads the queue: this matrix runs on ubuntu-latest and
+# macos-latest (GitHub-hosted, NOT the self-hosted ARC pool) and, since
+# 2026-11-05, on our own Windows machines (vars.RUNNER_WINDOWS_X64, hosted
+# windows-latest in forks) — so it was never part of the homelab starvation. It is narrowed here
 # to keep one consistent rule across the repo, and because macOS minutes bill
 # at 10x.
 on:
@@ -74,7 +75,10 @@ jobs:
               apps/desktop/release/*.AppImage
               apps/desktop/release/*.deb
           - label: windows
-            runner: windows-latest
+            # Our own Windows machines (ever-co org variable RUNNER_WINDOWS_X64, a
+            # JSON label list, owner rule 2026-11-04). Forks do not have the
+            # variable and keep the GitHub-hosted image.
+            runner: ${{ vars.RUNNER_WINDOWS_X64 && fromJSON(vars.RUNNER_WINDOWS_X64) || 'windows-latest' }}
             target: win
             artifacts: |
               apps/desktop/release/*.exe
@@ -90,6 +94,12 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Git Bash for the `shell: bash` steps on our own Windows runners; a
+      # no-op on GitHub-hosted ones.
+      - name: Self-hosted Windows setup
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/self-hosted-windows-setup
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v3

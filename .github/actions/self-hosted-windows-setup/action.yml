@@ -1,0 +1,80 @@
+name: Self-hosted Windows setup
+description: >-
+  Gives one of our own Windows runners (the ever-co org runners picked by the
+  org variable RUNNER_WINDOWS_X64) the tools a job expects from the
+  GitHub-hosted image. Every step is skipped on a GitHub-hosted runner, which
+  already has them, so forks running on the hosted fallback see no change.
+
+# Why each step exists (found on EVERDESK1/3/4, 2026-11-05):
+# - The runner service runs as SYSTEM. On EVERDESK1 and EVERDESK3 the first
+#   bash.exe on its PATH is System32\bash.exe, the WSL launcher, which refuses
+#   to start as SYSTEM. Same fix as the ever-gauzy desktop workflows: put Git
+#   for Windows' bin directory on GITHUB_PATH, which the runner prepends when
+#   it resolves `shell: bash`.
+# - No runner has PowerShell 7, and `shell: pwsh` (plus Test-Json) needs it.
+# - Rust is installed in the evereq user profiles only, which SYSTEM does not
+#   see. rustup goes into SYSTEM's own profile, as on the hosted image; the
+#   toolchain itself comes from each crate's rust-toolchain.toml.
+
+inputs:
+  pwsh:
+    description: Install PowerShell 7 when it is missing
+    required: false
+    default: 'false'
+  rust:
+    description: Install rustup for the runner account when it is missing
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Use Git Bash for bash steps
+      if: runner.os == 'Windows' && runner.environment == 'self-hosted'
+      shell: powershell
+      run: |
+        $candidates = @()
+        $git = Get-Command git.exe -ErrorAction SilentlyContinue
+        if ($git) { $candidates += Join-Path (Split-Path (Split-Path $git.Source -Parent) -Parent) 'bin' }
+        $candidates += Join-Path $env:ProgramFiles 'Git\bin'
+        $bin = $candidates | Where-Object { Test-Path (Join-Path $_ 'bash.exe') } | Select-Object -First 1
+        if ($bin) {
+          Write-Host "Using Git Bash from $bin"
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        } else {
+          Write-Host "::warning title=Git Bash not found::No Git for Windows bash.exe on $env:RUNNER_NAME - bash steps fall back to the first bash on the runner's PATH."
+        }
+
+    - name: Ensure PowerShell 7
+      if: runner.os == 'Windows' && runner.environment == 'self-hosted' && inputs.pwsh == 'true'
+      shell: powershell
+      run: |
+        if (Get-Command pwsh.exe -ErrorAction SilentlyContinue) { Write-Host 'PowerShell 7 already on PATH'; exit 0 }
+        $dir = Join-Path $env:ProgramFiles 'PowerShell\7'
+        if (-not (Test-Path (Join-Path $dir 'pwsh.exe'))) {
+          Write-Host "Installing PowerShell 7 on $env:RUNNER_NAME"
+          choco install -y powershell-core --no-progress
+        }
+        if (-not (Test-Path (Join-Path $dir 'pwsh.exe'))) {
+          throw "PowerShell 7 is missing on $env:RUNNER_NAME and choco could not install it"
+        }
+        $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+    - name: Ensure rustup
+      if: runner.os == 'Windows' && runner.environment == 'self-hosted' && inputs.rust == 'true'
+      shell: powershell
+      run: |
+        $cargoBin = Join-Path $env:USERPROFILE '.cargo\bin'
+        if (-not (Test-Path (Join-Path $cargoBin 'rustup.exe'))) {
+          $url = 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe'
+          $init = Join-Path $env:RUNNER_TEMP 'rustup-init.exe'
+          & curl.exe -fsSL --retry 5 -o $init $url
+          if ($LASTEXITCODE -ne 0) { throw "rustup-init download failed ($LASTEXITCODE)" }
+          $expected = ((& curl.exe -fsSL --retry 5 "$url.sha256") -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $init).Hash.ToLowerInvariant()
+          if ($expected -notmatch '^[0-9a-f]{64}$' -or $actual -cne $expected) { throw 'rustup-init checksum mismatch' }
+          & $init -y --no-modify-path --profile minimal --default-toolchain none
+          if ($LASTEXITCODE -ne 0) { throw "rustup-init exited $LASTEXITCODE" }
+        }
+        Write-Host "rustup for $env:USERNAME in $cargoBin"
+        $cargoBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
