@@ -17,6 +17,7 @@ import { useChatContext } from './ChatProvider';
 import { useDictation } from '@/components/common/composer/use-dictation';
 import { VoiceBar } from '@/components/common/composer/VoiceBar';
 import type { ChatAttachmentRef } from '@/lib/ai/attachments';
+import { useChatPanelVisible } from '@/lib/hooks/use-chat-panel';
 import { confirmedMentionCandidates } from '@/lib/hooks/use-mention-candidates';
 import { MentionPicker, useMentionPicker } from './conversations/MentionPicker';
 import {
@@ -95,11 +96,6 @@ export function ChatInput({
     }, [mentions, candidateVersion]);
 
     // Re-focus the composer when the AI finishes generating — the person is mid-conversation.
-    // Only on that streaming → idle transition, never on mount: the chat panel's view stack
-    // mounts on every dashboard page load and stays mounted (transparent) while the panel is
-    // closed, so a mount-time focus() moved keyboard focus off whatever the page had focused
-    // and onto a composer that may not even be visible (stage E2E run 41605694388: a focused
-    // Work tab lost focus to it, so Enter typed into the chat instead of following the link).
     const wasStreaming = useRef(isStreaming);
     useEffect(() => {
         if (wasStreaming.current && !isStreaming) {
@@ -107,6 +103,22 @@ export function ChatInput({
         }
         wasStreaming.current = isStreaming;
     }, [isStreaming]);
+
+    // On mount, take focus only when the composer is on screen and nothing else holds focus
+    // (e.g. back from the conversation history, whose clicked control just unmounted). The
+    // chat panel's view stack mounts on every dashboard page load and stays mounted
+    // (transparent) while the panel is closed, so an unconditional mount-time focus() moved
+    // keyboard focus off whatever the page had focused — or onto a composer nobody can see
+    // (stage E2E run 41605694388: a focused Work tab lost focus to it, so Enter typed into
+    // the chat instead of following the link).
+    const panelVisible = useChatPanelVisible();
+    const panelVisibleAtMount = useRef(panelVisible);
+    useEffect(() => {
+        if (!panelVisibleAtMount.current) return;
+        const active = document.activeElement;
+        if (active && active !== document.body) return;
+        textareaRef.current?.focus();
+    }, []);
 
     const autoResize = () => {
         const el = textareaRef.current;

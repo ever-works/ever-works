@@ -175,7 +175,7 @@ test.describe('flow: account deletion — initiate/confirm/grace + anonymization
         const reLogin = await request.post(`${API_BASE}/api/auth/login`, {
             data: { email: user.email, password: user.password },
         });
-        expect(reLogin.status(), 'the deleted account can no longer sign in').not.toBe(200);
+        expect(reLogin.status(), 'the deleted account can no longer sign in').toBe(401);
         const staleProfile = await request.get(`${API_BASE}/api/auth/profile/fresh`, {
             headers: authedHeaders(user.access_token),
         });

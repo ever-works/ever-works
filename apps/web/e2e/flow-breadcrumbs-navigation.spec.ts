@@ -458,7 +458,7 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         // (The other thief was the product: the chat composer focused itself on
         // mount, AFTER this probe passed, so Enter typed into the chat — stage
         // run 41605694388, shard 7, snapshot showed the composer [active].
-        // ChatInput now focuses only when a reply finishes streaming.)
+        // ChatInput no longer takes focus from an element that holds it.)
         await expect
             .poll(
                 async () => {

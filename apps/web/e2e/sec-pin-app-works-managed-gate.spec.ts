@@ -354,7 +354,7 @@ test.describe('ACC-NEG-03 — the managed target is refused fail-closed, with a 
         expect(viaAlias.text).toContain('"code":"managed_hosting_unavailable"');
     });
 
-    test('the three app-target routes the case drives are mounted and gated — another account is masked as 404, nobody gets 401, and the owner's managed PUT is refused fail-closed', async ({
+    test('the three app-target routes the case drives are mounted and gated — another account is masked as 404, nobody gets 401, and the owner’s managed PUT is refused fail-closed', async ({
         request,
     }) => {
         const run = stamp();
@@ -418,9 +418,10 @@ test.describe('ACC-NEG-03 — the managed target is refused fail-closed, with a 
                 `Work with id '${workId}' not found`,
             );
             const anon = await attempt.run('');
-            expect(anon.status, `${attempt.label} (no session) body=${anon.text.slice(0, 200)}`).toBe(
-                401,
-            );
+            expect(
+                anon.status,
+                `${attempt.label} (no session) body=${anon.text.slice(0, 200)}`,
+            ).toBe(401);
         }
 
         // The owner reads the target the create stored: None (R-12), with the managed tier

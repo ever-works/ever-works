@@ -99,7 +99,7 @@ jobs:
               "https://api.github.com/repos/$REPO/$1"
           }
 
-          RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=1")
+          RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=20")
           CURL_RC=$?
           CODE=$(printf '%s' "$RAW" | tail -n1)
           BODY=$(printf '%s' "$RAW" | sed '$d')
@@ -114,10 +114,35 @@ jobs:
           fi
 
           TOTAL=$(printf '%s' "$BODY" | jq -r '.total_count // 0')
-          RUN=$(printf '%s' "$BODY" | jq -c '.workflow_runs[0] // empty')
+
+          # Only a run that covered the WHOLE suite is a verdict. A `workflow_dispatch`
+          # may run a subset of the 32 shards (e2e.yml `inputs.shards`), and a subset's
+          # green says nothing about the shards it skipped. So take the newest run that
+          # covered all of them: a push run always does (pushes ignore `inputs`); a
+          # dispatch only when its jobs name all 32 shards. Runs come newest first.
+          RUN=""
+          for CANDIDATE in $(printf '%s' "$BODY" | jq -r '.workflow_runs[] | "\(.id):\(.event)"'); do
+            CID=${CANDIDATE%%:*}
+            CEVENT=${CANDIDATE#*:}
+            if [ "$CEVENT" != "push" ]; then
+              JRAW=$(api "actions/runs/$CID/jobs?per_page=100")
+              JCODE=$(printf '%s' "$JRAW" | tail -n1)
+              if [ "$JCODE" != "200" ]; then
+                echo "::warning::Could not list the jobs of E2E run $CID (http $JCODE) — not counting it."
+                continue
+              fi
+              SHARDS=$(printf '%s' "$JRAW" | sed '$d' | jq '[.jobs[].name | select(startswith("e2e (")) | split(", ") | .[1] // "" | rtrimstr(")")] | unique | length')
+              if [ "$SHARDS" != "32" ]; then
+                echo "Skipping E2E run $CID ($CEVENT): it covered $SHARDS of the 32 shards."
+                continue
+              fi
+            fi
+            RUN=$(printf '%s' "$BODY" | jq -c --argjson id "$CID" '.workflow_runs[] | select(.id == $id)')
+            break
+          done
 
           if [ "$TOTAL" = "0" ] || [ -z "$RUN" ]; then
-            echo "::error::No E2E run found for $HEAD_SHA (lookup succeeded, http 200, total_count=$TOTAL)."
+            echo "::error::No full-suite E2E run found for $HEAD_SHA (lookup succeeded, http 200, total_count=$TOTAL; subset dispatches do not count)."
             echo "The suite runs on push to stage. If it has not started yet, wait for it."
             echo "Promoting a commit whose E2E result is unknown is what shipped the"
             echo "2026-08-09 signup outage."

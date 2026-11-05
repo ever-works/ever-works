@@ -149,6 +149,17 @@ jobs:
           --health-retries 5
 
     steps:
+      # A dispatched `shards` list is free text: refuse a value outside 1-32 before
+      # the install and build spend half an hour on a shard Playwright will reject.
+      - name: Check the shard number
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          if ! [[ "$SHARD" =~ ^[0-9]+$ ]] || [ "$SHARD" -lt 1 ] || [ "$SHARD" -gt 32 ]; then
+            echo "::error::shard must be an integer from 1 to 32, got '$SHARD'"
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v7
 

@@ -568,7 +568,7 @@ test.describe('flow-settings-security-deep', () => {
             const login = await request.post(LOGIN, {
                 data: { email: account.email, password: ORIGINAL_PASSWORD },
             });
-            expect(login.status(), 'the deleted account can no longer sign in').not.toBe(200);
+            expect(login.status(), 'the deleted account can no longer sign in').toBe(401);
         } finally {
             await context.close();
         }
