@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenRouterPlugin } from '../openrouter.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 vi.mock('@ever-works/plugin/ai', () => {
 	const MockAiOperations = vi.fn().mockImplementation(function () {
@@ -142,6 +145,128 @@ describe('OpenRouterPlugin', () => {
 			const props = plugin.settingsSchema.properties!;
 			for (const [key, prop] of Object.entries(props)) {
 				expect((prop as any).title, `${key} should have a title`).toBeDefined();
+			}
+		});
+	});
+
+	/**
+	 * Model defaults as of 2026-11-05 (models refresh). Every id was on the
+	 * gateway's live model list that day (https://openrouter.ai/api/v1/models) and is the
+	 * vendor's current model for its role (https://developers.openai.com/api/docs/models:
+	 * GPT-6 Astra is the flagship, GPT-6.1 Sol balances intelligence and cost,
+	 * GPT-6 Luna is for cost-sensitive, high-volume work). The previous ids are
+	 * deprecated by OpenAI (openai/gpt-5-mini and openai/gpt-5 shut down 2026-12-11). Each field keeps its shape (the default equals the medium tier).
+	 * A config that saved a model keeps it; configs that never saved one move
+	 * to these defaults (owner decision, 2026-11-05). Update from those pages,
+	 * never from memory.
+	 */
+	describe('model defaults (as of 2026-11-05)', () => {
+		const EXPECTED_TIER_DEFAULTS: Record<string, string> = {
+			defaultModel: 'openai/gpt-6.1-sol',
+			simpleModel: 'openai/gpt-6-luna',
+			mediumModel: 'openai/gpt-6.1-sol',
+			complexModel: 'openai/gpt-6-astra'
+		};
+		const EXPECTED_BOOTSTRAP_MODEL = 'openai/gpt-6-luna';
+
+		/** The ids this plugin shipped with until this refresh. */
+		const LEGACY_SAVED_MODELS: Record<string, string> = {
+			defaultModel: 'openai/gpt-5-mini',
+			simpleModel: 'openai/gpt-5-mini',
+			mediumModel: 'openai/gpt-5-mini',
+			complexModel: 'openai/gpt-5'
+		};
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'openrouter',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		const loadedAiOps = async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			return {
+				bootstrapModel: (MockAiOperations.mock.calls[0][0] as { model: string }).model,
+				aiOpsInstance: MockAiOperations.mock.results[0].value
+			};
+		};
+
+		it("defaults each tier to the vendor's current model for that role", () => {
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				expect(schemaDefault(key), key).toBe(id);
+			}
+		});
+
+		it('uses the simple tier for the onLoad bootstrap and getDefaultModelId()', async () => {
+			const { bootstrapModel, aiOpsInstance } = await loadedAiOps();
+
+			// No `defaultModel` in the settings: validateConnection falls back to
+			// getDefaultModelId(), the path every unsaved config takes.
+			await plugin.validateConnection({ apiKey: 'test-key' });
+			const fallbackModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(fallbackModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+		});
+
+		it('keeps the env var name of every tier', () => {
+			for (const key of Object.keys(EXPECTED_TIER_DEFAULTS)) {
+				const prop = plugin.settingsSchema.properties![key] as Record<string, unknown>;
+				expect(prop['x-envVar'], key).toBe(`PLUGIN_OPENROUTER_${key.replace('Model', '').toUpperCase()}_MODEL`);
+			}
+		});
+
+		it('lets a saved legacy id pass settings validation (no enum or pattern on the model fields)', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const key of Object.keys(LEGACY_SAVED_MODELS)) {
+				const prop = props[key] as Record<string, unknown>;
+				expect(prop.type, key).toBe('string');
+				expect(prop, key).not.toHaveProperty('enum');
+				expect(prop, key).not.toHaveProperty('const');
+				expect(prop, key).not.toHaveProperty('pattern');
+			}
+			expect(validateSettingsConstraints({ apiKey: 'test-key', ...LEGACY_SAVED_MODELS }, props as never)).toEqual(
+				[]
+			);
+		});
+
+		it('sends a saved legacy id to AiOperations unchanged', async () => {
+			const { aiOpsInstance } = await loadedAiOps();
+			const settings = { apiKey: 'test-key', ...LEGACY_SAVED_MODELS };
+
+			await plugin.createChatCompletion({
+				model: LEGACY_SAVED_MODELS.complexModel,
+				messages: [{ role: 'user', content: 'hi' }],
+				settings
+			});
+			const [options, config] = aiOpsInstance.createChatCompletion.mock.calls[0];
+			expect(options.model).toBe(LEGACY_SAVED_MODELS.complexModel);
+			expect(config.model).toBe(LEGACY_SAVED_MODELS.defaultModel);
+		});
+
+		// Env/docs consistency (models refresh §8.8): the sample env files and the
+		// env-var reference must show the code defaults, not stale values.
+		it('matches the sample env files and docs/environment-variables.md', () => {
+			const repoRoot = resolve(__dirname, '../../../../..');
+			const read = (file: string) => readFileSync(resolve(repoRoot, file), 'utf8');
+			for (const file of ['.env.compose', '.env.demo.compose', 'apps/api/.env.example']) {
+				const text = read(file);
+				for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+					const name = `PLUGIN_OPENROUTER_${key.replace('Model', '').toUpperCase()}_MODEL`;
+					const match = text.match(new RegExp(`^${name}='([^']*)'`, 'm'));
+					expect(match?.[1], `${file} ${name}`).toBe(id);
+				}
+			}
+			const doc = read('docs/environment-variables.md');
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				const name = `PLUGIN_OPENROUTER_${key.replace('Model', '').toUpperCase()}_MODEL`;
+				const row = doc.split('\n').find((line) => line.includes(`\`${name}\``));
+				expect(row, name).toContain(`\`${id}\``);
 			}
 		});
 	});
