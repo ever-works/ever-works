@@ -14,6 +14,7 @@ import {
 	compareSemver,
 	computeFingerprint,
 	entryPointTargets,
+	githubVisibility,
 	incPatch,
 	maxStable,
 	normalizeManifestForFingerprint,
@@ -167,7 +168,7 @@ describe('buildPublishManifest', () => {
 			'@ever-works/agent',
 			'@ever-works/eslint-config'
 		]),
-		repositoryUrl: 'https://github.com/ever-works/ever-works',
+		repositoryUrl: 'https://github.com/ever-co/ever-works',
 		directory: 'packages/plugins/minio'
 	};
 	const source = {
@@ -210,7 +211,7 @@ describe('buildPublishManifest', () => {
 		const m = buildPublishManifest(source, ctx);
 		assert.deepEqual(m.repository, {
 			type: 'git',
-			url: 'git+https://github.com/ever-works/ever-works.git',
+			url: 'git+https://github.com/ever-co/ever-works.git',
 			directory: 'packages/plugins/minio'
 		});
 	});
@@ -421,5 +422,30 @@ describe('resolveDistribution', () => {
 		assert.equal(resolveDistribution({ systemPlugin: true }), 'core');
 		assert.equal(resolveDistribution({}), 'registry');
 		assert.equal(resolveDistribution(undefined), 'registry');
+	});
+});
+
+describe('githubVisibility', () => {
+	it('looks a package up under the owner its scope names, not the repository owner', async () => {
+		const realFetch = globalThis.fetch;
+		const realOwner = process.env.GITHUB_REPOSITORY_OWNER;
+		const urls = [];
+		globalThis.fetch = async (url) => {
+			urls.push(String(url));
+			return { status: 404 };
+		};
+		process.env.GITHUB_REPOSITORY_OWNER = 'ever-co';
+		try {
+			const privateOnes = await githubVisibility(['@ever-works/contracts', 'unscoped-tool']);
+			assert.deepEqual(urls, [
+				'https://github.com/orgs/ever-works/packages/npm/package/contracts',
+				'https://github.com/orgs/ever-co/packages/npm/package/unscoped-tool'
+			]);
+			assert.equal(privateOnes[0].url, 'https://github.com/orgs/ever-works/packages/npm/contracts/settings');
+		} finally {
+			globalThis.fetch = realFetch;
+			if (realOwner === undefined) delete process.env.GITHUB_REPOSITORY_OWNER;
+			else process.env.GITHUB_REPOSITORY_OWNER = realOwner;
+		}
 	});
 });

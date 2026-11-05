@@ -1,5 +1,5 @@
 import { createHash, createHmac } from 'node:crypto';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EverEmailRouterPlugin } from './ever-email-router-plugin.js';
 
 const SECRET = 'router-secret-0123456789-abcdef';
@@ -177,12 +177,31 @@ describe('EverEmailRouterPlugin', () => {
 		});
 
 		it('rejects a stale or future timestamp (more than 300 s away)', () => {
-			const raw = body();
-			const now = Math.floor(Date.now() / 1000);
-			for (const t of [now - 301, now + 301]) {
-				expect(() =>
-					plugin.verifyWebhookSignature(raw, { 'x-ever-email-signature': sign(raw, SECRET, t) }, { settings })
-				).toThrow(/outside the accepted window/);
+			// The clock is pinned. With a live clock the future case was a race: the plugin compares
+			// against the FRACTIONAL `Date.now() / 1000`, so `now + 301` is only 301 - f s ahead (f
+			// the sub-second part at signing) and drops to 300 s, inside the window, once more than
+			// 1 - f s pass before the check. A loaded CI runner took 492 ms over this case (stage
+			// run 41605694347) and the second iteration was accepted.
+			vi.useFakeTimers({ toFake: ['Date'] });
+			try {
+				vi.setSystemTime(new Date('2026-11-03T11:45:45.000Z'));
+				const raw = body();
+				const now = Math.floor(Date.now() / 1000);
+				const check = (t: number) => () =>
+					plugin.verifyWebhookSignature(
+						raw,
+						{ 'x-ever-email-signature': sign(raw, SECRET, t) },
+						{ settings }
+					);
+				for (const t of [now - 301, now + 301]) {
+					expect(check(t)).toThrow(/outside the accepted window/);
+				}
+				// The window is inclusive: exactly 300 s either way is still accepted.
+				for (const t of [now - 300, now + 300]) {
+					expect(check(t)).not.toThrow();
+				}
+			} finally {
+				vi.useRealTimers();
 			}
 		});
 

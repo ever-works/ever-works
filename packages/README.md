@@ -37,7 +37,7 @@ packages/
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Repository](https://github.com/ever-works/ever-works)
+- [Repository](https://github.com/ever-co/ever-works)
 - [Specs](../docs/specs)
 
 ## License

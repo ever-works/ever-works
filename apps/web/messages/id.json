@@ -295,7 +295,8 @@
                 "signedInAs": "Masuk ke Ever ID sebagai {name} · {email}",
                 "signedInAsEmail": "Masuk ke Ever ID sebagai {email}",
                 "submit": "Buat akun",
-                "cancel": "Batal"
+                "cancel": "Batal",
+                "linkedTo": "This account will be linked to ever.co/{handle}"
             },
             "accountExists": {
                 "title": "Anda sudah memiliki akun Ever Works",
@@ -896,6 +897,24 @@
                 "minLength": "Deskripsi harus minimal 10 karakter.",
                 "error": "Tidak dapat membuat Misi. Silakan coba lagi.",
                 "chatUnavailable": "Chat sedang tidak tersedia — gunakan \"Buat manual\"."
+            },
+            "buildOnApp": {
+                "product": "Produk",
+                "business": "Bisnis",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Pilih App Work",
+                "noAppWorks": "Anda belum punya App Work. Tambahkan dulu dari Works.",
+                "summary": "Setiap Senin pukul 08:00 UTC · hingga {count} tugas per minggu · {amount} per eksekusi",
+                "backlogNote": "Tugas baru menunggu persetujuan Anda di Backlog.",
+                "suggestedGoals": "Sasaran yang disarankan (dibuat sebagai draf):",
+                "rules": "Aturan aplikasi yang disarankan: perubahan skema digabungkan oleh seseorang, PR paling banyak {lines} baris",
+                "proposeRules": "Usulkan aturan ini",
+                "proposeNeedsAppWork": "Pilih App Work terlebih dahulu.",
+                "rulesProposed": "Tugas untuk mengubah aturan aplikasi telah dibuka di App Work.",
+                "rulesFailed": "Tugas tidak dapat dibuka. Coba lagi.",
+                "create": "Buat Misi",
+                "templateUnreadable": "Template tidak dapat dibaca, jadi hanya nilai yang Anda masukkan yang digunakan.",
+                "templatePartial": "Misi telah dibuat, tetapi sebagian templatenya tidak dapat diterapkan."
             },
             "quickAdd": {
                 "label": "Start a new Mission",
@@ -8377,7 +8396,7 @@
                 "formTitle": "Work Baru — Repositori",
                 "formSubtitle": "Daftarkan repositori kode yang sudah ada sebagai Work. Tidak ada yang dibuat atau dideploy — Task, Goal, dan eksekusi fleet cukup bekerja di repositori tersebut.",
                 "urlLabel": "URL Repositori",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "Repositori GitHub yang dapat Anda akses. Repositori ini menjadi repositori data Work apa adanya.",
                 "nameLabel": "Nama Work",
                 "slugLabel": "Slug Work",
@@ -11199,6 +11218,46 @@
                 "subjectRequired": "Subject is required.",
                 "bodyRequired": "Message body is required.",
                 "sendFailed": "Send failed."
+            }
+        }
+    },
+    "everConnect": {
+        "provision": {
+            "title": "Create your company in Ever Works",
+            "confirmPageTitle": "Confirm your company",
+            "checking": "One moment, checking your request…",
+            "forHandle": "{name} · ever.co/{handle}",
+            "body": "Sign in with Ever ID to confirm. Nothing is created until you confirm.",
+            "continueEverId": "Continue with Ever ID",
+            "continue": "Continue",
+            "createHere": "Create a company in Ever Works",
+            "confirmTitle": "Create company {name}?",
+            "confirmSubtitle": "For ever.co/{handle}, in Ever Works.",
+            "existsTitle": "Your company is ready",
+            "name": "Company name",
+            "legalName": "Legal name",
+            "staffing": "Starter staff",
+            "staffingNone": "None",
+            "staffingHelp": "Agents arrive paused; you turn them on.",
+            "missionTitle": "First Mission",
+            "missionGoal": "Goal",
+            "create": "Create company",
+            "decline": "Not now",
+            "connectEverId": "Connect Ever ID in Settings",
+            "failure": {
+                "incomplete": "This link is not complete. Start again from Ever.",
+                "invalid": "This link is not valid any more. Start again from Ever.",
+                "expired": "This request has expired. Start again from Ever.",
+                "used": "This link was already used. Start again from Ever.",
+                "unavailable": "Creating a company from Ever is not available on this installation.",
+                "rateLimited": "Too many attempts. Wait a minute, then try again.",
+                "mismatch": "Sign in with the same Ever ID you used on app.ever.co.",
+                "tenantLinked": "Your account already has a company linked to Ever.",
+                "organizationLinked": "This Ever organization already has a company here.",
+                "inProgress": "This company is being created. Try again in a moment.",
+                "invalidValue": "One of these values cannot be used. Check them and try again.",
+                "unreachable": "Ever Platform cannot be reached right now. Try again in a minute.",
+                "failed": "The company could not be created. Try again."
             }
         }
     }

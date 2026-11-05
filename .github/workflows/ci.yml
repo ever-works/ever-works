@@ -218,6 +218,65 @@ jobs:
       # depends on it), so a bad merge cannot reach a pushed image first.
       - uses: ./.github/actions/assert-no-analytics-key
 
+  # D-5: actionlint over every file in .github/workflows.
+  #
+  # Nothing checked the workflow files themselves. A mistyped expression, a
+  # `steps.<id>` or `needs.<job>` that does not exist, an unknown action input
+  # or a bad `runs-on` label only showed up when that path ran, and for most of
+  # these files that means a push to stage or main. actionlint finds those
+  # statically, on every run of this file: each stage/main push, and any
+  # `gh workflow run ci.yml --ref <branch>`, which is how to check a workflow
+  # change before it merges (this file does not run on pull requests, see the
+  # top). It reads `.github/actionlint.yaml` (the self-hosted runner labels)
+  # and checks every `run:` script with shellcheck.
+  #
+  # GitHub-hosted for the same reason as `release-tooling` above: no install and
+  # no build, so it finishes in seconds instead of queueing for the pool. The
+  # binary is pinned by version AND by the sha256 GitHub records for that
+  # release asset, so a replaced asset fails the step instead of running.
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install actionlint (version- and sha256-pinned)
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      # shellcheck gates at `warning` and up. The 74 info/style findings it also
+      # reports today (70 of them SC2086, unquoted variables, mostly in the
+      # legacy DigitalOcean deploy workflows) are opinions about scripts that
+      # work; warnings are the likely bugs, and there were none left when this
+      # job was added. Run `SHELLCHECK_OPTS= actionlint` locally to see all.
+      #
+      # shellcheck comes from the runner image (0.11.0 on ubuntu-26.04 when this
+      # was added), so an image update can change what it reports. actionlint
+      # silently skips `run:` scripts when shellcheck is missing, so a missing
+      # shellcheck fails this step instead of passing it.
+      - name: actionlint
+        env:
+          SHELLCHECK_OPTS: --severity=warning
+        run: |
+          if ! command -v shellcheck >/dev/null; then
+            echo "::error::shellcheck is not installed, so actionlint would not check any run: script"
+            exit 1
+          fi
+          shellcheck --version
+          actionlint -color
+
 
   # W (EW-779, self-build finding OPS-21) — THE NODE-CONTRACT GATE.
   #
@@ -396,6 +455,7 @@ jobs:
           fi
 
       - name: Build all packages
+        id: build
         if: steps.scope.outputs.code == 'true'
         run: pnpm build --filter=!./apps/docs
 
@@ -495,6 +555,8 @@ jobs:
             local log="/tmp/guard-$label.log"
             rm -f "$log"
             if [ -n "$extra" ]; then
+              # `$extra` is a whole `NAME=value` assignment, which `export` applies as given.
+              # shellcheck disable=SC2163
               ( export "$extra"; pnpm exec next start -p "$port" ) >"$log" 2>&1 &
             else
               ( pnpm exec next start -p "$port" ) >"$log" 2>&1 &
@@ -655,7 +717,7 @@ jobs:
         working-directory: apps/internal-cli
         # NODE_ENV=test signals this is a test-context bootstrap (the CLI uses
         # in-memory sqlite here, not a real database). C-07 PR-B made
-        # `autoMigrate()` default-off everywhere except NODE_ENV=test â€” without
+        # `autoMigrate()` default-off everywhere except NODE_ENV=test — without
         # this env, `synchronize` doesn't run and the eager NestJS bootstrap
         # hits "no such table: subscription_plans". Equivalent to setting
         # DATABASE_AUTOMIGRATE=true explicitly; NODE_ENV=test is the standard
@@ -667,12 +729,34 @@ jobs:
       - name: Test External CLI
         if: steps.scope.outputs.code == 'true'
         working-directory: apps/cli
-        # See note above on the Internal CLI step â€” same C-07 PR-B implication.
+        # See note above on the Internal CLI step — same C-07 PR-B implication.
         env:
           NODE_ENV: test
         run: pnpm test:cli
 
-  # EW-742 P6 T37 â€” per-provider job-runtime plugin matrix.
+      # The repo-wide type-check (D-3). Nothing ran it before. `pnpm build`
+      # proves only what each build compiles, and most builds (tsup, swc) do
+      # not type-check at all, or check a build tsconfig that leaves the spec
+      # files out. So a type error that only `type-check` sees went straight to
+      # `stage`. Five of them were there when this step was added, in
+      # `packages/agent` and `packages/plugins/github-actions-build`.
+      #
+      # LAST, and run whenever the build succeeded: a type error must not hide
+      # the test results of a promotion, and a red test must not hide a type
+      # error. Either one still fails the job.
+      #
+      # `type-check` depends on `^build` in turbo.json, so it is right on a cold
+      # tree too. Here those builds are turbo cache hits from "Build all
+      # packages". The one exception is apps/node, which that step skips and
+      # apps/desktop-node depends on; it builds here with two `tsc` runs. The
+      # concurrency cap bounds memory: the large `tsc` runs (apps/web, apps/api,
+      # packages/agent) take a few GB each, against the ~36 GiB limit of an
+      # ever-works x64-4 runner pod.
+      - name: Type-check
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm type-check --concurrency=4
+
+  # EW-742 P6 T37 — per-provider job-runtime plugin matrix.
   #
   # Why a separate job: the aggregate `pnpm test` step in `lint-and-test`
   # passes/fails as a single signal. When a contract change in
@@ -682,10 +766,10 @@ jobs:
   #
   # Scope: contract + bindToTenant + dispatcher/worker-host factories +
   # T31 enqueue-options translators + T36-T40 tenant conformance suite
-  # â€” all mocks-only. The real-infra portion of T37 (a `TENANT_OVERLAY=
-  # {off|on}` Ã— `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}`
+  # — all mocks-only. The real-infra portion of T37 (a `TENANT_OVERLAY=
+  # {off|on}` × `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}`
   # matrix against live Redis/Postgres/Temporal/Inngest service
-  # containers) remains gated on CI infra availability â€” tracked in
+  # containers) remains gated on CI infra availability — tracked in
   # tasks.md and ADR-017.
   #
   # Independent of `lint-and-test`: this job re-installs and re-builds
@@ -764,7 +848,7 @@ jobs:
       - name: Test @ever-works/job-runtime-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/job-runtime-${{ matrix.provider }}-plugin test
 
-  # EW-742 P6 T32/T37 real-infra axis â€” all 4 push-model providers
+  # EW-742 P6 T32/T37 real-infra axis — all 4 push-model providers
   # against live infra: BullMQ on Redis, pg-boss on Postgres, Temporal
   # via temporalio/auto-setup (shares the Postgres service, Temporal
   # namespaces its own tables), Inngest via the inngest/inngest dev
@@ -777,7 +861,7 @@ jobs:
   job-runtime-real-infra:
     # Cost gate: real-infra cells spin up 4 service containers (Redis,
     # Postgres, Temporal auto-setup, Inngest dev-server) which burn
-    # Ubicloud minutes. Run on direct pushes to main only â€” PR signal
+    # Ubicloud minutes. Run on direct pushes to main only — PR signal
     # stays covered by the mocks-only job-runtime-plugin-matrix above.
     # Re-enable per-PR by removing this `if:` line.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -927,7 +1011,7 @@ jobs:
           docker run -d --name inngest -p 8288:8288 \
             inngest/inngest:v1.38.1 inngest dev --no-discovery --host 0.0.0.0
           echo "Waiting for Inngest on http://localhost:8288 ..."
-          for i in $(seq 1 45); do
+          for _ in $(seq 1 45); do
             if curl -sf -o /dev/null http://localhost:8288/; then
               echo "Inngest is ready."; exit 0
             fi
@@ -943,7 +1027,7 @@ jobs:
         run: pnpm --filter @ever-works/job-runtime-inngest-plugin test
 
   # Companion matrix for the secret-store-resolver provider family
-  # (EW-742 P3.2 / P6 â€” runSecretStoreContractSuite is wired into all 7
+  # (EW-742 P3.2 / P6 — runSecretStoreContractSuite is wired into all 7
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:

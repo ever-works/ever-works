@@ -137,6 +137,13 @@ export const BACKUP_DROPPED_ENTITIES: readonly string[] = Object.freeze([
     'EverConnectOutbox',
     'EverConnectLease',
     'EverConnectPersonRequest',
+    // Companies created from Ever Platform: the signed requests and the record of
+    // each creation answer one request, and a restore must never replay them.
+    'EverConnectProvisionIntent',
+    'EverConnectProvisionRecord',
+    'EverConnectLink',
+    // A keyed import belongs to the creation that ran it.
+    'OrganizationCompanyImport',
 ]);
 
 const DROPPED_ENTITY_SET = new Set(BACKUP_DROPPED_ENTITIES);

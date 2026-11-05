@@ -23,7 +23,7 @@ Stay tuned for upcoming blog posts about:
 
 - **[Documentation](/)** - Complete guides and API reference
 - **[Support](/support)** - Get help and support
-- **[GitHub](https://github.com/ever-works/ever-works)** - Contribute to the project
+- **[GitHub](https://github.com/ever-co/ever-works)** - Contribute to the project
 
 ---
 

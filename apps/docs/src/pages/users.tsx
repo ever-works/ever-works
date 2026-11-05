@@ -13,7 +13,7 @@ import Link from '@docusaurus/Link';
 // an "Add your company" button that pointed back at the site root. Both are
 // replaced with real Ever Works destinations so every link on the page resolves
 // somewhere useful.
-const SHOWCASE_SUBMISSION_URL = 'https://github.com/ever-works/ever-works/issues/new';
+const SHOWCASE_SUBMISSION_URL = 'https://github.com/ever-co/ever-works/issues/new';
 
 function UserspageHeader() {
 	return (

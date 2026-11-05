@@ -48,7 +48,7 @@ pnpm --filter @ever-works/cli-shared dev     # tsc --watch
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Repository](https://github.com/ever-works/ever-works)
+- [Repository](https://github.com/ever-co/ever-works)
 - [`apps/cli`](../../apps/cli) — public CLI
 - [`apps/internal-cli`](../../apps/internal-cli) — internal CLI
 

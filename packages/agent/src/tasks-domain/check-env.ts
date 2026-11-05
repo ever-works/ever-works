@@ -1,4 +1,8 @@
 import { homedir, tmpdir } from 'os';
+import {
+    HOST_CREDENTIAL_ENV_PATTERN,
+    PLATFORM_OWNED_ENV_NAMESPACE_PATTERN,
+} from '@ever-works/contracts';
 
 /**
  * Quality gates — the environment an acceptance-check subprocess runs with.
@@ -131,14 +135,29 @@ export const SECRETISH_ENV_KEY_PATTERN =
     /(SECRET|TOKEN|KEY|PASSWORD|PASSWD|CREDENTIAL|DSN|DATABASE_URL|CONNECTION)/i;
 
 /**
- * Platform-owned configuration namespaces. These are NEVER grantable — not
- * by the allowlist, not by an explicit `envPassthrough` — because they are
- * the platform's own credentials, not the Work's. Without this, the opt-in
+ * Platform-owned configuration. These are NEVER grantable — not by the
+ * allowlist, not by an explicit `envPassthrough` — because they are the
+ * platform's own credentials, not the Work's. Without this, the opt-in
  * escape hatch would re-open the very hole this module closes
  * (`envPassthrough: ['PLATFORM_ENCRYPTION_KEY']`).
+ *
+ * Built from the two shared lists in `@ever-works/contracts` — the
+ * platform's own namespaces (`PLATFORM_OWNED_ENV_NAMESPACE_PATTERN`, `FLEET_`
+ * included) and the HOST's credentials (`HOST_CREDENTIAL_ENV_PATTERN`:
+ * `KUBECONFIG`, `GITHUB_TOKEN`, `SSH_AUTH_SOCK`, `DOCKER_CONFIG`, …) — the
+ * SAME two the fleet node builds its refusal from, so the two runtimes that
+ * run a check cannot disagree about it. On the platform's worker every one of
+ * those is the platform's credential, and there is no per-repository grant
+ * here, so they are refused outright.
+ *
+ * Known gap (see `HOST_CREDENTIAL_ENV_PATTERN`): credential FILES at their
+ * default home locations, and a mounted service-account token, stay
+ * readable by path; no env-name rule closes that.
  */
-export const PLATFORM_OWNED_ENV_PATTERN =
-    /^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_)/i;
+export const PLATFORM_OWNED_ENV_PATTERN = new RegExp(
+    `${PLATFORM_OWNED_ENV_NAMESPACE_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`,
+    'i',
+);
 
 /**
  * Shape a passthrough NAME must have to be honored. Anything else (spaces,
@@ -324,6 +343,28 @@ export function normalizePassthrough(names: readonly string[] | null | undefined
         seen.add(upper);
         out.push(name);
         if (out.length >= MAX_ENV_PASSTHROUGH) break;
+    }
+    return out;
+}
+
+/**
+ * The names in a check's `envPassthrough` that are REFUSED (platform-owned
+ * configuration or a host credential), so the run can say why a listed
+ * variable is missing instead of failing later on a registry or auth error.
+ * Names only, never values.
+ */
+export function refusedPassthroughNames(names: readonly string[] | null | undefined): string[] {
+    if (!Array.isArray(names)) return [];
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of names) {
+        if (typeof raw !== 'string') continue;
+        const name = raw.trim();
+        if (!ENV_NAME_PATTERN.test(name) || !PLATFORM_OWNED_ENV_PATTERN.test(name)) continue;
+        const upper = name.toUpperCase();
+        if (seen.has(upper)) continue;
+        seen.add(upper);
+        out.push(name);
     }
     return out;
 }

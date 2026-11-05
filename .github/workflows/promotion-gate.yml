@@ -99,7 +99,43 @@ jobs:
               "https://api.github.com/repos/$REPO/$1"
           }
 
-          RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=1")
+          # Our own repo builds in-cluster (ever-co/k8s-gitops apps/ci-builds): one commit status per job and
+          # shard, `ci-builds/e2e.yml:<job>[/shard:<n>]`, and no Actions run. A fork on Actions has no such
+          # status and takes the run lookup below. Same rule as there: a failed lookup is a broken gate, not a
+          # verdict, and only all-green passes.
+          STATUS_RAW=$(api "commits/$HEAD_SHA/status?per_page=100")
+          STATUS_RC=$?
+          STATUS_CODE=$(printf '%s' "$STATUS_RAW" | tail -n1)
+          STATUS_BODY=$(printf '%s' "$STATUS_RAW" | sed '$d')
+          if [ "$STATUS_RC" -ne 0 ] || [ "$STATUS_CODE" != "200" ]; then
+            echo "::error::E2E STATUS LOOKUP FAILED (curl rc=$STATUS_RC, http=$STATUS_CODE): this is a BROKEN GATE, not a verdict."
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present: allowing despite a BROKEN LOOKUP."; exit 0; }
+            exit 1
+          fi
+          LEGS=$(printf '%s' "$STATUS_BODY" | jq -c '[.statuses[] | select(.context | startswith("ci-builds/e2e.yml"))]')
+          LEG_TOTAL=$(printf '%s' "$LEGS" | jq 'length')
+          if [ "$LEG_TOTAL" -gt 0 ]; then
+            NOT_GREEN=$(printf '%s' "$LEGS" | jq -r '.[] | select(.state != "success") | "  \(.state): \(.context)"')
+            SHARDS=$(printf '%s' "$LEGS" | jq '[.[].context | select(test("^ci-builds/e2e.yml:e2e/shard:[0-9]+$"))] | unique | length')
+            if [ "$SHARDS" -ne 32 ]; then
+              NOT_GREEN="$NOT_GREEN  missing: only $SHARDS of the 32 shards reported"
+            fi
+            JOBS=$(printf '%s' "$LEGS" | jq '[.[].context | select(. == "ci-builds/e2e.yml:e2e-prod-build" or . == "ci-builds/e2e.yml:e2e-app-works-flags-on")] | unique | length')
+            if [ "$JOBS" -ne 2 ]; then
+              NOT_GREEN="$NOT_GREEN  missing: only $JOBS of e2e-prod-build and e2e-app-works-flags-on reported"
+            fi
+            if [ -z "$NOT_GREEN" ]; then
+              echo "E2E is green for the commit being promoted ($LEG_TOTAL in-cluster jobs and shards)."
+              exit 0
+            fi
+            echo "::error::E2E for $HEAD_SHA is not green in-cluster:"
+            printf '%s\n' "$NOT_GREEN"
+            echo "Logs: kubectl -n ci-builds logs <workflow> -c main"
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present: promotion allowed despite that."; exit 0; }
+            exit 1
+          fi
+
+          RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=100")
           CURL_RC=$?
           CODE=$(printf '%s' "$RAW" | tail -n1)
           BODY=$(printf '%s' "$RAW" | sed '$d')
@@ -113,11 +149,104 @@ jobs:
             exit 1
           fi
 
-          TOTAL=$(printf '%s' "$BODY" | jq -r '.total_count // 0')
-          RUN=$(printf '%s' "$BODY" | jq -c '.workflow_runs[0] // empty')
+          TOTAL=$(printf '%s' "$BODY" | jq -r '.total_count // 0' 2>/dev/null)
+          LOOKUP_BROKEN=""
+          if ! [[ "$TOTAL" =~ ^[0-9]+$ ]] \
+            || ! printf '%s' "$BODY" | jq -e '.workflow_runs | type == "array"' > /dev/null 2>&1; then
+            LOOKUP_BROKEN="the E2E runs answer for $HEAD_SHA is not the expected JSON"
+            TOTAL=0
+          fi
+
+          # Prints `yes` when a run's jobs, across every attempt (`filter=all`, so a full
+          # dispatch whose failed jobs were re-run still counts), name exactly shards
+          # 1-32; `no` when they do not; `broken: <why>` when the jobs cannot be read.
+          covers_all_shards() {
+            local cid=$1 page=1 raw code body total names=""
+            while :; do
+              raw=$(api "actions/runs/$cid/jobs?per_page=100&filter=all&page=$page")
+              code=$(printf '%s' "$raw" | tail -n1)
+              body=$(printf '%s' "$raw" | sed '$d')
+              if [ "$code" != "200" ]; then
+                echo "broken: the jobs of E2E run $cid (page $page, http $code)"
+                return
+              fi
+              total=$(printf '%s' "$body" | jq -r '.total_count // empty' 2>/dev/null)
+              if ! [[ "$total" =~ ^[0-9]+$ ]] \
+                || ! printf '%s' "$body" | jq -e '.jobs | type == "array"' > /dev/null 2>&1; then
+                echo "broken: the jobs of E2E run $cid are not the expected JSON"
+                return
+              fi
+              names="$names
+          $(printf '%s' "$body" | jq -r '.jobs[].name')"
+              [ $((page * 100)) -ge "$total" ] && break
+              page=$((page + 1))
+              if [ "$page" -gt 10 ]; then
+                echo "broken: E2E run $cid has more than 1000 jobs"
+                return
+              fi
+            done
+            if printf '%s\n' "$names" | jq -R -s -e '[split("\n")[] | ltrimstr(" ") | select(startswith("e2e (")) | split(", ") | .[1] // "" | rtrimstr(")")] | unique == ([range(1;33)] | map(tostring) | sort)' > /dev/null; then
+              echo yes
+            else
+              echo no
+            fi
+          }
+
+          # Only a run that covered the WHOLE suite is a verdict. A `workflow_dispatch`
+          # may run a subset of the 32 shards (e2e.yml `inputs.shards`), and a subset's
+          # green says nothing about the shards it skipped. So take the newest run that
+          # covered all of them: a push run always does (pushes ignore `inputs`); a
+          # dispatch only when its jobs name exactly shards 1-32. Runs come newest first,
+          # 100 a page (GitHub serves at most 1000 for a head_sha filter); later pages are
+          # read only while nothing has qualified. Any lookup that fails on the way is a
+          # BROKEN GATE, never a reason to fall back to an older run. The verdict is the
+          # chosen run's own (final) conclusion.
+          RUN=""
+          PAGE=1
+          while [ -z "$LOOKUP_BROKEN" ]; do
+            for CANDIDATE in $(printf '%s' "$BODY" | jq -r '.workflow_runs[] | "\(.id):\(.event)"'); do
+              CID=${CANDIDATE%%:*}
+              CEVENT=${CANDIDATE#*:}
+              if [ "$CEVENT" != "push" ]; then
+                COVERS=$(covers_all_shards "$CID")
+                case "$COVERS" in
+                  yes) ;;
+                  no)
+                    echo "Skipping E2E run $CID ($CEVENT): it did not run exactly shards 1-32."
+                    continue
+                    ;;
+                  *)
+                    LOOKUP_BROKEN="${COVERS#broken: }"
+                    break 2
+                    ;;
+                esac
+              fi
+              RUN=$(printf '%s' "$BODY" | jq -c --argjson id "$CID" '.workflow_runs[] | select(.id == $id)')
+              break 2
+            done
+            [ $((PAGE * 100)) -ge "$TOTAL" ] && break
+            PAGE=$((PAGE + 1))
+            [ "$PAGE" -gt 10 ] && break
+            RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=100&page=$PAGE")
+            CODE=$(printf '%s' "$RAW" | tail -n1)
+            BODY=$(printf '%s' "$RAW" | sed '$d')
+            if [ "$CODE" != "200" ]; then
+              LOOKUP_BROKEN="page $PAGE of the E2E runs for $HEAD_SHA (http $CODE)"
+            elif ! printf '%s' "$BODY" | jq -e '.workflow_runs | type == "array"' > /dev/null 2>&1; then
+              LOOKUP_BROKEN="page $PAGE of the E2E runs for $HEAD_SHA is not the expected JSON"
+            fi
+          done
+
+          if [ -n "$LOOKUP_BROKEN" ]; then
+            echo "::error::E2E LOOKUP FAILED ($LOOKUP_BROKEN) — this is a BROKEN GATE, not a verdict."
+            echo "The gate could not tell which E2E run decides $HEAD_SHA, so it knows nothing"
+            echo "about it either way. Do not read this as 'no run'."
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present — allowing despite a BROKEN LOOKUP."; exit 0; }
+            exit 1
+          fi
 
           if [ "$TOTAL" = "0" ] || [ -z "$RUN" ]; then
-            echo "::error::No E2E run found for $HEAD_SHA (lookup succeeded, http 200, total_count=$TOTAL)."
+            echo "::error::No full-suite E2E run found for $HEAD_SHA (lookup succeeded, http 200, total_count=$TOTAL; subset dispatches do not count)."
             echo "The suite runs on push to stage. If it has not started yet, wait for it."
             echo "Promoting a commit whose E2E result is unknown is what shipped the"
             echo "2026-08-09 signup outage."

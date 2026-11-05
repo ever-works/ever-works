@@ -17,6 +17,7 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { RecordListView } from '@ever-works/contracts';
 import { RecordAccessPolicy } from '../record-visibility/record-access-policy.service';
 import {
@@ -53,8 +54,19 @@ import { MISSION_WORK_RELATIONS, type MissionWorkRelation } from '../entities/mi
 import { Work } from '../entities/work.entity';
 import { Agent } from '../entities/agent.entity';
 import { TitlerService } from '../titler/titler.service';
+import { GoalsService } from '../goals/goals.service';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 import { MissionTickService } from './mission-tick.service';
 import { toMissionDto, type MissionDto } from './types';
+import { findMissionTemplateConfig, type MissionTemplateConfig } from './mission-template.config';
+import {
+    MissionTemplateManifestService,
+    type MissionTemplateManifest,
+} from './mission-template-manifest.service';
+import {
+    MISSION_TEMPLATE_MANIFEST_UNREADABLE,
+    MissionTemplateManifestReader,
+} from './mission-template-manifest.reader';
 // Security: lexical SSRF predicate (blocks non-HTTP(S) schemes, literal
 // private/loopback/link-local IPs, and cloud-metadata hostnames). Reused to
 // validate full-URL forms of `missionTemplateRepo` so a malicious value can
@@ -95,6 +107,132 @@ const TEMPLATE_REPO_SLUG_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/;
 // vectors the URL branch below guards against.
 const TEMPLATE_REPO_BARE_SLUG_RE = /^[A-Za-z0-9._-]+$/;
 
+/** APW-08 T39 (FR-56) — the longest Product / Business a template form accepts. */
+export const MISSION_TEMPLATE_INPUT_MAX_CHARS = 80;
+
+/** APW-08 T39 (FR-56) — the title a Mission made with `templateInputs` gets when none is given. */
+export const BUILD_ON_APP_MISSION_TITLE =
+    'Build my own {product} for {business} on top of {appWork}';
+
+/** APW-08 T39 — a write's warning: the App Work could not be attached as the template asks. */
+export const MISSION_TEMPLATE_WORK_NOT_ATTACHED = 'templateWorkNotAttached';
+
+/** APW-08 T39 — a write's warning: one or more of the template's draft Goals were not created. */
+export const MISSION_TEMPLATE_GOALS_NOT_CREATED = 'templateGoalsNotCreated';
+
+/**
+ * APW-08 T39 (FR-56) — what a template form collects: the person's Product and Business and an
+ * App Work they own. Accepted only together with a `missionTemplateRepo` naming a catalog template.
+ */
+export interface MissionTemplateInputs {
+    product: string;
+    business: string;
+    appWorkId: string;
+}
+
+/**
+ * APW-08 T40 — a Mission Template's manifest as the create form reads it
+ * (`GET /api/me/missions/templates/:templateId/manifest`): only the values the form shows. `null`
+ * parts and `templateManifestUnreadable` when the manifest could not be read — the form then
+ * creates the Mission from its own values, exactly as the create would.
+ */
+export interface MissionTemplateManifestView {
+    templateId: string;
+    defaults: {
+        cadence: string | null;
+        outputMode: MissionOutputMode | null;
+        tasksPerTick: number | null;
+        openTasksCap: number | null;
+        maxBudgetCentsPerRun: number | null;
+        requireApprovalBeforeCreate: boolean | null;
+        outstandingIdeasCap: number | null;
+    } | null;
+    appWork: {
+        requiredRelation: MissionWorkRelation;
+        maxPullRequestChangedLines: number | null;
+        requireHumanMergePaths: string[];
+        protectedPaths: string[];
+    } | null;
+    suggestedGoals: Array<{ title: string; dodCriteria: string[] }>;
+    warnings: string[];
+}
+
+/** The template's manifest as a create reads it: parsed, or `null` with the warning to answer. */
+interface ResolvedMissionTemplate {
+    config: MissionTemplateConfig | null;
+    manifest: MissionTemplateManifest | null;
+    warnings: string[];
+}
+
+/** The validated `templateInputs` of one create. */
+interface ResolvedTemplateInputs {
+    product: string;
+    business: string;
+    work: { id: string; name: string };
+}
+
+const MISSION_TEMPLATE_DEFAULTS = new MissionTemplateManifestService();
+
+/**
+ * APW-08 T38 (review of #3077) — the guardrails a template may set, with the bounds the API's
+ * `WorkAgentGuardrailsDto` enforces on a person's own write. A manifest is repository content, so
+ * its guardrails are narrowed to these keys and ranges before they are stored (the parser keeps
+ * unknown keys for forward compatibility; the Mission row must not), as the clone path does.
+ */
+const TEMPLATE_GUARDRAIL_INT_BOUNDS: Record<string, readonly [number, number]> = {
+    maxWorksPerRun: [1, 25],
+    maxItemsPerWork: [1, 500],
+    maxBudgetCentsPerRun: [0, 1_000_000],
+    requireApprovalAboveBudgetCents: [0, 1_000_000],
+};
+const TEMPLATE_GUARDRAIL_FLAGS = [
+    'requireApprovalBeforeCreate',
+    'requireApprovalBeforeDelete',
+    'dryRunByDefault',
+] as const;
+
+function sanitizeTemplateGuardrails(raw: unknown): MissionGuardrailsOverride | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const source = raw as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const [key, [min, max]] of Object.entries(TEMPLATE_GUARDRAIL_INT_BOUNDS)) {
+        const value = source[key];
+        if (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max) {
+            result[key] = value;
+        }
+    }
+    for (const key of TEMPLATE_GUARDRAIL_FLAGS) {
+        if (typeof source[key] === 'boolean') result[key] = source[key];
+    }
+    return Object.keys(result).length > 0 ? (result as MissionGuardrailsOverride) : null;
+}
+
+/** The Task output a template may set: the two bounds only (never an Agent). */
+function sanitizeTemplateTaskOutput(raw: unknown): Record<string, unknown> | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const source = raw as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const key of ['tasksPerTick', 'openTasksCap']) {
+        if (source[key] !== undefined) result[key] = source[key];
+    }
+    return Object.keys(result).length > 0 ? result : null;
+}
+
+/** `{product}`, `{business}` and `{appWork}` filled in ONE pass, so an input holding braces stays text. */
+function fillTemplateText(text: string, inputs: ResolvedTemplateInputs): string {
+    const values: Record<string, string> = {
+        product: inputs.product,
+        business: inputs.business,
+        appWork: inputs.work.name,
+    };
+    return text.replace(/\{(product|business|appWork)\}/g, (_match, key: string) => values[key]);
+}
+
+/** One line of the person's text: trimmed, inner whitespace collapsed. */
+function cleanTemplateInput(value: unknown): string {
+    return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+}
+
 /**
  * Input shape for `MissionsService.create`. Mirrors the writable
  * subset of `Mission` minus the FK fields the system owns
@@ -129,6 +267,12 @@ export interface CreateMissionInput {
     outputMode?: string;
     /** APW-08 T34 — stored normalized; omitted / `null` = the defaults. */
     taskOutput?: Record<string, unknown> | null;
+    /**
+     * APW-08 T39 (FR-56…FR-58) — a template form's inputs: the title is filled from them when none
+     * is given, the App Work is attached as the template's relation, and the template's draft
+     * Goals are created on it. Needs `missionTemplateRepo` to name a catalog template.
+     */
+    templateInputs?: MissionTemplateInputs | null;
 }
 
 /**
@@ -275,6 +419,14 @@ export class MissionsService {
         @Optional()
         @InjectRepository(Agent)
         private readonly agentsRepo?: Repository<Agent>,
+        // APW-08 T38 (APW08-G13) — reads a catalog template's `.works/mission.yml` through the git
+        // facade. TRAILING + @Optional(): absent, a template's defaults are not applied (today's
+        // behaviour) and nothing is read.
+        @Optional() private readonly templateManifests?: MissionTemplateManifestReader,
+        // APW-08 T39 — GoalsService is resolved lazily (GoalsModule is not imported here: it pulls
+        // in the Agents and Tasks modules). TRAILING + @Optional(): absent, a template's draft
+        // Goals are not created and the write says so.
+        @Optional() private readonly moduleRef?: ModuleRef,
     ) {}
 
     /**
@@ -390,13 +542,22 @@ export class MissionsService {
      */
     async create(
         userId: string,
-        input: CreateMissionInput,
+        requested: CreateMissionInput,
         scope?: OwnershipScope,
         options: { withinCreate?: MissionWithinCreate } = {},
     ): Promise<MissionDto> {
         if (options.withinCreate && !this.domainEvents) {
             throw new Error('Mission withinCreate needs DomainEventsModule (one transaction)');
         }
+        // APW-08 T38 — a catalog template's manifest fills the fields the caller left undefined
+        // (explicit values, explicit `null`s included, win). An unreadable manifest leaves the
+        // Mission on its explicit values and answers ONE warning instead of failing the create.
+        const template = await this.resolveTemplate(userId, requested.missionTemplateRepo);
+        const input = template.manifest
+            ? this.applyTemplateDefaults(requested, template.manifest)
+            : requested;
+        // APW-08 T39 — the template's inputs are checked before anything is written.
+        const templateInputs = await this.resolveTemplateInputs(userId, input, template, scope);
         this.assertScheduleConsistency(input.type, input.schedule);
         // APW-08 T34 — validated (and its Agent checked) before anything is generated or written.
         const taskOutput = await this.resolveTaskOutput(userId, null, input.taskOutput, scope);
@@ -409,13 +570,16 @@ export class MissionsService {
         const callerTitle = input.title?.trim();
         const title = callerTitle
             ? callerTitle.slice(0, 200)
-            : (
-                  await this.titler.generateTitle(description, {
-                      kind: 'mission',
-                      userId,
-                      maxChars: 200,
-                  })
-              ).slice(0, 200);
+            : templateInputs
+              ? // APW-08 T39 (FR-56) — "Build my own {product} for {business} on top of {appWork}".
+                fillTemplateText(BUILD_ON_APP_MISSION_TITLE, templateInputs).slice(0, 200)
+              : (
+                    await this.titler.generateTitle(description, {
+                        kind: 'mission',
+                        userId,
+                        maxChars: 200,
+                    })
+                ).slice(0, 200);
         const saved = await this.persist(
             this.missions.create({
                 userId,
@@ -472,7 +636,279 @@ export class MissionsService {
             missionId: saved.id,
             title: saved.title,
         });
-        return this.withTaskOutputWarnings(toMissionDto(saved), userId, scope);
+        const warnings = [...template.warnings];
+        if (templateInputs) {
+            warnings.push(
+                ...(await this.applyTemplateInputs(
+                    userId,
+                    saved.id,
+                    templateInputs,
+                    template.manifest,
+                    scope,
+                )),
+            );
+        }
+        const dto = await this.withTaskOutputWarnings(toMissionDto(saved), userId, scope);
+        return withWarnings(dto, warnings);
+    }
+
+    /**
+     * APW-08 T40 — a catalog template's manifest, as the create form shows it. `404
+     * templateNotFound` for an id that is not a catalog template; a manifest that cannot be read
+     * answers `templateManifestUnreadable` with nothing else (the form falls back to its own fields).
+     */
+    async readTemplateManifest(
+        userId: string,
+        templateId: string,
+    ): Promise<MissionTemplateManifestView> {
+        const config = findMissionTemplateConfig(templateId);
+        if (!config) {
+            throw new NotFoundException({
+                code: 'templateNotFound',
+                message: 'Mission template not found.',
+            });
+        }
+        const resolved = await this.resolveTemplate(userId, config.id);
+        const manifest = resolved.manifest;
+        const view: MissionTemplateManifestView = {
+            templateId: config.id,
+            defaults: null,
+            appWork: null,
+            suggestedGoals: [],
+            warnings: resolved.warnings,
+        };
+        if (!manifest) return view;
+        const defaults = manifest.defaults;
+        if (defaults) {
+            // The form shows what a create would store (review of #3077): the same narrowing.
+            const guardrails = sanitizeTemplateGuardrails(defaults.guardrails) ?? {};
+            view.defaults = {
+                cadence: defaults.cadence ?? null,
+                outputMode: defaults.outputMode ?? null,
+                tasksPerTick: defaults.taskOutput?.tasksPerTick ?? null,
+                openTasksCap: defaults.taskOutput?.openTasksCap ?? null,
+                maxBudgetCentsPerRun: guardrails.maxBudgetCentsPerRun ?? null,
+                requireApprovalBeforeCreate: guardrails.requireApprovalBeforeCreate ?? null,
+                outstandingIdeasCap: defaults.outstandingIdeasCap ?? null,
+            };
+        }
+        if (manifest.appWork) {
+            const spec = manifest.appWork.recommendedAppSpec;
+            view.appWork = {
+                requiredRelation: manifest.appWork.requiredRelation ?? 'improves',
+                maxPullRequestChangedLines: spec?.agents?.maxPullRequestChangedLines ?? null,
+                requireHumanMergePaths: [...(spec?.agents?.requireHumanMergePaths ?? [])],
+                protectedPaths: [...(spec?.display?.protectedPaths ?? [])],
+            };
+        }
+        view.suggestedGoals = (manifest.suggestedGoals ?? []).map((goal) => ({
+            title: goal.title,
+            dodCriteria: [...goal.dodCriteria],
+        }));
+        return view;
+    }
+
+    /**
+     * APW-08 T38 — the catalog template `missionTemplateRepo` names, and its manifest read through
+     * the git facade at the template's branch. Not a catalog id (an `owner/repo` slug, a URL, an
+     * unknown id), or no reader in this graph: nothing is read and nothing changes.
+     */
+    private async resolveTemplate(
+        userId: string,
+        missionTemplateRepo: string | null | undefined,
+    ): Promise<ResolvedMissionTemplate> {
+        const config =
+            typeof missionTemplateRepo === 'string'
+                ? findMissionTemplateConfig(missionTemplateRepo.trim())
+                : null;
+        if (!config || !this.templateManifests) return { config, manifest: null, warnings: [] };
+        const read = await this.templateManifests.read(config, userId);
+        // `in` narrows the union without relying on `strictNullChecks` (off in this package).
+        if (!('reason' in read)) return { config, manifest: read.manifest, warnings: [] };
+        this.logger.warn(
+            `Mission template ${config.id}: manifest ${read.reason} (${read.message}); the Mission keeps its explicit values.`,
+        );
+        return { config, manifest: null, warnings: [MISSION_TEMPLATE_MANIFEST_UNREADABLE] };
+    }
+
+    /**
+     * APW-08 T38 — the manifest's defaults under the caller's explicit values. A ONE-SHOT create
+     * keeps no schedule: the template's cadence never turns a Mission the caller asked to run once
+     * into a scheduled one (the explicit `type` wins).
+     */
+    private applyTemplateDefaults(
+        input: CreateMissionInput,
+        manifest: MissionTemplateManifest,
+    ): CreateMissionInput {
+        const seed: CreateMissionInput =
+            input.type === MissionType.ONE_SHOT && input.schedule === undefined
+                ? { ...input, schedule: null }
+                : input;
+        const merged = MISSION_TEMPLATE_DEFAULTS.applyDefaults(seed, manifest);
+        // What the template supplied (and only that) is narrowed to what a person may write.
+        if (input.guardrailsOverride === undefined && merged.guardrailsOverride !== undefined) {
+            merged.guardrailsOverride = sanitizeTemplateGuardrails(merged.guardrailsOverride);
+        }
+        if (input.taskOutput === undefined && merged.taskOutput !== undefined) {
+            merged.taskOutput = sanitizeTemplateTaskOutput(merged.taskOutput);
+        }
+        return merged;
+    }
+
+    /**
+     * APW-08 T39 (FR-56) — `templateInputs`, checked before the Mission is written: a catalog
+     * template that is about an App Work, a non-empty Product and Business of at most 80
+     * characters, and an App Work the caller owns in this scope (`404 workNotFound` otherwise, the
+     * same answer as a missing one).
+     */
+    private async resolveTemplateInputs(
+        userId: string,
+        input: CreateMissionInput,
+        template: ResolvedMissionTemplate,
+        scope?: OwnershipScope,
+    ): Promise<ResolvedTemplateInputs | null> {
+        const raw = input.templateInputs;
+        if (raw === undefined || raw === null) return null;
+        if (!template.config) {
+            throw new BadRequestException({
+                code: 'templateRequired',
+                message: 'templateInputs needs missionTemplateRepo to name a Mission template.',
+            });
+        }
+        if (!template.config.takesAppWork || (template.manifest && !template.manifest.appWork)) {
+            throw new BadRequestException({
+                code: 'templateInputsNotAccepted',
+                message: 'This Mission template does not take an App Work.',
+            });
+        }
+        const product = cleanTemplateInput(raw.product);
+        const business = cleanTemplateInput(raw.business);
+        for (const [field, value] of [
+            ['product', product],
+            ['business', business],
+        ] as const) {
+            if (value.length === 0 || value.length > MISSION_TEMPLATE_INPUT_MAX_CHARS) {
+                throw new BadRequestException({
+                    code: 'invalidTemplateInputs',
+                    message: `templateInputs.${field} must be 1 to ${MISSION_TEMPLATE_INPUT_MAX_CHARS} characters.`,
+                });
+            }
+        }
+        const appWorkId = typeof raw.appWorkId === 'string' ? raw.appWorkId.trim() : '';
+        if (!appWorkId) {
+            throw new BadRequestException({
+                code: 'invalidTemplateInputs',
+                message: 'templateInputs.appWorkId is required.',
+            });
+        }
+        if (!this.missionWorks || !this.worksRepo) {
+            throw new BadRequestException(
+                'MissionWorkRepository is not wired — templateInputs cannot attach the App Work.',
+            );
+        }
+        const work = await this.worksRepo.findOne({
+            where: scope
+                ? ownershipWhere<Work>(userId, scope).map((branch) => ({
+                      ...branch,
+                      id: appWorkId,
+                  }))
+                : { id: appWorkId, userId },
+        });
+        if (!work) {
+            throw new NotFoundException({ code: 'workNotFound', message: 'Work not found.' });
+        }
+        if (!isAppWorkKind(work.kind ?? null)) {
+            throw new BadRequestException({
+                code: 'notAppWork',
+                message: 'templateInputs.appWorkId must be an App Work.',
+            });
+        }
+        return { product, business, work: { id: work.id, name: work.name } };
+    }
+
+    /**
+     * APW-08 T39 (FR-56…FR-58) — after the Mission is written: the App Work attached under the
+     * template's relation (`improves` by default) through the ordinary attach path, and each of the
+     * template's suggested Goals created as a DRAFT delivery Goal scoped to that Work and linked to
+     * the Mission. The App spec is never touched — no git call is made for it (FR-59). A step that
+     * fails is answered as a warning: the Mission exists either way.
+     */
+    private async applyTemplateInputs(
+        userId: string,
+        missionId: string,
+        inputs: ResolvedTemplateInputs,
+        manifest: MissionTemplateManifest | null,
+        scope?: OwnershipScope,
+    ): Promise<string[]> {
+        const warnings: string[] = [];
+        const relation: MissionWorkRelation = manifest?.appWork?.requiredRelation ?? 'improves';
+        try {
+            await this.attachWork(userId, missionId, inputs.work.id, relation, scope);
+        } catch (error) {
+            this.logger.warn(
+                `Mission ${missionId}: the template's App Work was not attached: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            warnings.push(MISSION_TEMPLATE_WORK_NOT_ATTACHED);
+        }
+        const goals = manifest?.suggestedGoals ?? [];
+        if (goals.length === 0) return warnings;
+        const goalsService = this.moduleRef
+            ? getOptionalProvider<GoalsService>(this.moduleRef, GoalsService)
+            : undefined;
+        if (!goalsService) {
+            this.logger.warn(
+                `Mission ${missionId}: GoalsService is not in this graph; the template's Goals were not created.`,
+            );
+            return [...warnings, MISSION_TEMPLATE_GOALS_NOT_CREATED];
+        }
+        let failed = false;
+        for (const goal of goals) {
+            let createdId: string | null = null;
+            try {
+                const created = await goalsService.create(
+                    userId,
+                    {
+                        title: fillTemplateText(goal.title, inputs).slice(0, 200),
+                        goalKind: 'delivery',
+                        workId: inputs.work.id,
+                        dodCriteria: goal.dodCriteria.map((text, index) => ({
+                            id: `c${index + 1}`,
+                            text: fillTemplateText(text, inputs).slice(0, 500),
+                            status: 'open' as const,
+                        })),
+                    },
+                    scope,
+                );
+                createdId = created.id;
+                await goalsService.linkToMission(userId, missionId, created.id, false, scope);
+            } catch (error) {
+                failed = true;
+                this.logger.warn(
+                    `Mission ${missionId}: a template Goal was not created: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                // Review of #3077 — a Goal created but not linked would sit in the Goals list
+                // belonging to no Mission while the answer says it was not created: remove it.
+                if (createdId) {
+                    await goalsService
+                        .delete(userId, createdId, scope)
+                        .catch((deleteError) =>
+                            this.logger.warn(
+                                `Mission ${missionId}: the unlinked template Goal ${createdId} could not be removed: ${
+                                    deleteError instanceof Error
+                                        ? deleteError.message
+                                        : String(deleteError)
+                                }`,
+                            ),
+                        );
+                }
+            }
+        }
+        if (failed) warnings.push(MISSION_TEMPLATE_GOALS_NOT_CREATED);
+        return warnings;
     }
 
     /**
@@ -719,7 +1155,7 @@ export class MissionsService {
                 (MISSION_TASK_OUTPUT_RELATIONS as readonly string[]).includes(relation.relation) &&
                 isAppWorkKind(relation.workKind ?? null),
         );
-        return hasAppWork ? dto : { ...dto, warnings: [MISSION_NO_APP_WORK_RELATION] };
+        return hasAppWork ? dto : withWarnings(dto, [MISSION_NO_APP_WORK_RELATION]);
     }
 
     /**
@@ -1380,4 +1816,14 @@ export class MissionsService {
         }
         return schedule;
     }
+}
+
+/** `dto` with `extra` appended to its warnings (no duplicates); unchanged when there are none. */
+function withWarnings(dto: MissionDto, extra: readonly string[]): MissionDto {
+    if (extra.length === 0) return dto;
+    const warnings = [...(dto.warnings ?? [])];
+    for (const warning of extra) {
+        if (!warnings.includes(warning)) warnings.push(warning);
+    }
+    return { ...dto, warnings };
 }

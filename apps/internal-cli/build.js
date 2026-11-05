@@ -121,11 +121,11 @@ async function buildCLI() {
         homepage: 'https://ever.works',
         repository: {
             type: 'git',
-            url: 'https://github.com/ever-works/ever-works.git',
-            work: 'apps/internal-cli',
+            url: 'https://github.com/ever-co/ever-works.git',
+            directory: 'apps/internal-cli',
         },
         bugs: {
-            url: 'https://github.com/ever-works/ever-works/issues',
+            url: 'https://github.com/ever-co/ever-works/issues',
         },
         keywords: [
             'cli',

@@ -156,7 +156,7 @@ The community plays a vital role in shaping Ever Works. Here is how you can prop
 
 The primary way to propose features is through GitHub Issues:
 
-- **Platform:** [github.com/ever-works/ever-works/issues](https://github.com/ever-works/ever-works/issues)
+- **Platform:** [github.com/ever-co/ever-works/issues](https://github.com/ever-co/ever-works/issues)
 - **Template:** [github.com/ever-works/ever-works-website-template/issues](https://github.com/ever-works/ever-works-website-template/issues)
 
 When creating a feature request:
@@ -171,7 +171,7 @@ When creating a feature request:
 
 For broader ideas that need community input before becoming formal proposals:
 
-- **Platform:** [github.com/ever-works/ever-works/discussions](https://github.com/ever-works/ever-works/discussions)
+- **Platform:** [github.com/ever-co/ever-works/discussions](https://github.com/ever-co/ever-works/discussions)
 - **Template:** [github.com/ever-works/ever-works-website-template/discussions](https://github.com/ever-works/ever-works-website-template/discussions)
 
 Discussions are ideal for:

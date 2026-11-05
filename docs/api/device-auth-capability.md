@@ -145,7 +145,7 @@ level.
 ## Plugin Contract
 
 To support this capability, a plugin must implement
-[`IDeviceAuthProvider`](https://github.com/ever-works/ever-works/blob/develop/packages/plugin/src/contracts/capabilities/device-auth-provider.interface.ts):
+[`IDeviceAuthProvider`](https://github.com/ever-co/ever-works/blob/develop/packages/plugin/src/contracts/capabilities/device-auth-provider.interface.ts):
 
 ```typescript
 export interface IDeviceAuthProvider {
@@ -223,7 +223,7 @@ upstream flow) and the audit-volume cost outweighs the visibility gain.
 A successful connection produces a regular `PLUGIN_CONFIGURED` log
 entry indirectly when the resulting token is persisted via the plugin's
 settings hooks (see [`activity-log`
-spec](https://github.com/ever-works/ever-works/tree/develop/docs/specs/features/activity-log)).
+spec](https://github.com/ever-co/ever-works/tree/develop/docs/specs/features/activity-log)).
 
 ## Source Files
 

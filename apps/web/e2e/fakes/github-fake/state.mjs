@@ -635,7 +635,13 @@ export function repoPayload(repo, origin, depth = 0, identity = 'anonymous') {
         full_name: fullName,
         private: repo.private,
         owner: ownerPayload(repo.owner),
-        html_url: base,
+        // The human link stays on github.com (the rule above, and what the recorded
+        // `repo*.json` fixtures carry). It used to be the fake's own origin, which the
+        // platform reads back as the repository's `url`: the App create form submits
+        // that URL, and the create service only accepts github.com — so every Link /
+        // Fork create THROUGH THE FORM was refused with `invalid_url` (stage run
+        // 41605694388, shard 7, `flow-app-work-create-form.spec.ts`).
+        html_url: `https://github.com/${fullName}`,
         description: repo.description,
         fork: repo.fork,
         url: `${origin}/repos/${fullName}`,

@@ -300,7 +300,8 @@
                 "signedInAs": "Signed in to Ever ID as {name} · {email}",
                 "signedInAsEmail": "Signed in to Ever ID as {email}",
                 "submit": "Create account",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "linkedTo": "This account will be linked to ever.co/{handle}"
             },
             "accountExists": {
                 "title": "You already have an Ever Works account",
@@ -1428,6 +1429,24 @@
                 "minLength": "Description must be at least 10 characters.",
                 "error": "Couldn't create the Mission. Please try again.",
                 "chatUnavailable": "Chat is unavailable right now — use \"Create manually\" instead."
+            },
+            "buildOnApp": {
+                "product": "Product",
+                "business": "Business",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Choose an App Work",
+                "noAppWorks": "You have no App Work yet. Add one from Works first.",
+                "summary": "Every Monday 08:00 UTC · up to {count} Tasks a week · {amount} per run",
+                "backlogNote": "New Tasks wait in Backlog for your approval.",
+                "suggestedGoals": "Suggested Goals (created as drafts):",
+                "rules": "Recommended app rules: schema changes merged by a person, {lines}-line PRs",
+                "proposeRules": "Propose these rules",
+                "proposeNeedsAppWork": "Choose an App Work first.",
+                "rulesProposed": "A Task to change the app rules was opened on the App Work.",
+                "rulesFailed": "Couldn’t open the Task. Try again.",
+                "create": "Create Mission",
+                "templateUnreadable": "The template could not be read, so only the values you entered were used.",
+                "templatePartial": "The Mission was created, but part of its template could not be applied."
             },
             "menu": {
                 "chat": "Chat about it"
@@ -10710,7 +10729,7 @@
                 "formTitle": "New Work — Repository",
                 "formSubtitle": "Register an existing code repository as a Work. Nothing is generated or deployed — Tasks, Goals and fleet runs simply work in that repository.",
                 "urlLabel": "Repository URL",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "A GitHub repository you can access. It becomes the Work’s data repository as-is.",
                 "nameLabel": "Work Name",
                 "slugLabel": "Work Slug",
@@ -17026,6 +17045,46 @@
                 "confirm": "Reinstall",
                 "reinstalling": "Reinstalling {name}…",
                 "failed": "The runner could not be reinstalled."
+            }
+        }
+    },
+    "everConnect": {
+        "provision": {
+            "title": "Create your company in Ever Works",
+            "confirmPageTitle": "Confirm your company",
+            "checking": "One moment, checking your request…",
+            "forHandle": "{name} · ever.co/{handle}",
+            "body": "Sign in with Ever ID to confirm. Nothing is created until you confirm.",
+            "continueEverId": "Continue with Ever ID",
+            "continue": "Continue",
+            "createHere": "Create a company in Ever Works",
+            "confirmTitle": "Create company {name}?",
+            "confirmSubtitle": "For ever.co/{handle}, in Ever Works.",
+            "existsTitle": "Your company is ready",
+            "name": "Company name",
+            "legalName": "Legal name",
+            "staffing": "Starter staff",
+            "staffingNone": "None",
+            "staffingHelp": "Agents arrive paused; you turn them on.",
+            "missionTitle": "First Mission",
+            "missionGoal": "Goal",
+            "create": "Create company",
+            "decline": "Not now",
+            "connectEverId": "Connect Ever ID in Settings",
+            "failure": {
+                "incomplete": "This link is not complete. Start again from Ever.",
+                "invalid": "This link is not valid any more. Start again from Ever.",
+                "expired": "This request has expired. Start again from Ever.",
+                "used": "This link was already used. Start again from Ever.",
+                "unavailable": "Creating a company from Ever is not available on this installation.",
+                "rateLimited": "Too many attempts. Wait a minute, then try again.",
+                "mismatch": "Sign in with the same Ever ID you used on app.ever.co.",
+                "tenantLinked": "Your account already has a company linked to Ever.",
+                "organizationLinked": "This Ever organization already has a company here.",
+                "inProgress": "This company is being created. Try again in a moment.",
+                "invalidValue": "One of these values cannot be used. Check them and try again.",
+                "unreachable": "Ever Platform cannot be reached right now. Try again in a minute.",
+                "failed": "The company could not be created. Try again."
             }
         }
     }

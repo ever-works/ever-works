@@ -46,7 +46,7 @@ The exact pnpm version is pinned in the root `package.json` under `"packageManag
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/ever-works/ever-works.git
+git clone https://github.com/ever-co/ever-works.git
 cd ever-works
 ```
 

@@ -57,7 +57,7 @@ pnpm --filter @ever-works/agent-pipeline-plugin test
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Vercel AI SDK](https://ai-sdk.dev/)
 - This plugin implements the `pipeline` capability defined in `@ever-works/plugin`.

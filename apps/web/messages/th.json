@@ -295,7 +295,8 @@
                 "signedInAs": "เข้าสู่ระบบ Ever ID ในชื่อ {name} · {email}",
                 "signedInAsEmail": "เข้าสู่ระบบ Ever ID ในชื่อ {email}",
                 "submit": "สร้างบัญชี",
-                "cancel": "ยกเลิก"
+                "cancel": "ยกเลิก",
+                "linkedTo": "This account will be linked to ever.co/{handle}"
             },
             "accountExists": {
                 "title": "คุณมีบัญชี Ever Works อยู่แล้ว",
@@ -896,6 +897,24 @@
                 "minLength": "คำอธิบายต้องมีอย่างน้อย 10 ตัวอักษร",
                 "error": "ไม่สามารถสร้างภารกิจได้ กรุณาลองใหม่อีกครั้ง",
                 "chatUnavailable": "แชทไม่พร้อมใช้งานขณะนี้ — ใช้ \"สร้างด้วยตนเอง\" แทน"
+            },
+            "buildOnApp": {
+                "product": "ผลิตภัณฑ์",
+                "business": "ธุรกิจ",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "เลือก App Work",
+                "noAppWorks": "คุณยังไม่มี App Work เพิ่มจาก Works ก่อน",
+                "summary": "ทุกวันจันทร์ 08:00 UTC · สูงสุด {count} งานต่อสัปดาห์ · {amount} ต่อการรัน",
+                "backlogNote": "งานใหม่จะรอการอนุมัติของคุณใน Backlog",
+                "suggestedGoals": "เป้าหมายที่แนะนำ (สร้างเป็นฉบับร่าง):",
+                "rules": "กฎของแอปที่แนะนำ: การเปลี่ยนสคีมาให้คนเป็นผู้ merge, PR ไม่เกิน {lines} บรรทัด",
+                "proposeRules": "เสนอกฎเหล่านี้",
+                "proposeNeedsAppWork": "เลือก App Work ก่อน",
+                "rulesProposed": "เปิดงานบน App Work เพื่อเปลี่ยนกฎของแอปแล้ว",
+                "rulesFailed": "ไม่สามารถเปิดงานได้ ลองอีกครั้ง",
+                "create": "สร้างภารกิจ",
+                "templateUnreadable": "อ่านเทมเพลตไม่ได้ จึงใช้เฉพาะค่าที่คุณกรอก",
+                "templatePartial": "สร้างภารกิจแล้ว แต่ไม่สามารถใช้บางส่วนของเทมเพลตได้"
             },
             "quickAdd": {
                 "label": "Start a new Mission",
@@ -8377,7 +8396,7 @@
                 "formTitle": "Work ใหม่ — รีโพซิทอรี",
                 "formSubtitle": "ลงทะเบียนรีโพซิทอรีโค้ดที่มีอยู่แล้วเป็น Work ไม่มีการสร้างหรือดีพลอยใด ๆ — งาน เป้าหมาย และการรันของฟลีตจะทำงานในรีโพซิทอรีนั้นโดยตรง",
                 "urlLabel": "URL ของรีโพซิทอรี",
-                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlPlaceholder": "https://github.com/ever-co/ever-works",
                 "urlHelp": "รีโพซิทอรี GitHub ที่คุณเข้าถึงได้ จะกลายเป็นรีโพซิทอรีข้อมูลของ Work ตามเดิม",
                 "nameLabel": "ชื่อ Work",
                 "slugLabel": "สลักของ Work",
@@ -11199,6 +11218,46 @@
                 "subjectRequired": "Subject is required.",
                 "bodyRequired": "Message body is required.",
                 "sendFailed": "Send failed."
+            }
+        }
+    },
+    "everConnect": {
+        "provision": {
+            "title": "Create your company in Ever Works",
+            "confirmPageTitle": "Confirm your company",
+            "checking": "One moment, checking your request…",
+            "forHandle": "{name} · ever.co/{handle}",
+            "body": "Sign in with Ever ID to confirm. Nothing is created until you confirm.",
+            "continueEverId": "Continue with Ever ID",
+            "continue": "Continue",
+            "createHere": "Create a company in Ever Works",
+            "confirmTitle": "Create company {name}?",
+            "confirmSubtitle": "For ever.co/{handle}, in Ever Works.",
+            "existsTitle": "Your company is ready",
+            "name": "Company name",
+            "legalName": "Legal name",
+            "staffing": "Starter staff",
+            "staffingNone": "None",
+            "staffingHelp": "Agents arrive paused; you turn them on.",
+            "missionTitle": "First Mission",
+            "missionGoal": "Goal",
+            "create": "Create company",
+            "decline": "Not now",
+            "connectEverId": "Connect Ever ID in Settings",
+            "failure": {
+                "incomplete": "This link is not complete. Start again from Ever.",
+                "invalid": "This link is not valid any more. Start again from Ever.",
+                "expired": "This request has expired. Start again from Ever.",
+                "used": "This link was already used. Start again from Ever.",
+                "unavailable": "Creating a company from Ever is not available on this installation.",
+                "rateLimited": "Too many attempts. Wait a minute, then try again.",
+                "mismatch": "Sign in with the same Ever ID you used on app.ever.co.",
+                "tenantLinked": "Your account already has a company linked to Ever.",
+                "organizationLinked": "This Ever organization already has a company here.",
+                "inProgress": "This company is being created. Try again in a moment.",
+                "invalidValue": "One of these values cannot be used. Check them and try again.",
+                "unreachable": "Ever Platform cannot be reached right now. Try again in a minute.",
+                "failed": "The company could not be created. Try again."
             }
         }
     }

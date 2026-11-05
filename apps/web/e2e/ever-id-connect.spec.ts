@@ -85,7 +85,12 @@ test.describe('Connect Ever ID from Settings', () => {
         await page.context().clearCookies();
         await loginViaUI(page, other);
         await startConnect(page, everId, request);
-        await page.waitForURL(/\/settings\/security(?!\/connect)/);
+        // Wait for the provider round trip to come BACK with its notice. The page is
+        // already on /settings/security when Connect is clicked, so a bare
+        // `/settings/security(?!/connect)` wait resolved at once, and the 5 s assertion
+        // below raced the whole Ever ID redirect chain (stage run 41605694388, shard 3:
+        // the failure snapshot still showed the pre-redirect "Opening Ever ID…" button).
+        await page.waitForURL(/\/settings\/security\?(?:.*&)?everId=subject_linked/);
         await expect(page.getByTestId('ever-id-connect-error')).toContainText(
             'This Ever ID is already connected to a different Ever Works account.',
         );

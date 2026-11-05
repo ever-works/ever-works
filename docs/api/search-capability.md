@@ -255,7 +255,7 @@ of view.
 in your settings, or pass `providerOverride` from the calling code path
 (currently only available to the AI facade — the HTTP controller does
 not expose this; see [`plugins-capabilities`
-spec](https://github.com/ever-works/ever-works/tree/develop/docs/specs/features/plugins-capabilities)
+spec](https://github.com/ever-co/ever-works/tree/develop/docs/specs/features/plugins-capabilities)
 OQ-4).
 
 ## Provider Integration

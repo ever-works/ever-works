@@ -13,9 +13,10 @@
  */
 
 /** Canonical repo, used to build a clickable commit URL. Overridable for forks. */
-const REPO_URL = (
-    process.env.GITHUB_REPO_URL || 'https://github.com/ever-works/ever-works'
-).replace(/\/+$/, '');
+const REPO_URL = (process.env.GITHUB_REPO_URL || 'https://github.com/ever-co/ever-works').replace(
+    /\/+$/,
+    '',
+);
 
 export interface BuildInfo {
     /** Which component this describes — always `api` here. */

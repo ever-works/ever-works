@@ -213,6 +213,16 @@
 			"source": "router"
 		},
 		{
+			"path": "/:locale/ever-connect/provision",
+			"file": "apps/web/src/app/[locale]/(auth)/ever-connect/provision/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/ever-connect/provision/confirm",
+			"file": "apps/web/src/app/[locale]/(auth)/ever-connect/provision/confirm/page.tsx",
+			"source": "router"
+		},
+		{
 			"path": "/:locale/fleet",
 			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/page.tsx",
 			"source": "router"

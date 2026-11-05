@@ -22,6 +22,11 @@ permissions:
   contents: read
   packages: write
 
+# Images stay under ghcr.io/ever-works/* whichever org hosts the repository
+# (moved to ever-co/ever-works on 2026-11-05); see the note in k8s-build.yml.
+env:
+  IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}
+
 jobs:
   ever-works-mcp:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
@@ -45,9 +50,9 @@ jobs:
           load: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/ever-works/ever-works-mcp:latest
+            ghcr.io/${{ env.IMAGE_OWNER }}/ever-works-mcp:latest
             registry.digitalocean.com/ever/ever-works-mcp:latest
-          cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-mcp:latest
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_OWNER }}/ever-works-mcp:latest
           cache-to: type=inline
           build-args: |
             NODE_ENV=production
@@ -79,12 +84,13 @@ jobs:
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # Optional cross-org push credentials; see the login step in k8s-build.yml.
+          username: ${{ vars.GH_PACKAGES_USER || github.repository_owner }}
+          password: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Push to Github Registry
         run: |
-          docker push ghcr.io/ever-works/ever-works-mcp:latest
+          docker push ghcr.io/${IMAGE_OWNER}/ever-works-mcp:latest
 
       - name: Login to CW Container Registry
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0

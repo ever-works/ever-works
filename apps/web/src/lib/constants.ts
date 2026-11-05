@@ -400,6 +400,14 @@ export const ROUTES = {
     // proxy auth gate bounces them to /login and the pending confirmation is lost.
     AUTH_EVER_ID_CREATE_ACCOUNT: '/auth/ever-id/create-account',
     AUTH_EVER_ID_ACCOUNT_EXISTS: '/auth/ever-id/account-exists',
+    // Where Ever sends a person who asked for a company here, the signed request in
+    // the URL fragment. Reached signed out, so it MUST be in PUBLIC_ROUTES; it grants
+    // nothing by itself. The confirmation page after it stays behind the auth gate.
+    EVER_CONNECT_PROVISION: '/ever-connect/provision',
+    EVER_CONNECT_PROVISION_CONFIRM: '/ever-connect/provision/confirm',
+    // The ordinary way to register a company, when this installation takes no
+    // requests from Ever.
+    EVER_CONNECT_PROVISION_FALLBACK: '/new?type=company',
     // EW-070 — the signed-out way back in for a user whose verification email
     // never arrived. Reached while UNAUTHENTICATED and unverifiable (login
     // answers 403 for an unverified address), so it MUST be in PUBLIC_ROUTES.
@@ -518,6 +526,8 @@ export const PUBLIC_ROUTES = [
     // pending cookie and confirms through the API.
     ROUTES.AUTH_EVER_ID_CREATE_ACCOUNT,
     ROUTES.AUTH_EVER_ID_ACCOUNT_EXISTS,
+    // A company request from Ever: see ROUTES.
+    ROUTES.EVER_CONNECT_PROVISION,
     '/about',
     '/contact',
     '/privacy',

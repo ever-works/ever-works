@@ -63,7 +63,7 @@ pnpm --filter @ever-works/perplexity-plugin test
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
-- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
 - [Perplexity homepage](https://perplexity.ai)
 

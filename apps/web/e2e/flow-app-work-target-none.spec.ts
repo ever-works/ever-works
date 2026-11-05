@@ -62,6 +62,11 @@
  * (**APW-06 / APW-10**, needs a cluster the PR lane does not have). The Kubernetes clauses
  * are out of this lane's reach by construction — ACC-E2E-11's own row names the nightly and
  * cluster lanes for them.
+ *
+ * Re-measured on stage (run 41605694388, 2026-11-03): APW-06 and APW-05 have since mounted
+ * `/app-target`, `/app-status` and `/builds` (all `200` for the owner). The running pin now
+ * asserts what they report for this Work (target None, state `not-deployed`, no address);
+ * the fixmes' measured reasons are stale and are left for the APW-05/06 owners to re-run.
  */
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -455,7 +460,7 @@ test.describe('ACC-E2E-11 — a None-target App Work is created, and nothing is 
         expect(work.forkName, 'the fork exists').not.toBe('');
     });
 
-    test('the app-target and build surfaces this case names are not mounted', async ({
+    test('the app-target and build surfaces this case names are mounted, and report a None-target Work as deployed nowhere', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -463,9 +468,12 @@ test.describe('ACC-E2E-11 — a None-target App Work is created, and nothing is 
         const work = await createNoneTargetWork(request, user.access_token, 'surfaces');
 
         // APW-06's S1 copy ("This app isn't running anywhere yet.", **Connect your
-        // cluster**) is rendered from `/app-target`; APW-05's "Builds still run" from
-        // `/builds`. Both answer 404 in this build, which is what the `fixme`s below say in
-        // full — asserted here so the blocker is a live measurement in every run.
+        // cluster**) is rendered from `/app-target` + `/app-status`; APW-05's "Builds still
+        // run" from `/builds`. This test pinned their 404 while they were unshipped; APW-06
+        // and APW-05 have since mounted all three (`work-app-runtime.controller.ts`,
+        // `app-builds.controller.ts` — stage run 41605694388, shard 7, measured 200 x3). It
+        // now pins what they say about this case's Work: the stored target is None and
+        // nothing is deployed. (The fixmes below still name what the PR lane cannot reach.)
         const target = await getAppTarget(request, {
             token: user.access_token,
             workId: work.workId,
@@ -480,8 +488,24 @@ test.describe('ACC-E2E-11 — a None-target App Work is created, and nothing is 
         });
         expect(
             { target: target.status, status: status.status, builds: builds.status },
-            'APW-06 owns /app-target and /app-status, APW-05 owns /builds (all 404 here)',
-        ).toEqual({ target: 404, status: 404, builds: 404 });
+            `APW-06 /app-target + /app-status and APW-05 /builds answer the owner ` +
+                `(target=${target.text.slice(0, 200)} status=${status.text.slice(0, 200)} ` +
+                `builds=${builds.text.slice(0, 200)})`,
+        ).toEqual({ target: 200, status: 200, builds: 200 });
+
+        const targetBody = JSON.parse(target.text) as { target?: string };
+        expect(targetBody.target, 'R-12: the stored target is None').toBe('none');
+        const statusBody = JSON.parse(status.text) as {
+            target?: string;
+            state?: string;
+            url?: string | null;
+        };
+        expect(statusBody.target, '/app-status reports the same None target').toBe('none');
+        expect(statusBody.state, 'a None-target Work runs nowhere').toBe('not-deployed');
+        expect(statusBody.url ?? null, 'and so has no address').toBeNull();
+        const buildsBody = JSON.parse(builds.text) as { total?: unknown; items?: unknown };
+        expect(typeof buildsBody.total, '/builds answers a page').toBe('number');
+        expect(Array.isArray(buildsBody.items)).toBe(true);
     });
 
     test('the literal "none" is refused: R-12’s value is the stored target, not an input', async ({

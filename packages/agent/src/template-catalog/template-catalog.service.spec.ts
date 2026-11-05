@@ -1071,6 +1071,96 @@ describe('TemplateCatalogService', () => {
         });
     });
 
+    // APW-08 T41 (review of #3077) — ever-works/build-on-open-source-app-mission-template is a public
+    // repository whose name ends in "template", like every Mission template repository: the name rule
+    // alone would list it as a WEBSITE template in the Create-Work picker.
+    describe('Mission template repositories are not website templates (APW-08 T41)', () => {
+        const websiteTemplateRepository = {
+            name: 'astro-blog-template',
+            owner: 'ever-works',
+            url: 'https://github.com/ever-works/astro-blog-template',
+            fullName: 'ever-works/astro-blog-template',
+            defaultBranch: 'main',
+            description: 'Astro blog template',
+        };
+        const missionTemplateRepository = {
+            name: 'build-on-open-source-app-mission-template',
+            owner: 'ever-works',
+            url: 'https://github.com/ever-works/build-on-open-source-app-mission-template',
+            fullName: 'ever-works/build-on-open-source-app-mission-template',
+            defaultBranch: 'main',
+            description: 'Mission template',
+        };
+        const otherMissionTemplateRepository = {
+            ...missionTemplateRepository,
+            name: 'some-future-mission-template',
+            url: 'https://github.com/ever-works/some-future-mission-template',
+            fullName: 'ever-works/some-future-mission-template',
+        };
+        const discoveredMissionTemplateRow = {
+            id: 'build-on-open-source-app-mission-template',
+            kind: 'website',
+            sourceType: 'built_in',
+            repositoryOwner: 'ever-works',
+            repositoryName: 'build-on-open-source-app-mission-template',
+            isActive: true,
+            metadata: { discoveredFromOrganization: 'ever-works' },
+        };
+
+        beforeEach(() => {
+            templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(true);
+            gitFacade.getAccessToken.mockResolvedValue(null);
+            templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue(null);
+            templateRepository.findById.mockResolvedValue(null);
+            templateRepository.findVisibleByKind.mockResolvedValue([]);
+            userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+        });
+
+        it('saves only the website template, never a Mission template repository', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                missionTemplateRepository,
+                websiteTemplateRepository,
+                otherMissionTemplateRepository,
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.upsert).toHaveBeenCalledTimes(1);
+            expect(templateRepository.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'astro-blog-template', kind: 'website' }),
+            );
+        });
+
+        it('retires a website row an earlier discovery saved for a Mission template repository', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                websiteTemplateRepository,
+                missionTemplateRepository,
+            ]);
+            templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
+                async (kind: string, owner: string, repo: string) =>
+                    kind === 'website' &&
+                    owner === 'ever-works' &&
+                    repo === 'build-on-open-source-app-mission-template'
+                        ? [discoveredMissionTemplateRow]
+                        : [],
+            );
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.updateById).toHaveBeenCalledTimes(1);
+            expect(templateRepository.updateById).toHaveBeenCalledWith(
+                'build-on-open-source-app-mission-template',
+                {
+                    metadata: expect.objectContaining({
+                        discoveredFromOrganization: 'ever-works',
+                        retiredReason: 'mission_template',
+                        retiredAt: expect.any(String),
+                    }),
+                },
+            );
+        });
+    });
+
     // A retired row (FR-5 c) is kept ONLY so the Works already on it keep
     // resolving. Greptile P1 #1 on https://github.com/ever-works/ever-works/pull/2511:
     // a row kept for old Works must not stay in every user's picker, and no

@@ -294,7 +294,7 @@ complete, and the promotion guard allows it:
 1. `TaskMergeGateService` raises a `merge_pull_request` proposal bound to
    `merge:<taskId>:<prNumber>:<headSha>`.
 2. It appears in your Inbox as
-   `Merge PR #N into stage in ever-works/ever-works for T-9 (@ <sha12>)`,
+   `Merge PR #N into stage in ever-co/ever-works for T-9 (@ <sha12>)`,
    with Approve / Reject. **"Approve all" cannot approve it** — a merge is
    decided one pull request at a time.
 3. You approve. On the NEXT refresh (≈2 minutes, or immediately with

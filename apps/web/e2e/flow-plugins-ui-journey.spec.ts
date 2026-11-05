@@ -80,11 +80,19 @@ async function listByCategory(request: APIRequestContext, token: string, categor
  * The /plugins card for a plugin display name: anchor on its <h3> heading, then
  * keep the ancestor that also holds the "Settings" link (the card footer).
  */
+/**
+ * The card is the INNERMOST `div` holding both the plugin's h3 and its Settings link
+ * (PluginCard's root; its header row has no link and its footer row no heading), so
+ * `.last()` — matches come outermost-first in document order. `.first()` resolved to an
+ * outer page wrapper, which since 952f40ad7 also encloses the collapsed sidebar's
+ * `aria-label="Settings"` link, and `card.getByRole('link', { name: /Settings/ })` then
+ * matched two links (stage run 41605694388, shard 17: strict-mode violation).
+ */
 function pluginCard(page: Page, name: string) {
     return page
         .locator('div', { has: page.getByRole('heading', { level: 3, name, exact: true }) })
         .filter({ has: page.getByRole('link', { name: /Settings/i }) })
-        .first();
+        .last();
 }
 
 async function openPluginsList(page: Page) {

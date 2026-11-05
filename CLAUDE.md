@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Ever Works** is an open-source work builder platform with AI-powered content generation.
 
-- **Repository**: https://github.com/ever-works/ever-works
+- **Repository**: https://github.com/ever-co/ever-works
 - **Docs site**: https://docs.ever.works (built from `apps/docs/`, content in `docs/`)
 - **Specs**: `docs/specs/` (internal architecture specs + GitHub Spec Kit format under `docs/specs/features/`)
 

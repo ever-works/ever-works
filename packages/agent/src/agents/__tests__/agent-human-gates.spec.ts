@@ -249,7 +249,7 @@ describe('AgentProposalExecutionListener', () => {
     it('a replayed / stale file edit is refused by the real hash check and reported', async () => {
         // A real AgentFileService over a row whose hash moved on after the
         // agent proposed: the approved proposal must not overwrite it.
-        const { AgentFileService } = await import('../agent-file.service');
+        const { AgentFileService } = await import('../agent-file.service.js');
         const row = {
             id: 'agent-1',
             userId: 'owner-1',

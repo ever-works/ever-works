@@ -19,6 +19,8 @@ interface EverIdCreateAccountClientProps {
      * blocked — the same rule as the register page.
      */
     termsDocuments: TermsAcceptanceDocument[];
+    /** The Ever handle of a company request this account is being made for, if any. */
+    linkedHandle?: string | null;
 }
 
 /**
@@ -30,6 +32,7 @@ interface EverIdCreateAccountClientProps {
 export function EverIdCreateAccountClient({
     identity,
     termsDocuments,
+    linkedHandle = null,
 }: EverIdCreateAccountClientProps) {
     const t = useTranslations('auth.everId');
     const router = useRouter();
@@ -124,6 +127,14 @@ export function EverIdCreateAccountClient({
                     create();
                 }}
             >
+                {linkedHandle ? (
+                    <p
+                        data-testid="ever-id-create-account-linked-handle"
+                        className="text-sm text-text dark:text-text-dark"
+                    >
+                        {t('createAccount.linkedTo', { handle: linkedHandle })}
+                    </p>
+                ) : null}
                 {error ? (
                     <div
                         role="alert"
