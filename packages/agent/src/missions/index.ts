@@ -17,6 +17,8 @@ export * from './mission-clone.service';
 export * from './mission-template.config';
 // Phase 8 PR JJ — Mission Template `.works/mission.yml` parser.
 export * from './mission-template-manifest.service';
+// APW-08 T38 — the manifest's reader (through the git facade).
+export * from './mission-template-manifest.reader';
 export {
     Mission,
     MissionStatus,

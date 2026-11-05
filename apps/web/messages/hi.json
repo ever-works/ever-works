@@ -898,6 +898,24 @@
                 "error": "मिशन नहीं बनाया जा सका। कृपया पुनः प्रयास करें।",
                 "chatUnavailable": "चैट अभी उपलब्ध नहीं है — इसके बजाय \"मैन्युअल रूप से बनाएँ\" का उपयोग करें।"
             },
+            "buildOnApp": {
+                "product": "उत्पाद",
+                "business": "व्यवसाय",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "कोई App Work चुनें",
+                "noAppWorks": "आपके पास अभी कोई App Work नहीं है। पहले Works से एक जोड़ें।",
+                "summary": "हर सोमवार 08:00 UTC · हर सप्ताह अधिकतम {count} Tasks · प्रति रन {amount}",
+                "backlogNote": "नए Tasks आपकी मंज़ूरी के लिए Backlog में इंतज़ार करते हैं।",
+                "suggestedGoals": "सुझाए गए लक्ष्य (ड्राफ़्ट के रूप में बनाए जाते हैं):",
+                "rules": "सुझाए गए ऐप नियम: स्कीमा बदलाव कोई व्यक्ति मर्ज करता है, अधिकतम {lines} पंक्तियों के PR",
+                "proposeRules": "ये नियम प्रस्तावित करें",
+                "proposeNeedsAppWork": "पहले कोई App Work चुनें।",
+                "rulesProposed": "ऐप नियम बदलने के लिए App Work पर एक Task खोला गया।",
+                "rulesFailed": "Task नहीं खुल सका। फिर से कोशिश करें।",
+                "create": "मिशन बनाएँ",
+                "templateUnreadable": "टेम्पलेट पढ़ा नहीं जा सका, इसलिए केवल आपके दर्ज किए गए मान इस्तेमाल हुए।",
+                "templatePartial": "मिशन बन गया, लेकिन उसके टेम्पलेट का कुछ हिस्सा लागू नहीं हो सका।"
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

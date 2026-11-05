@@ -8,7 +8,7 @@ import {
 import type { RosterBlueprintSlug, RosterLaneKey } from '@ever-works/contracts/api';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
-import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+import { assertUuid } from '../../trigger/worker/utils/assert-uuid.utils';
 
 /**
  * AW-20 P1 — provision one roster: a coordinator plus lane-owning

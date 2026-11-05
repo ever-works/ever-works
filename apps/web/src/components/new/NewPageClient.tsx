@@ -8,6 +8,9 @@ import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { RegisterCompanyDialog } from '@/components/organizations/RegisterCompanyDialog';
+import { NewMissionForm, type NewMissionFormTemplate } from '@/components/missions/NewMissionForm';
+import { templateTakesAppWork } from '@/components/missions/BuildOnAppTemplateFields';
+import { createMissionAction } from '@/app/actions/dashboard/missions';
 import { ALL_NEW_CHIP_VALUES, type ChipType } from './new-prompt.shared';
 import { useNewPrompt } from './use-new-prompt';
 
@@ -54,6 +57,15 @@ export interface NewPageClientProps {
     initialPrompt?: string;
     initialTemplateId?: string;
     /**
+     * APW-08 T40 (APW08-G13) — the catalog template behind `?template=<id>` with its manifest. A
+     * template about an App Work (its manifest has `appWork`) renders the Mission form with the
+     * template's fields — the same `NewMissionForm` as `/missions/new?template=<id>` — instead of
+     * the prompt composer; any other template keeps the composer path below.
+     */
+    missionTemplate?: NewMissionFormTemplate | null;
+    /** APW-08 T40 — the template's description, the form's starting description. */
+    missionTemplateDescription?: string;
+    /**
      * Work-kind chip values whose `works-<value>` PostHog flag resolved
      * to an explicit `false`. Evaluated server-side and passed down (the
      * web app keeps `posthog-js` out of the client bundle). Defaults to
@@ -68,6 +80,8 @@ export function NewPageClient({
     initialType = 'mission',
     initialPrompt,
     initialTemplateId,
+    missionTemplate = null,
+    missionTemplateDescription = '',
     disabledKinds = [],
 }: NewPageClientProps) {
     const t = useTranslations('dashboard.newPage');
@@ -120,6 +134,21 @@ export function NewPageClient({
             router.push(ROUTES.DASHBOARD_MISSION(mission.id));
         },
     });
+
+    // APW-08 T40 — "Use this Template" on a template about an App Work: the shared Mission form.
+    if (
+        initialType === 'mission' &&
+        missionTemplate &&
+        templateTakesAppWork(missionTemplate.manifest)
+    ) {
+        return (
+            <NewMissionForm
+                createMission={createMissionAction}
+                template={missionTemplate}
+                initialDescription={missionTemplateDescription}
+            />
+        );
+    }
 
     return (
         <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto space-y-6">

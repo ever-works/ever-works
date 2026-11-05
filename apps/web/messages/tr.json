@@ -898,6 +898,24 @@
                 "error": "Görev oluşturulamadı. Lütfen tekrar deneyin.",
                 "chatUnavailable": "Sohbet şu anda kullanılamıyor — \"Elle oluştur\" seçeneğini kullanın."
             },
+            "buildOnApp": {
+                "product": "Ürün",
+                "business": "İşletme",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Bir App Work seçin",
+                "noAppWorks": "Henüz bir App Work’ünüz yok. Önce Works’ten bir tane ekleyin.",
+                "summary": "Her pazartesi 08:00 UTC · haftada en fazla {count} iş · çalıştırma başına {amount}",
+                "backlogNote": "Yeni işler Backlog’da onayınızı bekler.",
+                "suggestedGoals": "Önerilen hedefler (taslak olarak oluşturulur):",
+                "rules": "Önerilen uygulama kuralları: şema değişikliklerini bir kişi birleştirir, en fazla {lines} satırlık PR’lar",
+                "proposeRules": "Bu kuralları öner",
+                "proposeNeedsAppWork": "Önce bir App Work seçin.",
+                "rulesProposed": "App Work’te uygulama kurallarını değiştirmek için bir iş açıldı.",
+                "rulesFailed": "İş açılamadı. Tekrar deneyin.",
+                "create": "Görev oluştur",
+                "templateUnreadable": "Şablon okunamadı; yalnızca girdiğiniz değerler kullanıldı.",
+                "templatePartial": "Görev oluşturuldu ancak şablonunun bir kısmı uygulanamadı."
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",

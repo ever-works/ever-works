@@ -291,7 +291,7 @@ jobs:
           CONTROL_NOTE=""
           if [ "${OVERALL_OK}" -eq 0 ]; then
             probe_once "${CONTROL_URL}"
-            read -r C_CODE C_DNS C_CONN C_TLS C_TTFB C_TOTAL C_SIZE <<< "${W}"
+            read -r C_CODE _ <<< "${W}"
             if [ "${CURL_RC}" -ne 0 ] || [ "${C_CODE}" != "200" ]; then
               CONTROL_NOTE="> ⚠️ **VANTAGE POINT SUSPECT** — the unrelated control target \`${CONTROL_URL}\` ALSO failed (HTTP ${C_CODE}, curl exit ${CURL_RC}). This runner's own egress is degraded, so treat the failures above as UNCONFIRMED until a second vantage point agrees."
             else

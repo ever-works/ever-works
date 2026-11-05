@@ -7,7 +7,7 @@ import { PtyLocalPlugin } from '@ever-works/pty-local-plugin';
 import { TriggerTerminalModule } from '../../trigger/worker/modules/trigger-terminal.module';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
-import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+import { assertUuid } from '../../trigger/worker/utils/assert-uuid.utils';
 import { TerminalTransportClient } from '../../trigger/worker/services/terminal-transport.client';
 import { TerminalSessionHost } from '../../trigger/worker/services/terminal-session-host';
 import { resolveTerminalSessionSpawner } from '../../trigger/worker/services/terminal-provider.resolver';

@@ -6,7 +6,7 @@ import { AgentRunService, computeNextHeartbeat } from '@ever-works/agent/agents'
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 // Security: import assertUuid to validate Trigger.dev payload fields before any DB access
-import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+import { assertUuid } from '../../trigger/worker/utils/assert-uuid.utils';
 
 export interface AgentHeartbeatPayload {
     agentId: string;

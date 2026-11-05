@@ -871,11 +871,26 @@ export class TemplateCatalogService implements OnModuleInit {
             const templateNamedRepositories = repositories.filter((repository) =>
                 this.isStandardTemplateRepository(repository.name),
             );
+            // APW-08 T41 — a Mission template repository (a curated
+            // MISSION_TEMPLATES row, or any `*-mission-template` repository) is
+            // named like a website template too, and is never one.
             const standardTemplates = templateNamedRepositories.filter(
-                (repository) => !this.isAppBlueprintRepository(repository),
+                (repository) =>
+                    !this.isAppBlueprintRepository(repository) &&
+                    !this.isMissionTemplateRepository(repository),
             );
-            const appBlueprintRepositories = templateNamedRepositories.filter((repository) =>
-                this.isAppBlueprintRepository(repository),
+            const notWebsiteRepositories = templateNamedRepositories.flatMap(
+                (
+                    repository,
+                ): Array<{ repository: typeof repository; reason: TemplateRetirementReason }> => {
+                    if (this.isAppBlueprintRepository(repository)) {
+                        return [{ repository, reason: 'app_blueprint' }];
+                    }
+                    if (this.isMissionTemplateRepository(repository)) {
+                        return [{ repository, reason: 'mission_template' }];
+                    }
+                    return [];
+                },
             );
 
             // Repos already represented by a curated WEBSITE_TEMPLATES entry —
@@ -903,7 +918,7 @@ export class TemplateCatalogService implements OnModuleInit {
             // id. A failure here is logged and never blocks discovery of the
             // real website templates below.
             await Promise.all(
-                appBlueprintRepositories.map(async (repository) => {
+                notWebsiteRepositories.map(async ({ repository, reason }) => {
                     const coordinateKey = `${repository.owner.toLowerCase()}/${repository.name.toLowerCase()}`;
                     if (curatedRepoCoordinates.has(coordinateKey)) {
                         return;
@@ -936,7 +951,7 @@ export class TemplateCatalogService implements OnModuleInit {
                                     !isRetiredTemplate(row),
                             )
                             .map((row) =>
-                                this.retireAppBlueprintTemplateRow(row, repository.fullName),
+                                this.retireDiscoveredTemplateRow(row, repository.fullName, reason),
                             ),
                     );
                 }),
@@ -1294,26 +1309,43 @@ export class TemplateCatalogService implements OnModuleInit {
      *
      * Never throws: a failed write is logged, and the next discovery retries.
      */
-    private async retireAppBlueprintTemplateRow(
+    private async retireDiscoveredTemplateRow(
         row: Pick<Template, 'id' | 'metadata'>,
         repositoryFullName: string,
+        reason: TemplateRetirementReason,
     ): Promise<void> {
+        const what = reason === 'mission_template' ? 'a Mission template' : 'an App Blueprint';
         try {
             await this.templateRepository.updateById(row.id, {
-                metadata: withTemplateRetirement(row.metadata, 'app_blueprint'),
+                metadata: withTemplateRetirement(row.metadata, reason),
             });
             this.logger.log(
-                `Retired discovered website template "${row.id}": ${repositoryFullName} is an App Blueprint. ` +
+                `Retired discovered website template "${row.id}": ${repositoryFullName} is ${what}. ` +
                     'Works already using it keep resolving it; it is no longer listed or selectable.',
             );
         } catch (error) {
             this.logger.warn(
-                `Could not retire discovered website template "${row.id}" (${repositoryFullName} is an ` +
-                    `App Blueprint); retrying on the next discovery: ${
+                `Could not retire discovered website template "${row.id}" (${repositoryFullName} is ` +
+                    `${what}); retrying on the next discovery: ${
                         error instanceof Error ? error.message : String(error)
                     }`,
             );
         }
+    }
+
+    /**
+     * APW-08 T41 — a Mission template repository: a curated `MISSION_TEMPLATES`
+     * row's coordinates, or a repository named `*-mission-template`. Its name
+     * ends in "template", so the website name rule alone would list it.
+     */
+    private isMissionTemplateRepository(repository: { owner: string; name: string }): boolean {
+        const key = `${repository.owner.toLowerCase()}/${repository.name.toLowerCase()}`;
+        return (
+            /-mission-template$/i.test(repository.name.trim()) ||
+            listMissionTemplates().some(
+                (template) => `${template.owner}/${template.repo}`.toLowerCase() === key,
+            )
+        );
     }
 
     /**
