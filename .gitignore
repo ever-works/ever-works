@@ -113,3 +113,6 @@ apps/desktop-node/release
 # Egress audit (tools/egress-audit): the pinned harness checkout and the evidence of a run
 .egress-audit/
 egress-audit-artifacts/
+
+# Graphify knowledge graph: local, per-machine build output (never commit)
+graphify-out/
