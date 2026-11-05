@@ -268,7 +268,7 @@ test.describe('APW-08 T42 — Use this Template: Build on an open-source app', (
         }
     });
 
-    test('template inputs are refused for a Work that is not the caller’s, and without a template', async ({
+    test('template inputs naming an unknown Work are 404, and without a template 400', async ({
         request,
     }) => {
         const token = await seededToken(request);
