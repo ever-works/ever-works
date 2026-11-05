@@ -37,8 +37,14 @@ const SIMPLE_MODEL = 'gpt-6-luna';
 const DEFAULT_MODEL = COMPLEX_MODEL;
 const BOOTSTRAP_MODEL = SIMPLE_MODEL;
 
-/** Context window of the GPT-6 family: 1,050,000 tokens (developers.openai.com, checked 2026-11-05). */
-const GPT_6_CONTEXT_WINDOW = 1050000;
+/**
+ * Plugin-wide context hint, used only when neither the live model list nor the
+ * catalogue knows a model's window. It stays at the smallest window of the
+ * models a config may still name (gpt-4o / gpt-4o-mini: 128,000), because the
+ * AI facade also uses it as the output ceiling in its pre-flight cost check;
+ * the GPT-6 family's own 1,050,000-token window comes from the live list.
+ */
+const FALLBACK_CONTEXT_WINDOW = 128000;
 
 /**
  * OpenAI AI provider plugin
@@ -344,7 +350,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			supportsStreaming: true,
 			supportsToolCalling: true,
 			supportsVision: true,
-			maxContextLength: GPT_6_CONTEXT_WINDOW
+			maxContextLength: FALLBACK_CONTEXT_WINDOW
 		};
 	}
 

@@ -59,7 +59,7 @@ Model defaults as of 2026-11-05 — source: [docs.mistral.ai/models](https://doc
 | Complex Tasks Model                                      | `mistral-large-latest`  | `mistral-large-2512` (Mistral Large 3; deprecated 2026-10-31, retires 2027-04-30) |
 | Bootstrap and fallback (`onLoad`, `getDefaultModelId()`) | `mistral-small-latest`  | `mistral-small-2603`                                                              |
 
-**No default changed in this refresh.** The tiers stay on Mistral's `-latest` aliases, which the vendor moves forward on its own, so the model behind an unsaved config can change without an Ever Works release. Caveat: today `mistral-medium-latest` and `mistral-large-latest` point at models deprecated on 2026-10-31. Their suggested successor, `mistral-large-4`, is in Public Preview; the defaults will be revisited when it is GA. To pin a model, save its dated id (for example `mistral-large-2512`); a saved id is kept and sent to Mistral unchanged.
+**No default changed in this refresh.** The tiers stay on Mistral's `-latest` aliases, which the vendor moves forward on its own, so the model behind an unsaved config can change without an Ever Works release. Caveat: today `mistral-medium-latest` and `mistral-large-latest` point at models deprecated on 2026-10-31. Their suggested successor, `mistral-large-4`, is in Public Preview; the defaults will be revisited when it is GA. To pin a model, save its dated id (for example `mistral-small-2603`); a saved id is kept and sent to Mistral unchanged.
 
 ## Troubleshooting
 

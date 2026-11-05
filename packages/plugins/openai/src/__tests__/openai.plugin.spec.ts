@@ -206,8 +206,11 @@ describe('OpenAiPlugin', () => {
 	});
 
 	describe('capabilities and manifest text', () => {
-		it('advertises the GPT-6 family context window (1,050,000 tokens, developers.openai.com, 2026-11-05)', () => {
-			expect(plugin.getCapabilities().maxContextLength).toBe(1050000);
+		// The plugin-wide hint is only a fallback (the live model list carries each
+		// model's own window) and doubles as the facade's pre-flight output ceiling,
+		// so it stays at the smallest window a saved model may still have.
+		it('keeps the conservative fallback context hint (128,000 tokens)', () => {
+			expect(plugin.getCapabilities().maxContextLength).toBe(128000);
 		});
 
 		it('names current models, not GPT-4o, in its marketing text', () => {
