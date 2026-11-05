@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MistralPlugin } from '../mistral.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
 
 vi.mock('@ever-works/plugin/ai', () => {
 	const MockAiOperations = vi.fn().mockImplementation(function () {
@@ -143,6 +144,106 @@ describe('MistralPlugin', () => {
 			for (const [key, prop] of Object.entries(props)) {
 				expect((prop as any).title, `${key} should have a title`).toBeDefined();
 			}
+		});
+	});
+
+	/**
+	 * Model defaults as of 2026-11-05 (models refresh), read on
+	 * https://docs.mistral.ai/models that day. The tiers stay on Mistral's
+	 * `-latest` aliases, which the vendor moves forward on its own:
+	 *   mistral-small-latest  → mistral-small-2603 (Small 4, GA)
+	 *   mistral-medium-latest → mistral-medium-3-5 (deprecated 2026-10-31, retires 2027-04-30)
+	 *   mistral-large-latest  → mistral-large-2512 (Large 3; deprecated 2026-10-31, retires 2027-04-30)
+	 * The suggested successor, mistral-large-4, is in Public Preview, so no
+	 * default changes in this refresh; revisit when it is GA. These pins make a
+	 * change to the aliases a deliberate one. Update from that page, never from
+	 * memory.
+	 */
+	describe('model defaults (as of 2026-11-05)', () => {
+		const EXPECTED_TIER_DEFAULTS: Record<string, string> = {
+			defaultModel: 'mistral-small-latest',
+			simpleModel: 'mistral-small-latest',
+			mediumModel: 'mistral-medium-latest',
+			complexModel: 'mistral-large-latest'
+		};
+		const EXPECTED_BOOTSTRAP_MODEL = 'mistral-small-latest';
+
+		/** Pinned snapshots a user may have saved instead of the aliases. */
+		const SAVED_SNAPSHOT_MODELS: Record<string, string> = {
+			defaultModel: 'mistral-small-2603',
+			simpleModel: 'mistral-small-2603',
+			mediumModel: 'mistral-medium-latest',
+			complexModel: 'mistral-large-2512'
+		};
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'mistral',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		const loadedAiOps = async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			return {
+				bootstrapModel: (MockAiOperations.mock.calls[0][0] as { model: string }).model,
+				aiOpsInstance: MockAiOperations.mock.results[0].value
+			};
+		};
+
+		it("keeps each tier on the vendor's -latest alias for that role", () => {
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				expect(schemaDefault(key), key).toBe(id);
+			}
+		});
+
+		it('uses the default model for the onLoad bootstrap and getDefaultModelId()', async () => {
+			const { bootstrapModel, aiOpsInstance } = await loadedAiOps();
+
+			// No `defaultModel` in the settings: validateConnection falls back to
+			// getDefaultModelId(), the path every unsaved config takes.
+			await plugin.validateConnection({ apiKey: 'mistral-test' });
+			const fallbackModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(fallbackModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(schemaDefault('defaultModel')).toBe(EXPECTED_BOOTSTRAP_MODEL);
+		});
+
+		it('lets a saved snapshot id pass settings validation (no enum or pattern on the model fields)', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const key of Object.keys(SAVED_SNAPSHOT_MODELS)) {
+				const prop = props[key] as Record<string, unknown>;
+				expect(prop.type, key).toBe('string');
+				expect(prop, key).not.toHaveProperty('enum');
+				expect(prop, key).not.toHaveProperty('const');
+				expect(prop, key).not.toHaveProperty('pattern');
+			}
+			expect(
+				validateSettingsConstraints({ apiKey: 'mistral-test', ...SAVED_SNAPSHOT_MODELS }, props as never)
+			).toEqual([]);
+		});
+
+		it('sends a saved snapshot id to AiOperations unchanged', async () => {
+			const { aiOpsInstance } = await loadedAiOps();
+			const settings = { apiKey: 'mistral-test', ...SAVED_SNAPSHOT_MODELS };
+
+			await plugin.createChatCompletion({
+				model: 'mistral-large-2512',
+				messages: [{ role: 'user', content: 'hi' }],
+				settings
+			});
+			const [options, config] = aiOpsInstance.createChatCompletion.mock.calls[0];
+			expect(options.model).toBe('mistral-large-2512');
+			expect(config.model).toBe('mistral-small-2603');
+
+			await plugin.validateConnection(settings);
+			const tested = aiOpsInstance.testConnection.mock.calls.map((call: unknown[]) => call[1]);
+			expect([...tested].sort()).toEqual(['mistral-large-2512', 'mistral-medium-latest', 'mistral-small-2603']);
 		});
 	});
 

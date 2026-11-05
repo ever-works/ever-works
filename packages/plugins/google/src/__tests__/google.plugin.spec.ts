@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GooglePlugin } from '../google.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
 
 vi.mock('@ever-works/plugin/ai', () => {
 	const MockAiOperations = vi.fn().mockImplementation(function () {
@@ -95,6 +96,120 @@ describe('GooglePlugin', () => {
 			for (const [key, prop] of Object.entries(props)) {
 				expect((prop as any).title, `${key} should have a title`).toBeDefined();
 			}
+		});
+	});
+
+	/**
+	 * Model defaults as of 2026-11-05 (models refresh). Every id was read on the
+	 * vendor's pages that day (ai.google.dev/gemini-api/docs/* redirects here):
+	 *   https://aistudio.google.com/docs/models
+	 *   https://aistudio.google.com/docs/deprecations
+	 *   https://aistudio.google.com/docs/changelog
+	 * Each tier gets the vendor's current model for its role: simple = Gemini 3.5
+	 * Flash-Lite ("fastest, most cost-effective"), medium = Gemini 3.8 Flash,
+	 * complex = Gemini 4 Argon (flagship, GA 2026-10-13). The default keeps its
+	 * shape (it equals the medium tier) and the `models/` prefix stays. Fixes:
+	 * the simple tier's previous id, gemini-2.0-flash, was shut down on
+	 * 2026-06-01; gemini-2.5-flash and gemini-2.5-pro are deprecated since
+	 * 2026-11-02. Update from those pages, never from memory.
+	 */
+	describe('model defaults (as of 2026-11-05)', () => {
+		const EXPECTED_TIER_DEFAULTS: Record<string, string> = {
+			defaultModel: 'models/gemini-3.8-flash',
+			simpleModel: 'models/gemini-3.5-flash-lite',
+			mediumModel: 'models/gemini-3.8-flash',
+			complexModel: 'models/gemini-4-argon'
+		};
+		const EXPECTED_BOOTSTRAP_MODEL = 'models/gemini-3.8-flash';
+
+		/** Ids an earlier release shipped as tier defaults (2.0 Flash is shut down, 2.5 is deprecated). */
+		const LEGACY_SAVED_MODELS: Record<string, string> = {
+			defaultModel: 'models/gemini-2.5-flash',
+			simpleModel: 'models/gemini-2.0-flash',
+			mediumModel: 'models/gemini-2.5-flash',
+			complexModel: 'models/gemini-2.5-pro'
+		};
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'google',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		const loadedAiOps = async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			return {
+				bootstrapModel: (MockAiOperations.mock.calls[0][0] as { model: string }).model,
+				aiOpsInstance: MockAiOperations.mock.results[0].value
+			};
+		};
+
+		it("defaults each tier to the vendor's current model for that role", () => {
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				expect(schemaDefault(key), key).toBe(id);
+			}
+		});
+
+		it('uses the default model for the onLoad bootstrap and getDefaultModelId()', async () => {
+			const { bootstrapModel, aiOpsInstance } = await loadedAiOps();
+
+			// No `defaultModel` in the settings: validateConnection falls back to
+			// getDefaultModelId(), the path every unsaved config takes.
+			await plugin.validateConnection({ apiKey: 'google-test' });
+			const fallbackModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(fallbackModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(schemaDefault('defaultModel')).toBe(EXPECTED_BOOTSTRAP_MODEL);
+		});
+
+		it('lets a saved legacy id pass settings validation (no enum or pattern on the model fields)', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const key of Object.keys(LEGACY_SAVED_MODELS)) {
+				const prop = props[key] as Record<string, unknown>;
+				expect(prop.type, key).toBe('string');
+				expect(prop, key).not.toHaveProperty('enum');
+				expect(prop, key).not.toHaveProperty('const');
+				expect(prop, key).not.toHaveProperty('pattern');
+			}
+			expect(
+				validateSettingsConstraints({ apiKey: 'google-test', ...LEGACY_SAVED_MODELS }, props as never)
+			).toEqual([]);
+		});
+
+		it('sends a saved legacy id to AiOperations unchanged', async () => {
+			const { aiOpsInstance } = await loadedAiOps();
+			const settings = { apiKey: 'google-test', ...LEGACY_SAVED_MODELS };
+
+			await plugin.createChatCompletion({
+				model: 'models/gemini-2.5-pro',
+				messages: [{ role: 'user', content: 'hi' }],
+				settings
+			});
+			const [options, config] = aiOpsInstance.createChatCompletion.mock.calls[0];
+			expect(options.model).toBe('models/gemini-2.5-pro');
+			expect(config.model).toBe('models/gemini-2.5-flash');
+
+			await plugin.validateConnection(settings);
+			const tested = aiOpsInstance.testConnection.mock.calls.map((call: unknown[]) => call[1]);
+			expect([...tested].sort()).toEqual([
+				'models/gemini-2.0-flash',
+				'models/gemini-2.5-flash',
+				'models/gemini-2.5-pro'
+			]);
+		});
+	});
+
+	describe('manifest text', () => {
+		it('names the current complex-tier model, not "Gemini Pro"', () => {
+			const readme = plugin.getManifest().readme;
+			expect(readme).not.toMatch(/Gemini Pro/);
+			expect(readme).toMatch(/Gemini 4 Argon/);
 		});
 	});
 
