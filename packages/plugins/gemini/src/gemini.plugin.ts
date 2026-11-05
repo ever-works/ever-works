@@ -78,74 +78,64 @@ import {
 	DEFAULT_TARGET_ITEMS
 } from './form-schema.js';
 
+/**
+ * Gemini model catalog, as of 2026-11-05. Sources:
+ * - https://aistudio.google.com/docs/models (ids, 1,048,576 input / 65,536 output tokens)
+ * - https://aistudio.google.com/docs/deprecations (deprecations and shutdowns)
+ * - https://github.com/google-gemini/gemini-cli (the CLI README says it is not optimized for
+ *   Gemini 4+; an explicit `--model` id still passes through)
+ *
+ * Availability depends on the account, plan and region. The picker also accepts a custom id,
+ * and a saved id that is no longer listed keeps working as free text (`--model` takes it as is).
+ *
+ * Legacy handling (models refresh decision 2): `gemini-2.5-pro` and `gemini-2.5-flash` were
+ * deprecated on 2026-11-02 (existing users only; re-routed from 2026-12-01) and
+ * `gemini-2.5-flash-lite` is limited to past users, so they stay, labelled "(legacy)".
+ * `gemini-3.1-flash-lite-preview` shut down on 2026-05-25 and is no longer listed.
+ */
 const GEMINI_SUPPORTED_MODELS: readonly AiModel[] = [
-	{
-		id: 'gemini-3.1-pro-preview',
-		name: 'Gemini 3.1 Pro (Preview)',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'gemini-3.1-flash-lite-preview',
-		name: 'Gemini 3.1 Flash-Lite (Preview)',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'gemini-3-flash-preview',
-		name: 'Gemini 3 Flash (Preview)',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'gemini-2.5-pro',
-		name: 'Gemini 2.5 Pro',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'gemini-2.5-flash',
-		name: 'Gemini 2.5 Flash',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'gemini-2.5-flash-lite',
-		name: 'Gemini 2.5 Flash-Lite',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	}
+	buildGeminiModel(
+		'gemini-4-argon',
+		'Gemini 4 Argon',
+		'Flagship Gemini model (GA 2026-10-13). The Gemini CLI is not yet optimized for Gemini 4+.'
+	),
+	buildGeminiModel('gemini-3.8-flash', 'Gemini 3.8 Flash', 'Most intelligent Flash model (GA 2026-09-02). Default.'),
+	buildGeminiModel('gemini-3.6-flash', 'Gemini 3.6 Flash', 'Previous Flash release (GA 2026-07-21).'),
+	buildGeminiModel('gemini-3.5-flash-lite', 'Gemini 3.5 Flash-Lite', 'Fastest, most cost-effective Gemini model.'),
+	buildGeminiModel('gemini-3.1-pro-preview', 'Gemini 3.1 Pro (Preview)', 'Preview model; no shutdown announced.'),
+	buildGeminiModel('gemini-3-flash-preview', 'Gemini 3 Flash (Preview)', 'Preview model; no shutdown announced.'),
+	buildGeminiModel(
+		'gemini-2.5-pro',
+		'Gemini 2.5 Pro (legacy)',
+		'Deprecated 2026-11-02: existing users only, re-routed from 2026-12-01.'
+	),
+	buildGeminiModel(
+		'gemini-2.5-flash',
+		'Gemini 2.5 Flash (legacy)',
+		'Deprecated 2026-11-02: existing users only, re-routed from 2026-12-01.'
+	),
+	buildGeminiModel(
+		'gemini-2.5-flash-lite',
+		'Gemini 2.5 Flash-Lite (legacy)',
+		'Access limited to past users since 2026-09-18.'
+	)
 ] as const;
+
+function buildGeminiModel(id: string, name: string, description: string): AiModel {
+	return {
+		id,
+		name,
+		description,
+		capabilities: {
+			supportsStructuredOutput: true,
+			supportsStreaming: true,
+			supportsToolCalling: true,
+			supportsVision: true,
+			maxContextLength: 1_048_576,
+			maxOutputTokens: 65_536
+		}
+	};
+}
 
 const LOG_MESSAGE_MAX_LENGTH = 500;
 
@@ -240,7 +230,8 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				'x-scope': 'global',
 				'x-widget': 'model-select',
 				default: DEFAULT_MODEL,
-				description: 'Gemini model to use for generation.'
+				description:
+					'Gemini model to use for generation. Availability depends on your account, plan and region; custom model ids are accepted.'
 			}
 		}
 	};

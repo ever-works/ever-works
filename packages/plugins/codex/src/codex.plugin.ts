@@ -93,41 +93,51 @@ import {
 } from './utils/pipeline-helpers.js';
 import { startTaxonomyWatcher } from './utils/taxonomy-watcher.js';
 
+/**
+ * Codex model catalog, as of 2026-11-05. Sources:
+ * - https://learn.chatgpt.com/docs/models (models offered in Codex; default GPT-6.1 Sol)
+ * - https://developers.openai.com/api/docs/models (ids, 1,050,000 context / 128,000 output)
+ * - https://developers.openai.com/api/docs/deprecations (retirements)
+ *
+ * Which ids a user can run depends on how Codex signs in: ChatGPT sign-in follows the plan,
+ * API-key sessions follow the OpenAI organization and project. The picker also accepts a
+ * custom id, and a saved id that is no longer listed keeps working as free text.
+ *
+ * Legacy handling (models refresh decision 2): `gpt-5.4` is still GA in the API (it left
+ * Codex ChatGPT sign-in on 2026-08-31), so it stays, labelled "(legacy)". `codex-mini-latest`
+ * (retired 2026-02-12) and `gpt-5.2-codex` (retired 2026-07-23) are no longer listed.
+ */
 const CODEX_SUPPORTED_MODELS: readonly AiModel[] = [
-	{
-		id: 'gpt-5.4',
-		name: 'GPT-5.4',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 400000
-		}
-	},
-	{
-		id: 'codex-mini-latest',
-		name: 'Codex Mini Latest',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'gpt-5.2-codex',
-		name: 'GPT-5.2 Codex',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 400000
-		}
-	}
+	buildCodexModel('gpt-6-astra', 'GPT-6 Astra', 'Flagship OpenAI model for the hardest coding and research work.'),
+	buildCodexModel(
+		'gpt-6.1-sol',
+		'GPT-6.1 Sol',
+		"Codex's default model: balances intelligence and cost. Default in Ever Works."
+	),
+	buildCodexModel('gpt-6.1-terra', 'GPT-6.1 Terra', 'Lower-cost GPT-6.1 model for routine generation.'),
+	buildCodexModel('gpt-6-luna', 'GPT-6 Luna', 'Cost-sensitive, high-volume OpenAI model.'),
+	buildCodexModel(
+		'gpt-5.4',
+		'GPT-5.4 (legacy)',
+		'Previous generation. Still served in the OpenAI API; no longer offered with ChatGPT sign-in since 2026-08-31.'
+	)
 ] as const;
+
+function buildCodexModel(id: string, name: string, description: string): AiModel {
+	return {
+		id,
+		name,
+		description,
+		capabilities: {
+			supportsStructuredOutput: true,
+			supportsStreaming: true,
+			supportsToolCalling: true,
+			supportsVision: true,
+			maxContextLength: 1_050_000,
+			maxOutputTokens: 128_000
+		}
+	};
+}
 
 const MANIFEST: PluginManifest = {
 	id: 'codex',
@@ -302,7 +312,8 @@ export class CodexPlugin
 				'x-scope': 'global',
 				'x-widget': 'model-select',
 				default: DEFAULT_MODEL,
-				description: 'Model to use for Codex generation'
+				description:
+					'Model to use for Codex generation. Which models you can use depends on how Codex signs in: with ChatGPT sign-in it follows your plan, with an API key your OpenAI organization and project. The list also accepts a custom model id.'
 			},
 			unsafeBypassSandbox: {
 				type: 'boolean',

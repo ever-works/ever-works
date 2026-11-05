@@ -42,10 +42,14 @@ export async function detectPlatform(): Promise<PlatformInfo> {
 	const isMusl = detectedOs === 'linux' ? await isMuslLinux() : false;
 	const platformString = isMusl ? `${detectedOs}-${detectedArch}-musl` : `${detectedOs}-${detectedArch}`;
 
+	// openai/codex stopped publishing `*-unknown-linux-gnu` assets in 0.128.0 (#19445); since
+	// then every release ships Linux only as static musl binaries, which also run on glibc
+	// hosts. So both Linux flavours map to the musl archive. The platform string still tells
+	// them apart, which keeps their cached binaries in separate paths.
 	const assetNameByPlatform: Record<string, string> = {
-		'linux-x64': 'codex-x86_64-unknown-linux-gnu.tar.gz',
+		'linux-x64': 'codex-x86_64-unknown-linux-musl.tar.gz',
 		'linux-x64-musl': 'codex-x86_64-unknown-linux-musl.tar.gz',
-		'linux-arm64': 'codex-aarch64-unknown-linux-gnu.tar.gz',
+		'linux-arm64': 'codex-aarch64-unknown-linux-musl.tar.gz',
 		'linux-arm64-musl': 'codex-aarch64-unknown-linux-musl.tar.gz',
 		'darwin-x64': 'codex-x86_64-apple-darwin.tar.gz',
 		'darwin-arm64': 'codex-aarch64-apple-darwin.tar.gz'

@@ -44,14 +44,34 @@ The runtime also uses an isolated per-user Gemini home/config work instead of th
 | Setting   | Type   | Scope  | Description                                                       |
 | --------- | ------ | ------ | ----------------------------------------------------------------- |
 | `apiKey`  | string | user   | Gemini API key (secret, supports env var `PLUGIN_GEMINI_API_KEY`) |
-| `model`   | string | user   | Model for generation (default: `gemini-2.5-flash`)                |
-| `version` | string | hidden | Gemini CLI version to install (default: `latest`)                 |
+| `model`   | string | global | Model for generation (default: `gemini-3.8-flash`)                |
+| `version` | string | hidden | Gemini CLI version to install (default: `0.67.0`)                 |
 
 ### Supported Models
 
-- **Gemini 2.5 Flash** (default) - 200k context
-- **Gemini 2.5 Pro** - 200k context
-- **Gemini 2.0 Flash** - 200k context
+Model list as of 2026-11-05 — source: [Gemini API models](https://aistudio.google.com/docs/models) and
+[deprecations](https://aistudio.google.com/docs/deprecations). Availability depends on your account, plan and region;
+the picker also accepts a custom model id and keeps existing saved selections.
+
+| Model id                 | Notes                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `gemini-4-argon`         | Flagship. The Gemini CLI README says the CLI is not optimized for Gemini 4+ yet |
+| `gemini-3.8-flash`       | **Default.** Most intelligent Flash                                             |
+| `gemini-3.6-flash`       | Previous Flash release                                                          |
+| `gemini-3.5-flash-lite`  | Fastest, most cost-effective                                                    |
+| `gemini-3.1-pro-preview` | Preview                                                                         |
+| `gemini-3-flash-preview` | Preview                                                                         |
+| `gemini-2.5-pro`         | Legacy: deprecated 2026-11-02, existing users only, re-routed from 2026-12-01   |
+| `gemini-2.5-flash`       | Legacy: deprecated 2026-11-02, existing users only, re-routed from 2026-12-01   |
+| `gemini-2.5-flash-lite`  | Legacy: past users only                                                         |
+
+Every listed model takes 1,048,576 input and 65,536 output tokens. `gemini-3.1-flash-lite-preview` shut down on
+2026-05-25 and is no longer listed; a config that saved it keeps it as a custom id. Gemini 2.0 Flash shut down on
+2026-06-01.
+
+**Default change (2026-11-05):** the default moved from `gemini-2.5-flash` to `gemini-3.8-flash`. A config that never
+saved a model now runs on `gemini-3.8-flash`; there is no backfill, because Ever Works has no real users yet. Saved
+models are not changed.
 
 ## Form Schema
 
@@ -77,9 +97,12 @@ Both support variable substitution for work context, existing items, categories,
 
 The plugin runs Gemini CLI through `npx`:
 
-- Uses `npx --yes @google/gemini-cli`
-- Supports version pinning through `@google/gemini-cli@<version>`
-- Default version: `latest`
+- Uses `npx --yes @google/gemini-cli@<version>`
+- Supports version pinning through `@google/gemini-cli@<version>`; `latest` is an explicit opt-in
+- Default version: `0.67.0` (pinned 2026-11-05; was `0.45.2`, which rewrote any model id ending in "flash" to its own
+  default — [google-gemini/gemini-cli#28859](https://github.com/google-gemini/gemini-cli/issues/28859), fixed in
+  0.61.0)
+- Runs non-interactively with `--approval-mode yolo` inside Gemini's own `--sandbox`
 
 ## Error Handling
 

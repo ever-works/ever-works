@@ -40,6 +40,20 @@ export const CODEX_AUTH_MODE_LABELS: Record<CodexAuthMode, string> = {
 };
 
 export const BASE_TEMP_DIR = '/tmp/codex-generator';
-export const DEFAULT_MODEL = 'gpt-5.4';
+/**
+ * Default Codex model. GPT-6.1 Sol has been Codex's own default since CLI 0.161.0
+ * ("GPT-6.1 Sol is now the default model"; https://github.com/openai/codex/releases,
+ * https://learn.chatgpt.com/docs/models, checked 2026-11-05).
+ *
+ * Changing this moves every config that never saved a model onto the new default (models
+ * refresh decision B, 2026-11-05: no backfill, because Ever Works has no real users yet).
+ * Saved models are untouched.
+ */
+export const DEFAULT_MODEL = 'gpt-6.1-sol';
 export const CODEX_RELEASES_URL = 'https://github.com/openai/codex/releases/download';
-export const DEFAULT_CLI_VERSION = '0.120.0';
+/**
+ * Pinned Codex CLI release (`rust-v0.166.0`, latest stable on 2026-10-29;
+ * https://github.com/openai/codex/releases/tag/rust-v0.166.0). It runs every model in the
+ * catalog, including GPT-6.1 Terra (0.159.0+ per the docs; 0.165/0.166 per the release notes).
+ */
+export const DEFAULT_CLI_VERSION = '0.166.0';

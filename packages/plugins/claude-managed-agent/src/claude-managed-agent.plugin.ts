@@ -168,7 +168,8 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			model: {
 				type: 'string',
 				title: 'Model',
-				description: 'Managed Agents model ID to use for the session.',
+				description:
+					'Managed Agents model ID to use for the session. Availability depends on your account, plan and region; custom model ids are accepted.',
 				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'

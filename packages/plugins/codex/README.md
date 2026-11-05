@@ -57,14 +57,30 @@ The onboarding UI provides a 3-step flow: choose auth mode, configure credential
 | --------------------- | ------- | ------ | ---------------------------------------------------------- |
 | `authMode`            | string  | user   | `api-key` or `local` (hidden, set by onboarding wizard)    |
 | `apiKey`              | string  | user   | OpenAI API key (secret, supports env var `OPENAI_API_KEY`) |
-| `model`               | string  | global | Model for generation (default: `gpt-5.4`)                  |
+| `model`               | string  | global | Model for generation (default: `gpt-6.1-sol`)              |
 | `unsafeBypassSandbox` | boolean | hidden | Bypass Codex sandboxing on incompatible hosts              |
 
 ### Supported Models
 
-- **GPT-5.4** (default) - 400k context
-- **Codex Mini Latest** - 200k context
-- **GPT-5.2 Codex** - 400k context
+Model list as of 2026-11-05 — source: [Codex models](https://learn.chatgpt.com/docs/models) and the
+[OpenAI models page](https://developers.openai.com/api/docs/models). Availability depends on your account, plan and
+region (ChatGPT sign-in follows your plan; API-key sessions follow your OpenAI organization and project); the picker
+also accepts a custom model id and keeps existing saved selections.
+
+| Model id        | Notes                                                                      |
+| --------------- | -------------------------------------------------------------------------- |
+| `gpt-6-astra`   | Flagship                                                                   |
+| `gpt-6.1-sol`   | **Default** (Codex's own default since CLI 0.161.0)                        |
+| `gpt-6.1-terra` | Lower cost                                                                 |
+| `gpt-6-luna`    | Cost-sensitive, high volume                                                |
+| `gpt-5.4`       | Legacy: still served by the API, not offered with ChatGPT sign-in any more |
+
+All of them have a 1,050,000-token context and 128,000 output tokens. `codex-mini-latest` (retired 2026-02-12) and
+`gpt-5.2-codex` (retired 2026-07-23) are no longer listed; a config that saved one keeps it as a custom id.
+
+**Default change (2026-11-05):** the default moved from `gpt-5.4` to `gpt-6.1-sol`. A config that never saved a model
+now runs on `gpt-6.1-sol`; there is no backfill, because Ever Works has no real users yet. Saved models are not
+changed. GPT-6.1 Sol lists at $2 / $10 per million input / output tokens, below GPT-5.4's $2.50 / $15.
 
 ## Form Schema
 
@@ -91,9 +107,12 @@ Both support variable substitution for work context, existing items, categories,
 The plugin automatically downloads and caches the Codex CLI binary:
 
 - Binaries are cached in `/tmp/codex-generator/bin/`
-- Supports Linux (x64/arm64) and macOS (x64/arm64)
+- Supports Linux (x64/arm64) and macOS (x64/arm64). On Linux the plugin always downloads the static musl build:
+  openai/codex has published no `*-unknown-linux-gnu` assets since 0.128.0, and the musl binary also runs on glibc.
 - Falls back to a system-installed `codex` command if download fails
-- Default CLI version: `0.120.0`
+- Default CLI version: `0.166.0` ([`rust-v0.166.0`](https://github.com/openai/codex/releases/tag/rust-v0.166.0),
+  latest stable on 2026-10-29; was `0.120.0` before 2026-11-05)
+- Sandboxed runs use `codex exec --sandbox workspace-write`. `--full-auto` was removed from `codex exec` in 0.147.0.
 
 ## Error Handling
 
