@@ -28,7 +28,8 @@
  * It covers three kinds of carrier:
  *
  *   1. a credential VALUE (`GITHUB_TOKEN`, `GITLAB_TOKEN`, `VERCEL_TOKEN`,
- *      `AZURE_CLIENT_SECRET`, `CARGO_REGISTRY_TOKEN`, …);
+ *      `AZURE_CLIENT_SECRET`, `CARGO_REGISTRY_TOKEN`, a CI job's
+ *      `CI_JOB_TOKEN` / `ACTIONS_ID_TOKEN_REQUEST_TOKEN`, …);
  *   2. a live credential CHANNEL — a socket or helper that answers with a
  *      credential on request: `SSH_AUTH_SOCK` (every key in the ssh-agent),
  *      `GPG_AGENT_INFO`, `GIT_ASKPASS` / `SSH_ASKPASS`, and `VSCODE_GIT_*`
@@ -84,9 +85,6 @@ export const HOST_CREDENTIAL_ENV_PATTERN = new RegExp(
 			'GCP_',
 			// Terraform Cloud / Enterprise host tokens (`TF_TOKEN_app_terraform_io`).
 			'TF_TOKEN_',
-			// Package-registry upload credentials.
-			'TWINE_',
-			'CARGO_REGISTRIES_',
 			// The editor's git-credential IPC (VS Code's askpass bridge).
 			'VSCODE_GIT_',
 			// Exact names, anchored at their END so a neighbour stays passable.
@@ -107,8 +105,23 @@ export const HOST_CREDENTIAL_ENV_PATTERN = new RegExp(
 					'NPM_CONFIG_USERCONFIG',
 					'YARN_NPM_AUTH_TOKEN',
 					'CARGO_REGISTRY_TOKEN',
+					// `CARGO_REGISTRIES_<NAME>_TOKEN` only — `…_INDEX` is a URL.
+					'CARGO_REGISTRIES_[A-Z0-9_]+_TOKEN',
+					// `TWINE_PASSWORD` only — `TWINE_REPOSITORY_URL` is a URL.
+					'TWINE_PASSWORD',
 					'GEM_HOST_API_KEY',
 					'HOMEBREW_GITHUB_API_TOKEN',
+					// CI job credentials, present when the host itself runs inside
+					// a CI job (a GitLab runner, a self-hosted Actions runner):
+					// the job token, and Actions' OIDC-mint and cache/artifact tokens.
+					'CI_JOB_TOKEN',
+					'CI_JOB_JWT',
+					'CI_JOB_JWT_V2',
+					'CI_REGISTRY_PASSWORD',
+					'CI_DEPLOY_PASSWORD',
+					'CI_DEPENDENCY_PROXY_PASSWORD',
+					'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+					'ACTIONS_RUNTIME_TOKEN',
 					// Container registries / remote Docker daemons.
 					'DOCKER_AUTH_CONFIG',
 					'DOCKER_CONFIG',

@@ -26,7 +26,7 @@ A check is a small object:
 | `disabled`       | no       | On a Task entry, suppresses the same-id inherited Work default.                 |
 | `envPassthrough` | no       | Environment variable **names** (never values) this check is allowed to see.     |
 
-Checks run with a **scrubbed environment**. Listing a name in `envPassthrough` is a deliberate grant of that one value; platform-owned configuration (database, auth, job-runtime and plugin credentials) is never granted even if you list it.
+Checks run with a **scrubbed environment**. Listing a name in `envPassthrough` is a deliberate grant of that one value; platform-owned configuration (database, auth, job-runtime and plugin credentials) is never granted even if you list it. Neither is the machine's own access: cluster configs (`KUBECONFIG`), forge, registry and cloud tokens (`GITHUB_TOKEN`, `GITLAB_TOKEN`, `NPM_TOKEN`, `AZURE_*`, …), an ssh-agent socket (`SSH_AUTH_SOCK`) or a Docker config directory (`DOCKER_CONFIG`). On a fleet node, the node's operator can still grant one of those exact names to a repository.
 
 ## Work defaults and Task overrides
 

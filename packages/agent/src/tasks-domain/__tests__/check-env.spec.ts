@@ -384,6 +384,8 @@ describe("buildCheckEnv — the host's own credentials are not self-grantable", 
             .replace(/\)$/, '')
             .replace(/\(\?:|\)\$/g, '')
             .split('|')
+            // A name-shaped wildcard (`CARGO_REGISTRIES_<NAME>_TOKEN`) gets a sample name.
+            .map((alt) => alt.replace('[A-Z0-9_]+', 'PRIVATE'))
             .map((alt) => (alt.endsWith('_') ? `${alt}SAMPLE` : alt));
         expect(samples.length).toBeGreaterThan(40);
         for (const name of samples) {
