@@ -22,6 +22,14 @@ import { PluginSecretEncService } from '@ever-works/agent/plugins';
 @Injectable()
 export class EverConnectKeyService {
     private readonly secrets: PluginSecretEncService;
+    /**
+     * The signer last made, with the exact ciphertext it was made from.
+     * `signer()` runs on nearly every Ever Connect call (each `client()`), and
+     * unwrapping the key there meant an AES decrypt and a key import per call.
+     * The row is still read every time, so a key another replica discarded or
+     * replaced is seen at once: a different (or no) ciphertext is a miss.
+     */
+    private cachedSigner: { sealed: string; signer: InstanceSigner } | null = null;
 
     constructor(
         @InjectRepository(EverInstance) private readonly instances: Repository<EverInstance>,
@@ -55,12 +63,16 @@ export class EverConnectKeyService {
     /** The signer of the stored connect key, or `null` when there is none. */
     async signer(): Promise<InstanceSigner | null> {
         const row = await this.instances.findOne({ where: { id: EVER_INSTANCE_ROW_ID } });
-        if (!row?.connectPrivateKeyEncrypted) return null;
-        const der = Buffer.from(
-            this.secrets.decryptValue(row.connectPrivateKeyEncrypted),
-            'base64',
-        );
-        return makeNodeSigner(der);
+        const sealed = row?.connectPrivateKeyEncrypted;
+        if (!sealed) {
+            this.cachedSigner = null;
+            return null;
+        }
+        if (this.cachedSigner?.sealed === sealed) return this.cachedSigner.signer;
+        const der = Buffer.from(this.secrets.decryptValue(sealed), 'base64');
+        const signer = makeNodeSigner(der);
+        this.cachedSigner = { sealed, signer };
+        return signer;
     }
 
     /**
@@ -68,6 +80,7 @@ export class EverConnectKeyService {
      * held again, so connecting after a disconnect needs a new one.
      */
     async discard(): Promise<void> {
+        this.cachedSigner = null;
         await this.instances.update(
             { id: EVER_INSTANCE_ROW_ID },
             { connectPublicKey: null, connectPrivateKeyEncrypted: null, connectKeyId: null },
