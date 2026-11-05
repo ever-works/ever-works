@@ -168,7 +168,7 @@ Everything you write here is committed to `.content/kb/` in the Work's data repo
 
 1. Open the **Worker** tab — `/works/:id/generator`. Its sub-tabs are **Work · Schedule · History · Comparisons**. The two conditional ones are gated on your **role**, not on the kind: **Schedule** appears once the Work has configuration and you can manage schedules, and **Comparisons** appears for editors on _every_ Work kind (`GeneratorSubTabs.tsx` checks `permissions.canEdit`). On a Blog Work that Comparisons tab is an unused affordance — comparisons are off for `blog` in the capability registry, as the table above says.
 2. Check the **Worker Prompt**. It is pre-filled from the brief you typed on `/new`; this is where you refine it. Be specific about what a post should cover — the helper text says so plainly: _"Be specific about the type of content you want to generate."_
-3. Under **Show Advanced Options**, optionally set an **AI Model Override** (for example `openai/gpt-4.1`) and **Company Information** for branded content. Leave the model empty to use the account default.
+3. Under **Show Advanced Options**, optionally set an **AI Model Override** (for example `openai/gpt-6.1-sol`) and **Company Information** for branded content. Leave the model empty to use the account default.
 4. Click **Start Work**. Progress streams on the same screen, and runs are cancellable — see [Generation Cancellation](../features/generation-cancellation.md).
 5. When it finishes, open the **Posts** tab to see what landed, and **History** for the run record.
 

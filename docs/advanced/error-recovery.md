@@ -365,4 +365,4 @@ graph LR
 2. **Implement `contextToSnapshot` and `contextFromSnapshot`**: Pipeline plugins should support checkpointing to enable resume after failures
 3. **Implement `isCheckpointViable`**: Validate that checkpoint data is still relevant (e.g., source URLs have not changed)
 4. **Use `withToolCallingRetry` for all tool-calling operations**: This handles the most common AI model failure mode automatically
-5. **Handle `ToolCallingError` as a model compatibility issue**: When a model exhausts retries, suggest switching to a model with better tool-calling support (e.g., GPT-4o, Claude Sonnet)
+5. **Handle `ToolCallingError` as a model compatibility issue**: When a model exhausts retries, suggest switching to a model with better tool-calling support (e.g., GPT-6.1 Sol, Claude Sonnet 5.5)

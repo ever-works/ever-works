@@ -32,7 +32,7 @@ Get all available plugins with the current user's installation status.
 			"id": "openai",
 			"name": "OpenAI",
 			"version": "1.0.0",
-			"description": "Use OpenAI models like GPT-4o for content generation",
+			"description": "Connects to OpenAI for content generation and chat",
 			"category": "ai-provider",
 			"capabilities": ["ai-provider"],
 			"icon": { "type": "svg", "value": "<svg>...</svg>" },
@@ -125,9 +125,9 @@ For AI provider plugins, fetch the list of available models. The plugin must be 
 ```json
 [
 	{
-		"id": "gpt-4o",
-		"name": "GPT-4o",
-		"contextLength": 128000,
+		"id": "gpt-6.1-sol",
+		"name": "GPT-6.1 Sol",
+		"contextLength": 1050000,
 		"capabilities": {
 			"supportsStreaming": true,
 			"supportsToolCalling": true,
@@ -135,9 +135,9 @@ For AI provider plugins, fetch the list of available models. The plugin must be 
 		}
 	},
 	{
-		"id": "gpt-4o-mini",
-		"name": "GPT-4o Mini",
-		"contextLength": 128000
+		"id": "gpt-6-luna",
+		"name": "GPT-6 Luna",
+		"contextLength": 1050000
 	}
 ]
 ```
@@ -235,7 +235,7 @@ Get all plugins with their work-specific configuration.
 			"activeCapability": "ai-provider",
 			"priority": 1,
 			"settings": {
-				"defaultModel": "gpt-4o"
+				"defaultModel": "gpt-6-astra"
 			}
 		}
 	]
@@ -253,7 +253,7 @@ Enable a plugin for a specific work. The plugin must already be enabled at the u
 ```json
 {
 	"settings": {
-		"defaultModel": "gpt-4o-mini"
+		"defaultModel": "gpt-6.1-sol"
 	},
 	"activeCapability": "ai-provider",
 	"priority": 1
@@ -290,7 +290,7 @@ Update work-specific settings for a plugin. These settings take highest priority
 ```json
 {
 	"settings": {
-		"defaultModel": "gpt-4o-mini",
+		"defaultModel": "gpt-6.1-sol",
 		"temperature": 0.5
 	},
 	"secretSettings": {

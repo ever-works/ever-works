@@ -32,8 +32,8 @@ Plugin implementations (in `packages/plugins/`):
 
 ```
 packages/plugins/
-  openai/          # OpenAI provider (GPT-4, GPT-4o, etc.)
-  anthropic/       # Anthropic provider (Claude 3, Claude 4, etc.)
+  openai/          # OpenAI provider (GPT-6 family, etc.)
+  anthropic/       # Anthropic provider (Claude 5.5 family, etc.)
   google/          # Google AI provider (Gemini)
   groq/            # Groq provider (fast inference)
   ollama/          # Ollama provider (local models)
@@ -213,16 +213,16 @@ Each AI provider plugin defines its settings via JSON Schema in `package.json`:
 			},
 			"defaultModel": {
 				"type": "string",
-				"default": "gpt-4o",
+				"default": "gpt-6-astra",
 				"description": "Default model for completions"
 			},
 			"simpleModel": {
 				"type": "string",
-				"default": "gpt-4o-mini"
+				"default": "gpt-6-luna"
 			},
 			"complexModel": {
 				"type": "string",
-				"default": "gpt-4o"
+				"default": "gpt-6-astra"
 			}
 		}
 	}
@@ -240,14 +240,19 @@ Settings are resolved using the 4-level hierarchy (highest priority first):
 
 ### Supported Providers
 
-| Provider   | Plugin ID    | Models                                   |
-| ---------- | ------------ | ---------------------------------------- |
-| OpenAI     | `openai`     | GPT-4o, GPT-4o-mini, GPT-4-turbo, o1, o3 |
-| Anthropic  | `anthropic`  | Claude Opus, Claude Sonnet, Claude Haiku |
-| Google     | `google`     | Gemini Pro, Gemini Flash                 |
-| Groq       | `groq`       | Llama, Mixtral (fast inference)          |
-| Ollama     | `ollama`     | Any locally hosted model                 |
-| OpenRouter | `openrouter` | Multi-provider gateway (200+ models)     |
+Default model families as of 2026-11-05 — source: each plugin's README and the vendor model lists it cites (see the [plugin pages](../plugin-system/ai-provider-plugins.md)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. Configs that never saved a model use the current defaults; saved selections are kept.
+
+| Provider          | Plugin ID           | Models                                                   |
+| ----------------- | ------------------- | -------------------------------------------------------- |
+| OpenAI            | `openai`            | GPT-6 Astra, GPT-6.1 Sol, GPT-6 Luna (the tier defaults) |
+| Anthropic         | `anthropic`         | Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5     |
+| Google            | `google`            | Gemini 4 Argon, Gemini 3.8 Flash, Gemini 3.5 Flash-Lite  |
+| Grok (xAI)        | `grok`              | Grok 4.7, Grok 4.3                                       |
+| Groq              | `groq`              | gpt-oss 120B / 20B (fast inference)                      |
+| Mistral           | `mistral`           | Mistral Small / Medium / Large via the `-latest` aliases |
+| Ollama            | `ollama`            | Any locally hosted model (default `qwen3.5:4b`)          |
+| OpenRouter        | `openrouter`        | Multi-provider gateway (454 models listed on 2026-11-06) |
+| Vercel AI Gateway | `vercel-ai-gateway` | Multi-provider gateway (495 models listed on 2026-11-06) |
 
 ## Dependencies
 
@@ -309,7 +314,7 @@ for await (const chunk of stream) {
 const result = await aiFacade.askJson(
 	prompt,
 	schema,
-	{ modelOverride: 'claude-sonnet-4-20250514' },
+	{ modelOverride: 'claude-sonnet-5-5' },
 	{ userId: user.id, providerId: 'anthropic' }
 );
 ```

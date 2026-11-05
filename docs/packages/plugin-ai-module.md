@@ -69,7 +69,7 @@ interface AiOperationsConfig {
 ```typescript
 const ops = new AiOperations({
 	apiKey: 'sk-...',
-	model: 'gpt-4',
+	model: 'gpt-6.1-sol',
 	providerType: 'openai'
 });
 
@@ -163,28 +163,42 @@ The tracker checks both `llmOutput.tokenUsage`, `llmOutput.estimatedTokenUsage`,
 
 ## Reasoning Configuration
 
-The `reasoning.utils.ts` module configures reasoning effort settings for models that support extended thinking, preventing unnecessary compute costs.
+The `reasoning.utils.ts` module configures reasoning effort settings for models that support extended thinking, preventing unnecessary compute costs. Each entry asks for the **lowest** effort the matched models accept. Patterns are matched against the bare model name (after `extractModelName` strips any `provider/` or `models/` prefix), and the **first match wins**, so the specific patterns come first. A provider that rejects the value anyway is handled by the parameter retry above: `AiOperations.withParamRetry` drops `reasoning` and retries.
 
 ### Supported Reasoning Models
 
-| Model Pattern                     | Provider Configs                                                 |
-| --------------------------------- | ---------------------------------------------------------------- |
-| `gpt-5.1+`                        | OpenAI: `effort: 'none'`, OpenRouter: `effort: 'none'`           |
-| `gpt-5` (base)                    | OpenAI: `effort: 'minimal'`, OpenRouter: `effort: 'minimal'`     |
-| `o1`, `o3`, `o4`                  | OpenAI: `effort: 'minimal'`, OpenRouter: `effort: 'minimal'`     |
-| `gemini-2`, `gemini-3`            | Google: `reasoning_effort: 'none'`, OpenRouter: `effort: 'none'` |
-| `claude-sonnet/opus-4+`           | OpenRouter: `effort: 'none'`                                     |
-| `deepseek-r`, `deepseek-reasoner` | OpenRouter: `effort: 'low'`                                      |
-| `gpt-oss`                         | Groq: `effort: 'low'`, `reasoning_format: 'hidden'`              |
-| `qwen3`                           | Groq: `reasoning_effort: 'none'`                                 |
+Registry as of 2026-11-05 — sources: OpenAI's per-model pages ([developers.openai.com/api/docs/models](https://developers.openai.com/api/docs/models)), Google's OpenAI-compatibility page ([aistudio.google.com/docs/openai](https://aistudio.google.com/docs/openai)), OpenRouter's live list ([openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models), `reasoning.mandatory` and `supported_efforts`) and Groq's reasoning page ([console.groq.com/docs/reasoning](https://console.groq.com/docs/reasoning)). Rows are in match order:
+
+| Model pattern (in match order)                                         | Matches, for example                                           | Provider configs                                                         |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `^gpt-6-astra`, `^gpt-6.1-sol`, `^gpt-6.x-*-pro`                       | `gpt-6-astra`, `gpt-6.1-sol`                                   | OpenAI: `reasoning.effort: 'low'`, OpenRouter: `reasoning.effort: 'low'` |
+| `^gpt-6` (the rest)                                                    | `gpt-6-luna`, `gpt-6-sol`, `gpt-6.1-terra`                     | OpenAI: `'none'`, OpenRouter: `'none'`                                   |
+| `gpt-5.[2-5]-pro`                                                      | `gpt-5.4-pro`                                                  | OpenAI: `'medium'`, OpenRouter: `'medium'`                               |
+| `gpt-5.[12]-codex`                                                     | `gpt-5.1-codex-mini`, `gpt-5.2-codex`                          | OpenAI: `'low'`, OpenRouter: `'low'`                                     |
+| `gpt-5.[1-9]`                                                          | `gpt-5.1`, `gpt-5.4`, `gpt-5.6-sol`                            | OpenAI: `'none'`, OpenRouter: `'none'`                                   |
+| `gpt-5` (base only)                                                    | `gpt-5` (not `gpt-5-mini` / `gpt-5-nano`)                      | OpenAI: `'minimal'`, OpenRouter: `'minimal'`                             |
+| `^o1`, `^o3`, `^o4`                                                    | `o3`, `o3-pro`                                                 | OpenAI: `'minimal'`, OpenRouter: `'minimal'`                             |
+| `gemini-3.7`+, `gemini-4`+, `gemini-2.5-pro`, `gemini-3*-pro`          | `gemini-3.8-flash`, `gemini-4-argon`, `gemini-3.1-pro-preview` | Google: `reasoning_effort: 'low'`, OpenRouter: `'low'`                   |
+| `gemini-3` (the rest)                                                  | `gemini-3.5-flash-lite`, `gemini-3.6-flash`                    | Google: `reasoning_effort: 'minimal'`, OpenRouter: `'minimal'`           |
+| `gemini-2`                                                             | `gemini-2.5-flash`                                             | Google: `reasoning_effort: 'none'`, OpenRouter: `'none'`                 |
+| `claude-opus-5-5` / `claude-sonnet-5-5` (dash or dot), `claude-fable*` | `claude-opus-5.5`, `claude-fable-5.1`                          | OpenRouter: `'low'` (reasoning is mandatory for them)                    |
+| `claude-sonnet-4`+, `claude-opus-4`+, `claude-haiku-5`+, `claude-3-5`+ | `claude-haiku-5.5`, `claude-opus-4.5`                          | OpenRouter: `'none'`                                                     |
+| `deepseek-r`, `deepseek-reasoner`                                      | `deepseek-r1-0528`                                             | OpenRouter: `'low'`                                                      |
+| `gpt-oss`                                                              | `openai/gpt-oss-120b`                                          | Groq: `reasoning_effort: 'low'`, `include_reasoning: false`              |
+| `qwen3`                                                                | `qwen3-32b`                                                    | Groq: `reasoning_effort: 'none'`                                         |
+
+Only `openai`, `openrouter`, `google` and `groq` have slices. Every other provider type (`anthropic`, `grok`, `mistral`, `vercel-ai-gateway`, the local servers) gets `undefined`, so no reasoning parameter is sent and the model runs at its vendor default. Models the registry does not match -- for example the DeepSeek V4 family or Grok 4.x -- also run at their default. For Groq's gpt-oss, Groq documents that `reasoning_format` is not supported, so the registry hides the reasoning with `include_reasoning: false` instead (it used to send `reasoning_format: 'hidden'`).
 
 ### Usage
 
 ```typescript
 import { getReasoningConfig, extractModelName } from '@ever-works/plugin/ai';
 
-const config = getReasoningConfig('openai', 'gpt-5');
-// => { reasoning: { effort: 'minimal' } }
+const config = getReasoningConfig('openai', 'gpt-6-astra');
+// => { reasoning: { effort: 'low' } }
+
+getReasoningConfig('anthropic', 'claude-opus-5-5');
+// => undefined (no anthropic slice)
 
 const name = extractModelName('openai/gpt-5.2');
 // => 'gpt-5.2'
@@ -195,10 +209,10 @@ const name = extractModelName('openai/gpt-5.2');
 For backward compatibility, individual provider getters are available:
 
 ```typescript
-getOpenAIReasoningConfig('o3'); // { reasoning: { effort: 'minimal' } }
-getOpenRouterReasoningConfig('o3'); // { reasoning: { effort: 'minimal' } }
-getGoogleReasoningConfig('gemini-2'); // { reasoning_effort: 'none' }
-getGroqReasoningConfig('qwen3'); // { reasoning_effort: 'none' }
+getOpenAIReasoningConfig('gpt-6-luna'); // { reasoning: { effort: 'none' } }
+getOpenRouterReasoningConfig('anthropic/claude-opus-5.5'); // { reasoning: { effort: 'low' } }
+getGoogleReasoningConfig('models/gemini-3.8-flash'); // { reasoning_effort: 'low' }
+getGroqReasoningConfig('openai/gpt-oss-120b'); // { reasoning_effort: 'low', include_reasoning: false }
 ```
 
 ## Model Listing

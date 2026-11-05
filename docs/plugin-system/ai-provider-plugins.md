@@ -84,6 +84,8 @@ protected resolveConfig(settings?: PluginSettings): Partial<AiOperationsConfig> 
 
 ## Available Providers
 
+Model defaults as of 2026-11-05 — source: each plugin's README and the vendor model list it cites (linked from each plugin's own page). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. Configs that never saved a model use these defaults since the 2026-11-05 models refresh; saved selections are kept.
+
 ### OpenAI
 
 | Property           | Value                       |
@@ -91,7 +93,7 @@ protected resolveConfig(settings?: PluginSettings): Partial<AiOperationsConfig> 
 | Package            | `@ever-works/openai-plugin` |
 | Provider Type      | `openai`                    |
 | Configuration Mode | `user-required`             |
-| Default Model      | `gpt-5.1`                   |
+| Default Model      | `gpt-6-astra`               |
 | Structured Output  | Yes                         |
 | Streaming          | Yes                         |
 | Tool Calling       | Yes                         |
@@ -99,7 +101,7 @@ protected resolveConfig(settings?: PluginSettings): Partial<AiOperationsConfig> 
 | Embeddings         | Yes                         |
 | Max Context        | 128,000 tokens              |
 
-Supports tiered model selection: `simpleModel` (gpt-5-nano), `mediumModel` (gpt-4o-mini), `complexModel` (gpt-5.1). Each tier is used for different task complexity levels during generation.
+Supports tiered model selection: `simpleModel` (`gpt-6-luna`), `mediumModel` (`gpt-6.1-sol`), `complexModel` (`gpt-6-astra`). Each tier is used for different task complexity levels during generation. The 128,000-token max context is the plugin's fallback hint; the GPT-6 family's 1,050,000-token window comes from the live model list.
 
 ### Anthropic
 
@@ -108,12 +110,14 @@ Supports tiered model selection: `simpleModel` (gpt-5-nano), `mediumModel` (gpt-
 | Package            | `@ever-works/anthropic-plugin` |
 | Provider Type      | `anthropic`                    |
 | Configuration Mode | `user-required`                |
-| Default Model      | Claude series                  |
+| Default Model      | `claude-opus-5-5`              |
 | Structured Output  | Yes                            |
 | Streaming          | Yes                            |
 | Tool Calling       | Yes                            |
 | Vision             | Yes                            |
 | Embeddings         | No                             |
+
+Tiers: `simpleModel` (`claude-haiku-5-5`), `mediumModel` (`claude-sonnet-5-5`), `complexModel` (`claude-opus-5-5`).
 
 ### Google (Gemini)
 
@@ -122,12 +126,30 @@ Supports tiered model selection: `simpleModel` (gpt-5-nano), `mediumModel` (gpt-
 | Package            | `@ever-works/google-plugin` |
 | Provider Type      | `google`                    |
 | Configuration Mode | `user-required`             |
-| Default Model      | Gemini series               |
+| Default Model      | `models/gemini-3.8-flash`   |
 | Structured Output  | Yes                         |
 | Streaming          | Yes                         |
 | Tool Calling       | Yes                         |
 | Vision             | Yes                         |
 | Embeddings         | Yes                         |
+
+Tiers: `simpleModel` (`models/gemini-3.5-flash-lite`), `mediumModel` (`models/gemini-3.8-flash`), `complexModel` (`models/gemini-4-argon`).
+
+### Grok (xAI)
+
+| Property           | Value                     |
+| ------------------ | ------------------------- |
+| Package            | `@ever-works/grok-plugin` |
+| Provider Type      | `grok`                    |
+| Configuration Mode | `user-required`           |
+| Default Model      | `grok-4.7`                |
+| Structured Output  | Yes                       |
+| Streaming          | Yes                       |
+| Tool Calling       | Yes                       |
+| Vision             | Yes                       |
+| Embeddings         | No                        |
+
+Calls the xAI API directly. Tiers: `simpleModel` (`grok-4.3`); `mediumModel` and `complexModel` (`grok-4.7`). See [xAI Grok Models](./xai-plugin.md) for the gateway route.
 
 ### Groq
 
@@ -136,14 +158,14 @@ Supports tiered model selection: `simpleModel` (gpt-5-nano), `mediumModel` (gpt-
 | Package            | `@ever-works/groq-plugin` |
 | Provider Type      | `groq`                    |
 | Configuration Mode | `user-required`           |
-| Default Model      | Groq-hosted models        |
+| Default Model      | `openai/gpt-oss-120b`     |
 | Structured Output  | Yes                       |
 | Streaming          | Yes                       |
 | Tool Calling       | Yes                       |
 | Vision             | Depends on model          |
 | Embeddings         | No                        |
 
-Groq provides extremely fast inference through custom LPU hardware. Ideal for latency-sensitive tasks.
+Groq provides extremely fast inference through custom LPU hardware. Ideal for latency-sensitive tasks. Tiers: `simpleModel` (`openai/gpt-oss-20b`); `mediumModel` and `complexModel` (`openai/gpt-oss-120b`).
 
 ### Ollama
 
@@ -152,7 +174,7 @@ Groq provides extremely fast inference through custom LPU hardware. Ideal for la
 | Package            | `@ever-works/ollama-plugin` |
 | Provider Type      | `ollama`                    |
 | Configuration Mode | `user-required`             |
-| Default Model      | User's local models         |
+| Default Model      | `qwen3.5:4b`                |
 | Structured Output  | Model dependent             |
 | Streaming          | Yes                         |
 | Tool Calling       | Model dependent             |
@@ -200,12 +222,14 @@ vLLM is a high-throughput inference server, usually deployed on a GPU host. It e
 | Package            | `@ever-works/mistral-plugin` |
 | Provider Type      | `mistral`                    |
 | Configuration Mode | `user-required`              |
-| Default Model      | Mistral series               |
+| Default Model      | `mistral-small-latest`       |
 | Structured Output  | Yes                          |
 | Streaming          | Yes                          |
 | Tool Calling       | Yes                          |
 | Vision             | Model dependent              |
 | Embeddings         | Yes                          |
+
+Tiers: `simpleModel` (`mistral-small-latest`), `mediumModel` (`mistral-medium-latest`), `complexModel` (`mistral-large-latest`). No default changed on 2026-11-05; the medium and large aliases point at models Mistral deprecated on 2026-10-31.
 
 ### Perplexity
 
@@ -230,14 +254,14 @@ Perplexity specializes in search-augmented AI responses with built-in web citati
 | Package            | `@ever-works/openrouter-plugin` |
 | Provider Type      | `openrouter`                    |
 | Configuration Mode | `user-required`                 |
-| Default Model      | Varies (multi-provider access)  |
+| Default Model      | `openai/gpt-6.1-sol`            |
 | Structured Output  | Model dependent                 |
 | Streaming          | Yes                             |
 | Tool Calling       | Model dependent                 |
 | Vision             | Model dependent                 |
 | Embeddings         | No                              |
 
-OpenRouter aggregates multiple AI providers behind a single API. It overrides `resolveConfig()` to handle provider-specific model mapping.
+OpenRouter aggregates multiple AI providers behind a single API. It overrides `resolveConfig()` to handle provider-specific model mapping. Tiers: `simpleModel` (`openai/gpt-6-luna`), `mediumModel` (`openai/gpt-6.1-sol`), `complexModel` (`openai/gpt-6-astra`).
 
 ### Vercel AI Gateway
 
@@ -246,14 +270,14 @@ OpenRouter aggregates multiple AI providers behind a single API. It overrides `r
 | Package            | `@ever-works/vercel-ai-gateway-plugin` |
 | Provider Type      | `vercel-ai-gateway`                    |
 | Configuration Mode | `user-required`                        |
-| Default Model      | Routed through Vercel                  |
+| Default Model      | `openai/gpt-6-astra`                   |
 | Structured Output  | Model dependent                        |
 | Streaming          | Yes                                    |
 | Tool Calling       | Model dependent                        |
 | Vision             | Model dependent                        |
 | Embeddings         | No                                     |
 
-Routes requests through the Vercel AI Gateway for caching, rate limiting, and observability.
+Routes requests through the Vercel AI Gateway for caching, rate limiting, and observability. Tiers: `simpleModel` (`openai/gpt-6-luna`), `mediumModel` (`openai/gpt-6.1-sol`), `complexModel` (`openai/gpt-6-astra`).
 
 ## Common Settings Schema
 
