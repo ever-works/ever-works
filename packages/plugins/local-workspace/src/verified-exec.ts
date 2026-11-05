@@ -329,6 +329,9 @@ interface ProcStat {
  *   names `selfPid`), or the numbers would describe other processes;
  * - `/proc` must not be mounted with `hidepid`, which hides processes of other
  *   users from the listing (a live member could be invisible);
+ * - `/proc/<pid>/stat` is the thread-group LEADER's state: a leader that
+ *   exited while other threads run also reads `Z` (`ps` shows `Zl`), so an
+ *   exited member must list exactly one task;
  * - an entry that vanished mid-scan (`ENOENT`/`ESRCH`) was reaped and is
  *   skipped; any other read error, or a line that does not parse, refuses.
  *
@@ -346,23 +349,31 @@ export function linuxProcessGroupHasOnlyExitedMembers(
 		let members = 0;
 		for (const entry of proc.readdir('/proc')) {
 			if (!/^\d+$/.test(entry)) continue;
-			let text: string;
-			try {
-				text = proc.readFile(`/proc/${entry}/stat`);
-			} catch (error) {
-				const code = (error as NodeJS.ErrnoException).code;
-				if (code === 'ENOENT' || code === 'ESRCH') continue;
-				return false;
-			}
+			const text = unlessVanished(() => proc.readFile(`/proc/${entry}/stat`));
+			if (text === undefined) continue;
 			const stat = parseProcStat(text);
 			if (!stat) return false;
 			if (stat.pgrp !== pgid) continue;
 			if (stat.state !== 'Z' && stat.state !== 'X') return false;
+			const tasks = unlessVanished(() => proc.readdir(`/proc/${entry}/task`));
+			if (tasks === undefined) continue;
+			if (tasks.length !== 1) return false;
 			members += 1;
 		}
 		return members > 0;
 	} catch {
 		return false;
+	}
+}
+
+/** `read()`, or `undefined` when the entry is gone (reaped mid-scan); any other error throws. */
+function unlessVanished<T>(read: () => T): T | undefined {
+	try {
+		return read();
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === 'ENOENT' || code === 'ESRCH') return undefined;
+		throw error;
 	}
 }
 

@@ -149,10 +149,19 @@ describe('a process group whose members all exited (Linux, no reaping PID 1)', (
 
 	function reader(
 		stats: Record<string, string | NodeJS.ErrnoException>,
-		mountinfo = `${PROC_MOUNT}\n`
+		mountinfo = `${PROC_MOUNT}\n`,
+		tasks: Record<string, string[] | NodeJS.ErrnoException> = {}
 	): ProcFsReader {
 		return {
-			readdir: () => ['self', 'thread-self', 'sys', ...Object.keys(stats)],
+			readdir: (path) => {
+				if (path === '/proc') return ['self', 'thread-self', 'sys', ...Object.keys(stats)];
+				// A real zombie lists exactly itself under task/ (captured: `task=[13]`).
+				const pid = /^\/proc\/(\d+)\/task$/.exec(path)?.[1] ?? '';
+				const listed = tasks[pid] ?? (pid in stats ? [pid] : undefined);
+				if (listed === undefined) throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
+				if (!Array.isArray(listed)) throw listed;
+				return listed;
+			},
 			readFile: (path) => {
 				if (path === '/proc/self/stat') return SELF;
 				if (path === '/proc/self/mountinfo') return mountinfo;
@@ -172,6 +181,13 @@ describe('a process group whose members all exited (Linux, no reaping PID 1)', (
 	it('keeps a group alive while any member still runs', () => {
 		const live = '16 (git-remote-https) S 15 13 13 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 4726702';
 		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 1: PID1, 15: ZOMBIE, 16: live }), 7)).toBe(false);
+	});
+
+	it('keeps a group alive whose zombie-state leader still has running threads (`Zl`)', () => {
+		const tasks = { 15: ['15', '17'] };
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }, undefined, tasks), 7)).toBe(false);
+		const unreadable = { 15: errno('EACCES') };
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }, undefined, unreadable), 7)).toBe(false);
 	});
 
 	it('reads the state after the LAST parenthesis, whatever the command name holds', () => {
