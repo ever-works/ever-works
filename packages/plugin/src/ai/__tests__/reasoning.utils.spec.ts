@@ -72,9 +72,11 @@ describe('getReasoningConfig — o-series', () => {
 });
 
 describe('getReasoningConfig — gemini & claude on openrouter', () => {
-	it('gemini-2/3 → google effort=none', () => {
+	it('gemini-2 (non-Pro) → google effort=none; Gemini 3 Pro cannot turn reasoning off → low', () => {
 		expect(getReasoningConfig('google', 'gemini-2.0-flash')).toEqual({ reasoning_effort: 'none' });
-		expect(getReasoningConfig('google', 'gemini-3-pro')).toEqual({ reasoning_effort: 'none' });
+		// "Reasoning cannot be turned off for Gemini 2.5 Pro or 3 models"
+		// (https://aistudio.google.com/docs/openai, checked 2026-11-05).
+		expect(getReasoningConfig('google', 'gemini-3-pro')).toEqual({ reasoning_effort: 'low' });
 	});
 
 	it('gemini-2/3 → openrouter effort=none', () => {
@@ -102,6 +104,110 @@ describe('getReasoningConfig — gemini & claude on openrouter', () => {
 
 	it('claude-3-1 → no match (only 3-5..3-9 and 4–9)', () => {
 		expect(getReasoningConfig('openrouter', 'anthropic/claude-3-1-sonnet')).toBeUndefined();
+	});
+});
+
+/**
+ * Current model families (models refresh, checked 2026-11-05). The registry asks
+ * for the LOWEST effort each model accepts. Sources:
+ *  - OpenAI per-model pages https://developers.openai.com/api/docs/models/<id>
+ *    (gpt-6-astra: "supports `low`, `medium`, `high`, `xhigh`, and `max`";
+ *    gpt-6.1-sol: "`low`, `medium` (default), …"; gpt-6-luna, gpt-6-sol,
+ *    gpt-6.1-terra, gpt-5.6-sol: "`none`, `low`, `medium` (default), …").
+ *  - Google https://aistudio.google.com/docs/openai ("Reasoning cannot be turned
+ *    off for Gemini 2.5 Pro or 3 models"; Gemini 4 Argon maps minimal → low).
+ *  - OpenRouter https://openrouter.ai/api/v1/models `reasoning.mandatory` /
+ *    `supported_efforts` (a mandatory model "rejects" effort `none`).
+ */
+describe('getReasoningConfig — current families (models refresh 2026-11-05)', () => {
+	it('GPT-6 Astra and GPT-6.1 Sol cannot turn reasoning off → effort=low', () => {
+		for (const model of ['gpt-6-astra', 'gpt-6.1-sol']) {
+			expect(getReasoningConfig('openai', model)).toEqual({ reasoning: { effort: 'low' } });
+			expect(getReasoningConfig('openrouter', `openai/${model}`)).toEqual({ reasoning: { effort: 'low' } });
+		}
+	});
+
+	it('GPT-6 / 6.1 -pro variants are mandatory on OpenRouter → effort=low', () => {
+		for (const model of ['openai/gpt-6-astra-pro', 'openai/gpt-6.1-sol-pro', 'openai/gpt-6.1-terra-pro']) {
+			expect(getReasoningConfig('openrouter', model)).toEqual({ reasoning: { effort: 'low' } });
+		}
+	});
+
+	it('GPT-6 Luna / Sol, GPT-6.1 Terra and GPT-5.6 accept none → effort=none', () => {
+		for (const model of [
+			'gpt-6-luna',
+			'gpt-6-sol',
+			'gpt-6.1-terra',
+			'gpt-5.6-sol',
+			'gpt-5.6-terra',
+			'gpt-5.6-luna'
+		]) {
+			expect(getReasoningConfig('openai', model)).toEqual({ reasoning: { effort: 'none' } });
+			expect(getReasoningConfig('openrouter', `openai/${model}`)).toEqual({ reasoning: { effort: 'none' } });
+		}
+	});
+
+	it('Gemini 4, 3.7+ Flash and the Pro models → effort=low (thinking cannot be turned off)', () => {
+		for (const model of [
+			'gemini-4-argon',
+			'gemini-3.8-flash',
+			'gemini-3.7-flash',
+			'gemini-3.1-pro-preview',
+			'gemini-2.5-pro'
+		]) {
+			expect(getReasoningConfig('google', model)).toEqual({ reasoning_effort: 'low' });
+			expect(getReasoningConfig('openrouter', `google/${model}`)).toEqual({ reasoning: { effort: 'low' } });
+		}
+		// The google plugin's ids carry a `models/` prefix.
+		expect(getReasoningConfig('google', 'models/gemini-3.8-flash')).toEqual({ reasoning_effort: 'low' });
+	});
+
+	it('other Gemini 3.x models accept minimal → effort=minimal', () => {
+		for (const model of [
+			'gemini-3.6-flash',
+			'gemini-3.5-flash-lite',
+			'gemini-3.1-flash-lite',
+			'gemini-3-flash-preview'
+		]) {
+			expect(getReasoningConfig('google', model)).toEqual({ reasoning_effort: 'minimal' });
+			expect(getReasoningConfig('openrouter', `google/${model}`)).toEqual({ reasoning: { effort: 'minimal' } });
+		}
+	});
+
+	it('Gemini 2.5 Flash / Flash-Lite still accept none', () => {
+		expect(getReasoningConfig('google', 'models/gemini-2.5-flash')).toEqual({ reasoning_effort: 'none' });
+		expect(getReasoningConfig('google', 'gemini-2.5-flash-lite')).toEqual({ reasoning_effort: 'none' });
+	});
+
+	it('Claude Opus / Sonnet 5.5 and Fable always think on OpenRouter → effort=low', () => {
+		for (const model of ['claude-opus-5.5', 'claude-sonnet-5.5', 'claude-fable-5.1', 'claude-fable-5']) {
+			expect(getReasoningConfig('openrouter', `anthropic/${model}`)).toEqual({ reasoning: { effort: 'low' } });
+		}
+	});
+
+	it('Claude Haiku 5.5 accepts none on OpenRouter; earlier Opus / Sonnet stay at none', () => {
+		for (const model of ['claude-haiku-5.5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.8']) {
+			expect(getReasoningConfig('openrouter', `anthropic/${model}`)).toEqual({ reasoning: { effort: 'none' } });
+		}
+	});
+
+	it('never sends effort=none to a model OpenRouter marks reasoning-mandatory', () => {
+		const mandatory = [
+			'openai/gpt-6-astra',
+			'openai/gpt-6.1-sol',
+			'anthropic/claude-opus-5.5',
+			'anthropic/claude-sonnet-5.5',
+			'anthropic/claude-fable-5.1',
+			'google/gemini-4-argon',
+			'google/gemini-3.8-flash',
+			'google/gemini-3.6-flash',
+			'google/gemini-3.5-flash-lite',
+			'google/gemini-3.1-pro-preview',
+			'google/gemini-2.5-pro'
+		];
+		for (const model of mandatory) {
+			expect(getOpenRouterReasoningConfig(model)?.reasoning.effort).not.toBe('none');
+		}
 	});
 });
 
