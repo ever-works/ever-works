@@ -233,6 +233,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             subdomainAllocator,
             customDomainRepository,
             workRuntimeEnvService,
+            websiteUpdateService,
         };
     };
 
@@ -416,10 +417,128 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             'acme',
             'acme-site',
             '.github/workflows/deploy_k8s.yaml',
-            'gh-token',
             'main',
+            'gh-token',
         );
         expect(githubPlugin.dispatchWorkflow).toHaveBeenCalledTimes(1);
+    });
+
+    describe('workflow-file preflight follows the git-provider getFileContent contract', () => {
+        /**
+         * A stand-in with the REAL `IGitProviderPlugin.getFileContent`
+         * shape — `(owner, repo, path, ref?, token?)` — and the real GitHub
+         * plugin's answers: `null` for a file that does not exist, a
+         * thrown 401 when the credential is not a token. `present` lists
+         * the workflow files the website repository holds on `main`.
+         */
+        const contractGetFileContent = (present: () => readonly string[]) =>
+            jest.fn(
+                async (
+                    _owner: string,
+                    _repo: string,
+                    path: string,
+                    ref?: string,
+                    token?: string,
+                ): Promise<{ content: string; encoding: string } | null> => {
+                    if (token !== 'gh-token') {
+                        throw Object.assign(new Error('Bad credentials'), { status: 401 });
+                    }
+                    if (ref !== 'main') {
+                        return null;
+                    }
+                    const name = path.replace('.github/workflows/', '');
+                    return present().includes(name)
+                        ? { content: 'name: deploy', encoding: 'utf-8' }
+                        : null;
+                },
+            );
+
+        it('detects a missing workflow (null answer) and syncs the template before dispatching', async () => {
+            let present: readonly string[] = [];
+            const getFileContent = contractGetFileContent(() => present);
+            const { service, githubPlugin, websiteUpdateService } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginOverrides: { getFileContent },
+            });
+            websiteUpdateService.updateRepository.mockImplementation(async () => {
+                present = ['deploy_k8s.yaml'];
+            });
+            jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
+
+            const result = await service.deploy('work-1', 'user-1', {});
+
+            expect(result.dispatched).toBe(true);
+            // The doomed first dispatch is skipped: the repository is synced
+            // first, then the workflow is dispatched exactly once.
+            expect(websiteUpdateService.updateRepository).toHaveBeenCalledTimes(1);
+            expect(githubPlugin.dispatchWorkflow).toHaveBeenCalledTimes(1);
+            expect(websiteUpdateService.updateRepository.mock.invocationCallOrder[0]).toBeLessThan(
+                githubPlugin.dispatchWorkflow.mock.invocationCallOrder[0],
+            );
+            for (const call of getFileContent.mock.calls) {
+                expect(call[3]).toBe('main');
+                expect(call[4]).toBe('gh-token');
+            }
+        });
+
+        it('stops without dispatching when the synced repository still lacks every workflow', async () => {
+            const getFileContent = contractGetFileContent(() => []);
+            const { service, githubPlugin, websiteUpdateService } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginOverrides: { getFileContent },
+            });
+            jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
+
+            const result = await service.deploy('work-1', 'user-1', {});
+
+            expect(result.dispatched).toBe(false);
+            expect(websiteUpdateService.updateRepository).toHaveBeenCalledTimes(1);
+            expect(githubPlugin.dispatchWorkflow).not.toHaveBeenCalled();
+        });
+
+        it('dispatches straight away when the workflow is present', async () => {
+            const getFileContent = contractGetFileContent(() => ['deploy_k8s.yaml']);
+            const { service, githubPlugin, websiteUpdateService } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginOverrides: { getFileContent },
+            });
+
+            const result = await service.deploy('work-1', 'user-1', {});
+
+            expect(result.dispatched).toBe(true);
+            expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+            expect(githubPlugin.dispatchWorkflow).toHaveBeenCalledTimes(1);
+        });
+
+        it('treats an undefined answer (over-reporting lazy proxy) as inconclusive, not missing', async () => {
+            const getFileContent = jest.fn().mockResolvedValue(undefined);
+            const { service, githubPlugin, websiteUpdateService } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginOverrides: { getFileContent },
+            });
+
+            const result = await service.deploy('work-1', 'user-1', {});
+
+            expect(result.dispatched).toBe(true);
+            expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+            expect(githubPlugin.dispatchWorkflow).toHaveBeenCalledTimes(1);
+        });
     });
 
     it('falls back to deploy_prod.yaml for plugins without getWorkflowFilenames', async () => {
