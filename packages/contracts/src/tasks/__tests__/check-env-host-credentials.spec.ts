@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { HOST_CREDENTIAL_ENV_PATTERN, isHostCredentialEnvName } from '../check-env-host-credentials.types.js';
+import {
+	HOST_CREDENTIAL_ENV_PATTERN,
+	isCheckEnvRefusedName,
+	isHostCredentialEnvName,
+	PLATFORM_OWNED_ENV_NAMESPACE_PATTERN
+} from '../check-env-host-credentials.types.js';
 
 /**
  * The host's own credentials, shared by the platform's `buildCheckEnv` and
@@ -68,6 +73,34 @@ const ADDED_NAMES = [
 	'CI_DEPENDENCY_PROXY_PASSWORD',
 	'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
 	'ACTIONS_RUNTIME_TOKEN',
+	'SYSTEM_ACCESSTOKEN',
+	// Independent review on #3073: password managers, podman / Terraform
+	// pointers, more registries, git config that can carry an auth header.
+	'BW_SESSION',
+	'OP_SESSION_my_team',
+	'OP_SERVICE_ACCOUNT_TOKEN',
+	'OP_CONNECT_TOKEN',
+	'REGISTRY_AUTH_FILE',
+	'KUBE_CONFIG_PATH',
+	'KUBE_CONFIG_PATHS',
+	'COMPOSER_AUTH',
+	'NUGET_AUTH_TOKEN',
+	'VSS_NUGET_EXTERNAL_FEED_ENDPOINTS',
+	'POETRY_PYPI_TOKEN_PYPI',
+	'POETRY_HTTP_BASIC_CORP_PASSWORD',
+	'UV_PUBLISH_TOKEN',
+	'UV_PUBLISH_PASSWORD',
+	'UV_INDEX_CORP_PASSWORD',
+	'YARN_NPM_AUTH_IDENT',
+	'GIT_CONFIG_PARAMETERS',
+	'GIT_CONFIG_VALUE_0',
+	'GIT_SSH',
+	'GIT_SSH_COMMAND',
+	'AZURE_CLIENT_CERTIFICATE_PASSWORD',
+	'AZURE_STORAGE_CONNECTION_STRING',
+	'ARM_ACCESS_KEY',
+	'CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE',
+	'GCP_SA_KEY',
 	'GEM_HOST_API_KEY',
 	'HOMEBREW_GITHUB_API_TOKEN',
 	'VERCEL_TOKEN',
@@ -108,6 +141,24 @@ const NEIGHBOURS = [
 	'CI_REGISTRY_USER',
 	'ACTIONS_ID_TOKEN_REQUEST_URL',
 	'ACTIONS_CACHE_URL',
+	// Cloud settings that are not credentials: only the secret-bearing names
+	// of a cloud SDK are refused, not its whole namespace.
+	'AZURE_OPENAI_ENDPOINT',
+	'AZURE_SUBSCRIPTION_ID',
+	'ARM_SUBSCRIPTION_ID',
+	'GCP_PROJECT',
+	'GCLOUD_PROJECT',
+	'CLOUDSDK_CORE_PROJECT',
+	// Model-provider keys are governed by the node's model-step credential
+	// families, not here (they ride the same passthrough by design).
+	'OPENAI_API_KEY',
+	'ANTHROPIC_API_KEY',
+	'AZURE_OPENAI_API_KEY',
+	// Usernames and git config KEYS are not credentials.
+	'UV_INDEX_CORP_USERNAME',
+	'POETRY_HTTP_BASIC_CORP_USERNAME',
+	'GIT_CONFIG_KEY_0',
+	'GIT_CONFIG_COUNT',
 	'TF_VAR_region',
 	'VERCEL_ENV',
 	'KUBECONFIG_BACKUP',
@@ -140,5 +191,28 @@ describe('HOST_CREDENTIAL_ENV_PATTERN', () => {
 		expect(HOST_CREDENTIAL_ENV_PATTERN.sticky).toBe(false);
 		expect(isHostCredentialEnvName('GITHUB_TOKEN')).toBe(true);
 		expect(isHostCredentialEnvName('GITHUB_TOKEN')).toBe(true);
+	});
+});
+
+describe('PLATFORM_OWNED_ENV_NAMESPACE_PATTERN / isCheckEnvRefusedName', () => {
+	it.each([
+		'DATABASE_URL',
+		'PLATFORM_ENCRYPTION_KEY',
+		'FLEET_NODE_SECRET',
+		'EVER_WORKS_API_KEY',
+		'GH_TOKEN',
+		'AWS_SECRET_ACCESS_KEY'
+	])('refuses the platform-owned name %s', (name) => {
+		expect(PLATFORM_OWNED_ENV_NAMESPACE_PATTERN.test(name)).toBe(true);
+		expect(isCheckEnvRefusedName(name)).toBe(true);
+	});
+
+	it('refuses a host credential through the combined check', () => {
+		expect(isCheckEnvRefusedName('SSH_AUTH_SOCK')).toBe(true);
+		expect(PLATFORM_OWNED_ENV_NAMESPACE_PATTERN.test('SSH_AUTH_SOCK')).toBe(false);
+	});
+
+	it.each(['PATH', 'CUSTOM_BUILD_FLAG', 'DOCKER_HOST', 'OPENAI_API_KEY'])('leaves %s passable', (name) => {
+		expect(isCheckEnvRefusedName(name)).toBe(false);
 	});
 });

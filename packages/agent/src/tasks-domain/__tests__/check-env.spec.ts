@@ -1,7 +1,12 @@
-import { HOST_CREDENTIAL_ENV_PATTERN } from '@ever-works/contracts';
+import {
+    HOST_CREDENTIAL_ENV_PATTERN,
+    PLATFORM_OWNED_ENV_NAMESPACE_PATTERN,
+} from '@ever-works/contracts';
+import { executeAcceptanceCheck } from '../acceptance-check-executor';
 import {
     buildCheckEnv,
     normalizePassthrough,
+    refusedPassthroughNames,
     CHECK_ENV_ALLOWLIST,
     MAX_ENV_PASSTHROUGH,
     NO_CWD_IN_EXE_PATH_ENV,
@@ -376,7 +381,15 @@ describe("buildCheckEnv — the host's own credentials are not self-grantable", 
         expect(env.CUSTOM_BUILD_FLAG).toBe('yes');
     });
 
-    it('parity: refuses every name the shared host-credential list refuses (one list, two runtimes)', () => {
+    it('parity: is built from exactly the two shared lists the fleet node uses (no local copy to drift)', () => {
+        // The node pins the same equality for NODE_PLATFORM_OWNED_ENV_PATTERN.
+        expect(PLATFORM_OWNED_ENV_PATTERN.source).toBe(
+            `${PLATFORM_OWNED_ENV_NAMESPACE_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`,
+        );
+        expect(PLATFORM_OWNED_ENV_PATTERN.flags).toBe('i');
+    });
+
+    it('refuses every name the shared host-credential list refuses', () => {
         // Built from the shared pattern's own alternatives, so a name added
         // there is checked here without editing this spec.
         const samples = HOST_CREDENTIAL_ENV_PATTERN.source
@@ -391,6 +404,41 @@ describe("buildCheckEnv — the host's own credentials are not self-grantable", 
         for (const name of samples) {
             expect(HOST_CREDENTIAL_ENV_PATTERN.test(name)).toBe(true);
             expect(PLATFORM_OWNED_ENV_PATTERN.test(name)).toBe(true);
+            expect(normalizePassthrough([name])).toEqual([]);
         }
     });
+
+    it('names the refused passthrough entries (names only, de-duplicated, malformed ignored)', () => {
+        expect(
+            refusedPassthroughNames([
+                'NPM_TOKEN',
+                'npm_token',
+                'CUSTOM_BUILD_FLAG',
+                'DATABASE_URL',
+                'has space',
+                'SSH_AUTH_SOCK',
+            ]),
+        ).toEqual(['NPM_TOKEN', 'DATABASE_URL', 'SSH_AUTH_SOCK']);
+        expect(refusedPassthroughNames(undefined)).toEqual([]);
+    });
+
+    it("says in the check's own log which listed names were not granted", async () => {
+        const result = await executeAcceptanceCheck(
+            {
+                id: 'install',
+                name: 'install',
+                kind: 'build',
+                command: 'node -e "process.stdout.write(\'ran\')"',
+                required: true,
+                envPassthrough: ['NPM_TOKEN', 'CUSTOM_BUILD_FLAG', 'SSH_AUTH_SOCK'],
+            },
+            process.cwd(),
+        );
+        expect(result.status).toBe('green');
+        expect(result.logTail).toContain('ran');
+        expect(result.logTail).toContain(
+            'envPassthrough not granted (platform configuration or a host credential): NPM_TOKEN, SSH_AUTH_SOCK',
+        );
+        expect(result.logTail).not.toContain('CUSTOM_BUILD_FLAG');
+    }, 30_000);
 });

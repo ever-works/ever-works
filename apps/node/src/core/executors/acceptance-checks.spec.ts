@@ -1,11 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
-import { FLEET_JOB_MAX_RESULT_BYTES, HOST_CREDENTIAL_ENV_PATTERN } from '@ever-works/contracts';
+import {
+	FLEET_JOB_MAX_RESULT_BYTES,
+	HOST_CREDENTIAL_ENV_PATTERN,
+	PLATFORM_OWNED_ENV_NAMESPACE_PATTERN
+} from '@ever-works/contracts';
 import {
 	AcceptanceChecksPayloadError,
 	buildNodeCheckEnv,
@@ -13,6 +17,7 @@ import {
 	fitNodeOutcomeToResultBudget,
 	NODE_PLATFORM_OWNED_ENV_PATTERN,
 	normalizeChecks,
+	refusedNodePassthroughNames,
 	runAcceptanceChecksJob,
 	runNodeCommandStep,
 	tailUtf8Bytes
@@ -501,7 +506,37 @@ describe("buildNodeCheckEnv — the host's own credentials are not self-grantabl
 		expect(env.DOCKER_CERT_PATH).toBeUndefined();
 	});
 
-	it('parity: refuses every name the shared host-credential list refuses (one list with the platform)', () => {
+	it('parity: is built from exactly the two shared lists the platform uses (no local copy to drift)', () => {
+		// The platform's check-env spec pins the same equality for PLATFORM_OWNED_ENV_PATTERN.
+		expect(NODE_PLATFORM_OWNED_ENV_PATTERN.source).toBe(
+			`${PLATFORM_OWNED_ENV_NAMESPACE_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`
+		);
+		expect(NODE_PLATFORM_OWNED_ENV_PATTERN.flags).toBe('i');
+	});
+
+	it('names the refused passthrough entries in a warning (names only, never values)', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		try {
+			const env = buildNodeCheckEnv(['SSH_AUTH_SOCK', 'DOCKER_CONFIG', 'DOCKER_CONTEXT'], moreHost, [
+				'DOCKER_CONFIG'
+			]);
+			expect(env.DOCKER_CONFIG).toBe('C:/Users/owner/.docker-registry-auth');
+			const lines = warn.mock.calls.map((call) => String(call[0]));
+			const line = lines.find((text) => text.includes('envPassthrough not granted'));
+			expect(line).toContain('SSH_AUTH_SOCK');
+			// Granted per repository, so not reported as refused.
+			expect(line).not.toContain('DOCKER_CONFIG');
+			expect(line).not.toContain('DOCKER_CONTEXT');
+			expect(lines.join(' ')).not.toContain('ssh-agent.socket');
+		} finally {
+			warn.mockRestore();
+		}
+		expect(refusedNodePassthroughNames(['NPM_TOKEN', 'npm_token', 'CUSTOM_BUILD_FLAG', 'bad name'])).toEqual([
+			'NPM_TOKEN'
+		]);
+	});
+
+	it('refuses every name the shared host-credential list refuses (one list with the platform)', () => {
 		// Built from the shared pattern's own alternatives, so a name added
 		// to `HOST_CREDENTIAL_ENV_PATTERN` is checked here without editing this spec.
 		const samples = HOST_CREDENTIAL_ENV_PATTERN.source

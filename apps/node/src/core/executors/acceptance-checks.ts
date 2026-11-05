@@ -7,6 +7,7 @@ import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/con
 import {
 	FLEET_JOB_MAX_RESULT_BYTES,
 	HOST_CREDENTIAL_ENV_PATTERN,
+	PLATFORM_OWNED_ENV_NAMESPACE_PATTERN,
 	resolveExclusiveAgentCredentials
 } from '@ever-works/contracts';
 import { enforceAcceptanceChecksExecutionPolicy } from '../execution-policy';
@@ -916,14 +917,6 @@ export const NODE_SECRETISH_ENV_KEY_PATTERN =
 	/(SECRET|TOKEN|KEY|PASSWORD|PASSWD|CREDENTIAL|DSN|DATABASE_URL|CONNECTION)/i;
 
 /**
- * The platform's own configuration namespaces, plus this node's
- * (`FLEET_`). The host-credential half of the refusal is
- * {@link HOST_CREDENTIAL_ENV_PATTERN} — see {@link NODE_PLATFORM_OWNED_ENV_PATTERN}.
- */
-const NODE_PLATFORM_NAMESPACE_ENV_PATTERN =
-	/^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_)/i;
-
-/**
  * Namespaces that are NEVER grantable — not by the allowlist, not by an
  * explicit `envPassthrough`. On a fleet node this additionally covers
  * the node's OWN credential namespace: a check must never be able to
@@ -936,11 +929,13 @@ const NODE_PLATFORM_NAMESPACE_ENV_PATTERN =
  * Cloudflare / DigitalOcean / Vault / OpenBao / Proxmox credentials or a
  * registry auth blob. `envPassthrough` bypasses the secret-NAME sweep
  * above, so without these entries a check could grant itself any of
- * them. That half is {@link HOST_CREDENTIAL_ENV_PATTERN} from
- * `@ever-works/contracts` — ONE list shared with the platform's
- * `buildCheckEnv`, so the two runtimes that run a check cannot drift
- * apart on it (they had: the platform never learned the names this node
- * refused). Exact credential names only where a broad prefix would also
+ * them. Both halves come from `@ever-works/contracts` —
+ * `PLATFORM_OWNED_ENV_NAMESPACE_PATTERN` (the platform's namespaces and
+ * this node's `FLEET_`) and `HOST_CREDENTIAL_ENV_PATTERN` — the SAME two
+ * lists the platform's `buildCheckEnv` refuses, so the two runtimes that
+ * run a check cannot drift apart on them (they had: the platform never
+ * learned the names this node refused). The un-grantable core below
+ * stays a local literal on purpose. Exact credential names only where a broad prefix would also
  * catch harmless context (`GITHUB_ACTIONS`, `DOCKER_HOST`), anchored at
  * the END, so `GITHUB_PAT` does not also refuse Actions' `GITHUB_PATH`.
  * An operator can still grant one per repository (an `NPM_TOKEN` for a
@@ -954,7 +949,7 @@ const NODE_PLATFORM_NAMESPACE_ENV_PATTERN =
  * command naming an absolute path.
  */
 export const NODE_PLATFORM_OWNED_ENV_PATTERN = new RegExp(
-	`${NODE_PLATFORM_NAMESPACE_ENV_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`,
+	`${PLATFORM_OWNED_ENV_NAMESPACE_PATTERN.source}|${HOST_CREDENTIAL_ENV_PATTERN.source}`,
 	'i'
 );
 
@@ -1144,6 +1139,16 @@ export function buildNodeCheckEnv(
 	// lists are capped independently (32 each, matching the registry) and
 	// merged case-insensitively here, first spelling wins.
 	const grants = normalizeGrantedPlatformOwnedNames(platformOwnedGrants);
+	const refused = refusedNodePassthroughNames(passthrough, grants);
+	if (refused.length > 0) {
+		// Names only. Without this a refused name is just absent, and the
+		// command fails later on a registry / auth error pointing nowhere.
+		// eslint-disable-next-line no-console
+		console.warn(
+			`[fleet-node] envPassthrough not granted (platform configuration or a host credential; ` +
+				`an operator can grant one exact name per repository): ${refused.join(', ')}`
+		);
+	}
 	const granted: string[] = [];
 	const grantedSeen = new Set<string>();
 	for (const name of [...normalizePassthrough(passthrough, grants), ...grants]) {
@@ -1253,6 +1258,32 @@ export function normalizePassthrough(
 		seen.add(upper);
 		out.push(name);
 		if (out.length >= MAX_ENV_PASSTHROUGH) break;
+	}
+	return out;
+}
+
+/**
+ * The passthrough names this node REFUSES (platform-owned configuration or
+ * a host credential that no per-repository grant opened). Names only.
+ */
+export function refusedNodePassthroughNames(
+	names: readonly string[] | null | undefined,
+	platformOwnedGrants?: readonly string[] | null
+): string[] {
+	if (!Array.isArray(names)) return [];
+	const grantedUpper = new Set(
+		normalizeGrantedPlatformOwnedNames(platformOwnedGrants).map((name) => name.toUpperCase())
+	);
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const raw of names) {
+		if (typeof raw !== 'string') continue;
+		const name = raw.trim();
+		if (!NODE_ENV_NAME_PATTERN.test(name) || !NODE_PLATFORM_OWNED_ENV_PATTERN.test(name)) continue;
+		const upper = name.toUpperCase();
+		if (grantedUpper.has(upper) || seen.has(upper)) continue;
+		seen.add(upper);
+		out.push(name);
 	}
 	return out;
 }

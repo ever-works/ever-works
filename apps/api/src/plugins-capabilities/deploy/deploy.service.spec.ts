@@ -539,6 +539,29 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
             expect(githubPlugin.dispatchWorkflow).toHaveBeenCalledTimes(1);
         });
+
+        it.each([401, 403, 500])(
+            'treats a thrown %i as inconclusive: dispatch is tried, no template sync first',
+            async (status) => {
+                const getFileContent = jest
+                    .fn()
+                    .mockRejectedValue(Object.assign(new Error(`HTTP ${status}`), { status }));
+                const { service, githubPlugin, websiteUpdateService } = buildService({
+                    plugin: {
+                        id: 'k8s',
+                        getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                        getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                    },
+                    githubPluginOverrides: { getFileContent },
+                });
+
+                const result = await service.deploy('work-1', 'user-1', {});
+
+                expect(result.dispatched).toBe(true);
+                expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+                expect(githubPlugin.dispatchWorkflow).toHaveBeenCalledTimes(1);
+            },
+        );
     });
 
     it('falls back to deploy_prod.yaml for plugins without getWorkflowFilenames', async () => {
