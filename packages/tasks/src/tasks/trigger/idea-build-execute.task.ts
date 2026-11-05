@@ -5,7 +5,7 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 // Security: validate Trigger.dev payload IDs before any DB access
 // (defense-in-depth, mirrors agent-task-execute).
-import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+import { assertUuid } from '../../trigger/worker/utils/assert-uuid.utils';
 
 export interface IdeaBuildExecutePayload {
     /** The Idea-build `WorkAgentGoal` to execute. */
