@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { authAPI, type TermsAcceptanceDocument } from '@/lib/api';
+import { readProvisionCookie } from '@/lib/auth/ever-connect-provision-cookie';
 import { readEverIdPending } from '@/lib/auth/ever-id-cookies';
 import { EverIdCreateAccountClient } from './create-account-client';
 
@@ -37,6 +38,7 @@ export default async function EverIdCreateAccountPage() {
         <EverIdCreateAccountClient
             identity={{ name: pending.name, email: pending.email }}
             termsDocuments={termsDocuments}
+            linkedHandle={(await readProvisionCookie())?.handle ?? null}
         />
     );
 }

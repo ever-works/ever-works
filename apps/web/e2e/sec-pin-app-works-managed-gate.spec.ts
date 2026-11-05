@@ -52,6 +52,16 @@
  *     not the alias
  *   - `GET` and `PUT /api/works/:id/app-target` and `POST …/app-target/check` →
  *     `404` for the owner, for another account and for an anonymous caller alike
+ *
+ * ## Re-measured on stage (run 41605694388, 2026-11-03)
+ *
+ * APW-06 has since mounted the three routes (`apps/api/src/works/
+ * work-app-runtime.controller.ts`): the owner's `GET app-target` answers `200`
+ * `{"target":"none",…,"eligibility":{"managed":{"eligible":false,"reasons":
+ * ["managedTierDisabled"]}}}`. The routes pin now asserts the gate around them —
+ * another account masked as `404`, no session `401`, and the owner's managed `PUT`
+ * refused `422 APP_TARGET_REFUSED` naming `managed_disabled` with the target
+ * unchanged (`packages/agent/src/app-runtime/app-target.service.ts` `putTarget`).
  */
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -344,7 +354,7 @@ test.describe('ACC-NEG-03 — the managed target is refused fail-closed, with a 
         expect(viaAlias.text).toContain('"code":"managed_hosting_unavailable"');
     });
 
-    test('the three app-target routes the case drives are not mounted — 404 for the owner, for another account and for nobody', async ({
+    test('the three app-target routes the case drives are mounted and gated — another account is masked as 404, nobody gets 401, and the owner’s managed PUT is refused fail-closed', async ({
         request,
     }) => {
         const run = stamp();
@@ -393,30 +403,62 @@ test.describe('ACC-NEG-03 — the managed target is refused fail-closed, with a 
             },
         ];
 
+        // APW-06 mounted these routes (`work-app-runtime.controller.ts`); this test used to pin
+        // their ABSENCE (404 `Cannot …` for everyone), which went red once they shipped (stage
+        // run 41605694388, shard 28: GET app-target answered the owner 200). It now pins the
+        // gate around them: a stranger's 403 is masked as the same 404 an absent Work gets, and
+        // no session is refused by the auth guard before anything is read.
         for (const attempt of attempts) {
-            const mine = await attempt.run(owner.access_token);
-            expect(
-                mine.status,
-                `${attempt.label} (owner) body=${mine.text.slice(0, 200)} — APW-06 owns this route ` +
-                    'and it does not exist on this API yet',
-            ).toBe(404);
-            expect(mine.text).toContain('Cannot');
             const theirs = await attempt.run(other.access_token);
             expect(
                 theirs.status,
                 `${attempt.label} (another account) body=${theirs.text.slice(0, 200)}`,
             ).toBe(404);
+            expect(theirs.text, `${attempt.label} (another account) is masked`).toContain(
+                `Work with id '${workId}' not found`,
+            );
             const anon = await attempt.run('');
-            expect(anon.status, `${attempt.label} (no session) is 404 as well`).toBe(404);
+            expect(
+                anon.status,
+                `${attempt.label} (no session) body=${anon.text.slice(0, 200)}`,
+            ).toBe(401);
         }
 
-        // The copy the case quotes for the panel exists nowhere this lane can reach —
-        // asserted so that "the copy is missing" is measured rather than assumed.
+        // The owner reads the target the create stored: None (R-12), with the managed tier
+        // reported ineligible on this installation.
+        const before = await getAppTarget(request, { token: owner.access_token, workId });
+        expect(before.status, `GET app-target (owner) body=${before.text.slice(0, 300)}`).toBe(200);
+        const beforeBody = JSON.parse(before.text) as {
+            target?: string;
+            eligibility?: { managed?: { eligible?: boolean } };
+        };
+        expect(beforeBody.target).toBe('none');
+        expect(beforeBody.eligibility?.managed?.eligible, 'managed is not eligible here').toBe(
+            false,
+        );
+
+        // Choosing the managed target is refused fail-closed (`app-target.service.ts`
+        // `putTarget` → `managedRefusals`): 422 APP_TARGET_REFUSED naming `managed_disabled`,
+        // and the stored target is unchanged.
         const putResult = await putAppTarget(request, {
             token: owner.access_token,
             workId,
             body: { target: MANAGED_TARGET_CASE_ID },
         });
+        expect(
+            putResult.status,
+            `PUT app-target managed (owner) body=${putResult.text.slice(0, 300)}`,
+        ).toBe(422);
+        expect(putResult.text).toContain('"code":"APP_TARGET_REFUSED"');
+        expect(putResult.text).toContain('"code":"managed_disabled"');
+        const after = await getAppTarget(request, { token: owner.access_token, workId });
+        expect(after.status).toBe(200);
+        expect((JSON.parse(after.text) as { target?: string }).target, 'target unchanged').toBe(
+            'none',
+        );
+
+        // The copy the case quotes for the panel is still served by no route this lane
+        // reaches — asserted so that "the copy is missing" is measured rather than assumed.
         expect(
             putResult.text.includes(MANAGED_PAUSED_COPY),
             'the paused copy the case quotes is not served by any route this lane reaches',

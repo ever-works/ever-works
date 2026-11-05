@@ -1886,7 +1886,22 @@ export class DeployService {
         for (const workflowFile of workflowFiles) {
             const workflowPath = `.github/workflows/${workflowFile}`;
             try {
-                await plugin.getFileContent(owner, repo, workflowPath, token, branch);
+                // `IGitProviderPlugin.getFileContent(owner, repo, path, ref?, token?)`
+                // takes the ref BEFORE the token. Passing them the other way
+                // round asked GitHub for the token as a ref and authenticated
+                // with the branch name, so every preflight failed with 401 and
+                // was skipped. The GitHub plugin answers `null` (not a throw)
+                // for a 404, so `null` is the "missing" signal; the catch
+                // below still honours providers that throw a not-found error.
+                // `undefined` is not an answer the contract gives (a lazy
+                // plugin proxy over-reporting the method yields it), so it
+                // makes the preflight inconclusive rather than "missing".
+                const file = await plugin.getFileContent(owner, repo, workflowPath, branch, token);
+                if (file === null) {
+                    missing.push(workflowFile);
+                } else if (file === undefined) {
+                    return null;
+                }
             } catch (error: any) {
                 if (this.isRepositoryFileNotFound(error)) {
                     missing.push(workflowFile);

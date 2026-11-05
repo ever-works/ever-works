@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { API_BASE, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { clickAndExpectUrl } from './helpers/nav';
 import { firstWorkWithItemsTab } from './helpers/work-kind-fixtures';
 
 /**
@@ -208,9 +209,12 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         );
 
         // The level-1 trail: a Settings tab linking DOWN to /works/{id}/settings.
-        const settingsTab = page
-            .locator(`a[href$="/works/${work.id}/settings"], a[aria-label="Settings"]`)
-            .first();
+        // Pinned by its href only: since 952f40ad7 the COLLAPSED dashboard sidebar
+        // names its icon links (`aria-label={item.name}`), so a bare
+        // `a[aria-label="Settings"]` alternative resolved FIRST (DOM order) to the
+        // sidebar's account-settings link (`href="/settings"`) and the click left
+        // the Work (stage run 41605694388, shard 7: "navigated to /settings").
+        const settingsTab = page.locator(`a[href$="/works/${work.id}/settings"]`).first();
         await expect(settingsTab).toBeVisible({ timeout: RENDER_TIMEOUT });
         const overviewTab = page
             .locator(`a[aria-label="Overview"], a[href$="/works/${work.id}"]`)
@@ -310,10 +314,16 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
             .locator(`a[aria-label="Overview"], a[href$="/works/${work.id}"]`)
             .first();
         await expect(overviewCrumb).toBeVisible({ timeout: RENDER_TIMEOUT });
-        await overviewCrumb.click();
-        await page.waitForURL(
-            (url) => /\/works\/[^/]+$/.test(url.pathname) && !/\/items$/.test(url.pathname),
-            { timeout: NAV_TIMEOUT },
+        // Soft navigation: `clickAndExpectUrl` polls the URL (a soft nav fires no
+        // document `load`) and re-clicks only while the URL has not moved, so a
+        // click that lands before the tab row hydrates is not silently lost
+        // (stage run 41605694388, shard 7: first attempt stayed on /items with the
+        // Overview tab focused; the retry passed).
+        await clickAndExpectUrl(
+            page,
+            overviewCrumb,
+            new RegExp(`/works/${work.id}/?$`),
+            NAV_TIMEOUT,
         );
 
         // Same entity, shallower crumb: the title is unchanged (it tracks the
@@ -445,6 +455,10 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         // chronic flake mode. Same contract (the crumb must hold keyboard
         // focus), asserted as an awaited poll that re-issues focus until the
         // node holds it, instead of a single unawaited snapshot.
+        // (The other thief was the product: the chat composer focused itself on
+        // mount, AFTER this probe passed, so Enter typed into the chat — stage
+        // run 41605694388, shard 7, snapshot showed the composer [active].
+        // ChatInput no longer takes focus from an element that holds it.)
         await expect
             .poll(
                 async () => {

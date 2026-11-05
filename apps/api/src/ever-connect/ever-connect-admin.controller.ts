@@ -25,6 +25,10 @@ import {
 } from './ever-connect-outbox.service';
 import { EverConnectService, type EverConnectStatus } from './ever-connect.service';
 import { EverIdLoginHandler, type EverIdLoginClientStatus } from './identity/ever-id-login.handler';
+import {
+    provisionCapabilities,
+    type EverConnectProvisionCapabilities,
+} from './provision/provision.switches';
 
 /** The installation-wide integrations an administrator accepts here. */
 const INSTANCE_WIDE_KEYS = new Set(['ever_id_login', 'instance_url', 'stats_link', 'webhooks']);
@@ -35,6 +39,8 @@ export interface EverConnectAdminStatus {
     readonly integrations: EverConnectIntegrationView[];
     readonly everIdClient: EverIdLoginClientStatus;
     readonly outbox: EverConnectOutboxStatus;
+    /** What this installation can do with a request from Ever Platform. */
+    readonly capabilities: EverConnectProvisionCapabilities;
 }
 
 /**
@@ -73,6 +79,7 @@ export class EverConnectAdminController {
             integrations: await this.integrations.list(),
             everIdClient: this.login.getStatus(),
             outbox: await this.outbox.status(),
+            capabilities: provisionCapabilities(),
         };
     }
 

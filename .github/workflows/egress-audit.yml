@@ -380,7 +380,7 @@ jobs:
         run: |
           nohup tools/egress-audit/node_modules/.bin/ever-mock-platform --host 127.0.0.1 --port 18080 \
             > "$RUNNER_TEMP/ever-mock-platform.log" 2>&1 &
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf http://127.0.0.1:18080/__mock/healthz && exit 0
             sleep 1
           done

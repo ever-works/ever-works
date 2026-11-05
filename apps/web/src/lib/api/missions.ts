@@ -80,6 +80,41 @@ export interface CreateMissionInput {
     outstandingIdeasCap?: number | null;
     guardrailsOverride?: Record<string, unknown> | null;
     missionTemplateRepo?: string | null;
+    /** APW-08 T40 (FR-56) — the template form's inputs; needs `missionTemplateRepo`. */
+    templateInputs?: MissionTemplateInputs;
+}
+
+/** APW-08 T39/T40 (FR-56) — what a template about an App Work collects. */
+export interface MissionTemplateInputs {
+    product: string;
+    business: string;
+    appWorkId: string;
+}
+
+/**
+ * APW-08 T40 — a catalog Mission template's manifest as the create form shows it
+ * (`GET /me/missions/templates/:templateId/manifest`). `null` parts and
+ * `warnings: ['templateManifestUnreadable']` when the manifest could not be read.
+ */
+export interface MissionTemplateManifestView {
+    templateId: string;
+    defaults: {
+        cadence: string | null;
+        outputMode: MissionOutputMode | null;
+        tasksPerTick: number | null;
+        openTasksCap: number | null;
+        maxBudgetCentsPerRun: number | null;
+        requireApprovalBeforeCreate: boolean | null;
+        outstandingIdeasCap: number | null;
+    } | null;
+    appWork: {
+        requiredRelation: 'improves' | 'operates';
+        maxPullRequestChangedLines: number | null;
+        requireHumanMergePaths: string[];
+        protectedPaths: string[];
+    } | null;
+    suggestedGoals: Array<{ title: string; dodCriteria: string[] }>;
+    warnings: string[];
 }
 
 export interface UpdateMissionInput {
@@ -175,6 +210,21 @@ export const missionsAPI = {
     async get(id: string): Promise<Mission | null> {
         try {
             return await serverFetch<Mission>(`/me/missions/${id}`, { method: 'GET' });
+        } catch {
+            return null;
+        }
+    },
+
+    /**
+     * APW-08 T40 — a catalog Mission template's manifest (the create form's summary). `null` when
+     * the read fails for any reason: the form then shows no template fields.
+     */
+    async templateManifest(templateId: string): Promise<MissionTemplateManifestView | null> {
+        try {
+            return await serverFetch<MissionTemplateManifestView>(
+                `/me/missions/templates/${encodeURIComponent(templateId)}/manifest`,
+                { method: 'GET' },
+            );
         } catch {
             return null;
         }

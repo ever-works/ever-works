@@ -102,6 +102,30 @@ export class MissionTaskOutputDto {
 }
 
 /**
+ * APW-08 T39 (FR-56) — what the **Build on an open-source app** template form collects: the
+ * person's Product and Business (each 1–80 characters) and an App Work they own. Accepted with a
+ * `missionTemplateRepo` naming a catalog template; the service checks the Work (`404
+ * workNotFound`, `400 notAppWork`).
+ */
+export class MissionTemplateInputsDto {
+    @ApiProperty({ minLength: 1, maxLength: 80 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(80)
+    product: string;
+
+    @ApiProperty({ minLength: 1, maxLength: 80 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(80)
+    business: string;
+
+    @ApiProperty({ format: 'uuid' })
+    @IsUUID()
+    appWorkId: string;
+}
+
+/**
  * Phase 3 PR H — request body for `POST /me/missions`. Validated
  * by NestJS's global ValidationPipe via class-validator decorators.
  * The schedule-vs-type consistency rule (scheduled→schedule required,
@@ -202,6 +226,17 @@ export class CreateMissionDto {
     @ValidateNested()
     @Type(() => MissionTaskOutputDto)
     taskOutput?: MissionTaskOutputDto | null;
+
+    @ApiProperty({
+        required: false,
+        type: () => MissionTemplateInputsDto,
+        description:
+            'APW-08 T39 (FR-56…FR-58) — a template form’s inputs: the title is filled from them, the App Work is attached as the template’s relation and the template’s draft Goals are created on it. Needs `missionTemplateRepo`.',
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => MissionTemplateInputsDto)
+    templateInputs?: MissionTemplateInputsDto;
 }
 
 /**

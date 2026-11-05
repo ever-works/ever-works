@@ -67,10 +67,14 @@ Each Task's **Cost** section shows what its runs cost (an unpriced run reads _un
 
 An operator can stop new changes to every App Work (`EVER_WORKS_APP_CHANGES_ENABLED=false`) or stop changes deploying themselves (`EVER_WORKS_APP_AUTO_DEPLOY_ENABLED=false`). With changes off, a request is refused and the Overview says **"Changes to apps are paused by the operator."** A change run that would start is **parked** instead: it waits, nothing runs, and it starts by itself once the switch is back on. A scheduled Agent session on an App Work is skipped while changes are paused and fires again on its next schedule. Boards, delivery chains and history stay readable, and running deployments keep running.
 
+## Goals, Missions and templates
+
+- A **Goal** can be scoped to an App Work: its iterations become Tasks on it, and an iteration whose pull request is still open holds the loop — see [Goals → The Goal's Work](./goals.md#the-goals-work).
+- A **Mission** can file Tasks on the App Works attached to it as Improves or Operates — see [Missions → Output](./missions.md#output).
+- The **Build on an open-source app** Mission template sets both up for one App Work, and offers **Propose these rules** for the App spec rules it recommends: a change request, never a direct App spec edit — see [Mission Templates](./mission-templates.md#templates-about-an-app-work).
+
 ## Not yet
 
-- **Goals and Missions scoped to an App Work**, and a Mission that files Tasks on one.
-- **Templates** that propose App Work rules.
 - **Safety-rail holds** that block a Task with the rail's reason when a guardrail refuses an action mid-run.
 
 ## Related

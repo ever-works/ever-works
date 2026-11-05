@@ -136,6 +136,9 @@ import { ActiveScopeService } from '../users/services/active-scope.service';
         // membership the invitee does not have yet.
         OrganizationInvitationFlowService,
         OrganizationInvitationService,
+        // The company created from Ever Platform staffs itself with these.
+        OrgTemplateCatalogService,
+        CompanyImportService,
     ],
 })
 export class OrganizationsModule {}

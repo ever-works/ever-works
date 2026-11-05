@@ -295,7 +295,8 @@
                 "signedInAs": "{name} · {email} として Ever ID にサインイン中",
                 "signedInAsEmail": "{email} として Ever ID にサインイン中",
                 "submit": "アカウントを作成",
-                "cancel": "キャンセル"
+                "cancel": "キャンセル",
+                "linkedTo": "This account will be linked to ever.co/{handle}"
             },
             "accountExists": {
                 "title": "Ever Works アカウントはすでにお持ちです",
@@ -904,6 +905,24 @@
                 "minLength": "説明は 10 文字以上で入力してください。",
                 "error": "ミッションを作成できませんでした。もう一度お試しください。",
                 "chatUnavailable": "チャットは現在利用できません。「手動で作成」をご利用ください。"
+            },
+            "buildOnApp": {
+                "product": "プロダクト",
+                "business": "ビジネス",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "App Work を選択",
+                "noAppWorks": "App Work がまだありません。まず Works から追加してください。",
+                "summary": "毎週月曜 08:00 UTC · 週に最大 {count} 件のタスク · 1 回の実行あたり {amount}",
+                "backlogNote": "新しいタスクは承認されるまでバックログで待機します。",
+                "suggestedGoals": "提案されるゴール（下書きとして作成）：",
+                "rules": "推奨アプリルール：スキーマ変更は人がマージ、PR は {lines} 行まで",
+                "proposeRules": "これらのルールを提案",
+                "proposeNeedsAppWork": "先に App Work を選択してください。",
+                "rulesProposed": "アプリルールを変更するタスクを App Work に作成しました。",
+                "rulesFailed": "タスクを作成できませんでした。もう一度お試しください。",
+                "create": "ミッションを作成",
+                "templateUnreadable": "テンプレートを読み込めなかったため、入力した値のみを使用しました。",
+                "templatePartial": "ミッションは作成されましたが、テンプレートの一部を適用できませんでした。"
             },
             "quickAdd": {
                 "label": "Start a new Mission",
@@ -11199,6 +11218,46 @@
                 "subjectRequired": "Subject is required.",
                 "bodyRequired": "Message body is required.",
                 "sendFailed": "Send failed."
+            }
+        }
+    },
+    "everConnect": {
+        "provision": {
+            "title": "Create your company in Ever Works",
+            "confirmPageTitle": "Confirm your company",
+            "checking": "One moment, checking your request…",
+            "forHandle": "{name} · ever.co/{handle}",
+            "body": "Sign in with Ever ID to confirm. Nothing is created until you confirm.",
+            "continueEverId": "Continue with Ever ID",
+            "continue": "Continue",
+            "createHere": "Create a company in Ever Works",
+            "confirmTitle": "Create company {name}?",
+            "confirmSubtitle": "For ever.co/{handle}, in Ever Works.",
+            "existsTitle": "Your company is ready",
+            "name": "Company name",
+            "legalName": "Legal name",
+            "staffing": "Starter staff",
+            "staffingNone": "None",
+            "staffingHelp": "Agents arrive paused; you turn them on.",
+            "missionTitle": "First Mission",
+            "missionGoal": "Goal",
+            "create": "Create company",
+            "decline": "Not now",
+            "connectEverId": "Connect Ever ID in Settings",
+            "failure": {
+                "incomplete": "This link is not complete. Start again from Ever.",
+                "invalid": "This link is not valid any more. Start again from Ever.",
+                "expired": "This request has expired. Start again from Ever.",
+                "used": "This link was already used. Start again from Ever.",
+                "unavailable": "Creating a company from Ever is not available on this installation.",
+                "rateLimited": "Too many attempts. Wait a minute, then try again.",
+                "mismatch": "Sign in with the same Ever ID you used on app.ever.co.",
+                "tenantLinked": "Your account already has a company linked to Ever.",
+                "organizationLinked": "This Ever organization already has a company here.",
+                "inProgress": "This company is being created. Try again in a moment.",
+                "invalidValue": "One of these values cannot be used. Check them and try again.",
+                "unreachable": "Ever Platform cannot be reached right now. Try again in a minute.",
+                "failed": "The company could not be created. Try again."
             }
         }
     }

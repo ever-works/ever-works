@@ -1038,6 +1038,8 @@ interface GetWorksParams {
     search?: string;
     limit?: number;
     offset?: number;
+    /** APW-08 T40 — only Works of this kind (the API's `?kind=`; an unknown kind is a 400). */
+    kind?: string;
 }
 
 export async function getWorks(params: GetWorksParams = {}) {
@@ -1055,6 +1057,7 @@ export async function getWorks(params: GetWorksParams = {}) {
             search: params.search,
             limit: params.limit || 20,
             offset: params.offset || 0,
+            ...(params.kind ? { kind: params.kind } : {}),
         });
 
         return {

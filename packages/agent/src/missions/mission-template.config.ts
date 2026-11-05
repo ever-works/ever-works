@@ -33,7 +33,28 @@ export interface MissionTemplateConfig {
     branch: string;
     syncBranches: string[];
     betaBranch?: string | null;
+    /**
+     * APW-08 T38 — the git provider plugin that hosts `owner/repo`, for the manifest read through
+     * the git facade. Omitted = {@link MISSION_TEMPLATE_DEFAULT_GIT_PROVIDER}.
+     */
+    gitProvider?: string;
+    /**
+     * APW-08 T39 (review of #3077) — the template is about one App Work, so a create may carry
+     * `templateInputs`. Fixed here, not read from the manifest, so whether a template accepts them
+     * never depends on whether its manifest could be read. Omitted = `false`.
+     */
+    takesAppWork?: boolean;
 }
+
+/**
+ * APW-08 T38 — where the built-in Mission Templates live. The catalog row already records them as
+ * `https://github.com/<owner>/<repo>` (`TemplateCatalogService.toBuiltInMissionTemplateRecord`),
+ * so the manifest read names the same provider; a row hosted elsewhere sets `gitProvider`.
+ */
+export const MISSION_TEMPLATE_DEFAULT_GIT_PROVIDER = 'github';
+
+/** APW-08 T38 — the repository path of a Mission Template's manifest. */
+export const MISSION_TEMPLATE_MANIFEST_PATH = '.works/mission.yml';
 
 const STARTER_BUSINESS_MISSION_TEMPLATE: MissionTemplateConfig = {
     id: 'starter-business',
@@ -59,9 +80,32 @@ const STARTER_CONTENT_MISSION_TEMPLATE: MissionTemplateConfig = {
     betaBranch: null,
 };
 
+/**
+ * APW-08 T41 (FR-56…FR-60) — **Build on an open-source app**: a weekly, budgeted, approval-gated
+ * Mission that files small changes on one App Work. Its runtime manifest (`.works/mission.yml`:
+ * the FR-57 defaults, `appWork`, `suggestedGoals`) lives in the standalone repository below; the
+ * monorepo keeps the source under
+ * `docs/specs/features/app-works/APW-08-evolve-loop/mission-template-draft/`.
+ */
+export const BUILD_ON_OPEN_SOURCE_APP_MISSION_TEMPLATE_ID = 'build-on-open-source-app';
+
+const BUILD_ON_OPEN_SOURCE_APP_MISSION_TEMPLATE: MissionTemplateConfig = {
+    id: BUILD_ON_OPEN_SOURCE_APP_MISSION_TEMPLATE_ID,
+    name: 'Build on an open-source app',
+    description:
+        'Build your own product for your business on top of an open-source app you already run: every Monday it files up to two small, budgeted, approval-gated changes on an App Work and follows each one until it is live.',
+    owner: 'ever-works',
+    repo: 'build-on-open-source-app-mission-template',
+    branch: 'main',
+    syncBranches: ['main'],
+    betaBranch: null,
+    takesAppWork: true,
+};
+
 export const MISSION_TEMPLATES: MissionTemplateConfig[] = [
     STARTER_BUSINESS_MISSION_TEMPLATE,
     STARTER_CONTENT_MISSION_TEMPLATE,
+    BUILD_ON_OPEN_SOURCE_APP_MISSION_TEMPLATE,
 ];
 
 export function listMissionTemplates(): MissionTemplateConfig[] {

@@ -4,7 +4,7 @@ import { MemoryFactEmbedService } from '@ever-works/agent/services';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 // Security: validate payload ids before they cross the RPC channel.
-import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+import { assertUuid } from '../../trigger/worker/utils/assert-uuid.utils';
 
 /**
  * AW-07 — embed one memory fact.

@@ -1,0 +1,364 @@
+import { createPublicKey, verify as verifySignature } from 'node:crypto';
+import { HttpException } from '@nestjs/common';
+import { CONSTANTS, type KeySet } from '@ever-co/connect-sdk';
+
+/** The header `typ` of a provisioning request (Ever Platform signs every `intent` document so). */
+export const INTENT_HEADER_TYP: string = CONSTANTS.intent_typ;
+
+/** The claim `typ`: the version of the claim set. */
+export const INTENT_CLAIMS_TYP = 'ever.provision_intent.v1';
+
+/** The audience of a request for this product. */
+export const INTENT_AUDIENCE = 'ever-connect:works';
+
+/** The longest a request lives (`exp - iat`), seconds. */
+export const INTENT_MAX_TTL_S = 900;
+
+/** How far ahead of this clock a request's `iat` may be, seconds. */
+export const INTENT_MAX_FUTURE_IAT_S = 300;
+
+/** The longest compact JWS read. */
+const MAX_JWS_LENGTH = 65_536;
+
+/**
+ * Where Ever Platform's web app sends a person, and so where a request may send
+ * them back: app.ever.co and its stage and development hosts. No setting names
+ * another one.
+ */
+export const RETURN_ORIGINS: readonly string[] = Object.freeze([
+    'https://app.ever.co',
+    'https://app-stage.ever.co',
+    'https://app-dev.ever.co',
+]);
+
+const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+const TIERS: readonly string[] = ['starter', 'small_business', 'enterprise'];
+const B64URL = /^[A-Za-z0-9_-]+$/;
+
+/** The claims of a verified request (the closed set of `ever.provision_intent.v1`). */
+export interface ProvisionIntentClaims {
+    iss: string;
+    aud: string;
+    jti: string;
+    iat: number;
+    exp: number;
+    typ: string;
+    ever_purpose: 'intent';
+    job_id: string;
+    step_seq: number;
+    idempotency_key: string;
+    org: {
+        id: string;
+        handle: string;
+        display_name: string;
+        legal_name?: string;
+        country?: string;
+        website?: string;
+    };
+    product: string;
+    tier: string;
+    features: {
+        teams?: boolean;
+        register_company?: true;
+        staff_template?: string;
+        first_mission?: { title: string; goal: string };
+    };
+    person: { ever_id_sub: string };
+    billing?: { stripe_customer_ref: string };
+    instance_id?: string;
+    /** The consent Ever Platform holds for this hand-off (a ULID). Optional here until every platform sends it. */
+    consent_id?: string;
+    mode: 'handoff';
+    callback: string;
+    return_to: string;
+}
+
+/**
+ * A request refused. `reason` names the check that failed, for this
+ * installation's tests and logs only, never for the answer: the body says
+ * `intent_invalid` for every check but the expiry (410, once the signature
+ * verified) and the product (422).
+ */
+export class IntentRefusedError extends HttpException {
+    constructor(
+        status: 401 | 410 | 422,
+        readonly code: 'intent_invalid' | 'intent_expired' | 'product_mismatch',
+        readonly reason: string,
+    ) {
+        super({ status: 'error', code, message: 'This request is not valid.' }, status);
+        this.name = 'IntentRefusedError';
+    }
+}
+
+const refuse = (reason: string): IntentRefusedError =>
+    new IntentRefusedError(401, 'intent_invalid', reason);
+
+/** Where the verifier finds Ever Platform's keys of purpose `intent`. */
+export interface IntentKeySource {
+    /** The current key set (root-verified). */
+    keys(): Promise<KeySet>;
+    /** One refresh of the key set (an unknown `kid`); answers the set to use. */
+    refresh(): Promise<KeySet>;
+}
+
+/** What a request is checked against. */
+export interface IntentExpectations {
+    /** The issuer Ever Platform's documents name. */
+    issuer: string;
+    /** `EVER_PLATFORM_API_URL` (the completion callback must be under it). */
+    apiUrl: string;
+    /** This installation's id at Ever Platform. */
+    instanceId: string;
+    /** Unix seconds. */
+    now: number;
+    /** A request may return to a local web app too (a test platform on a local address only). */
+    localPlatform?: boolean;
+}
+
+function decodePart(part: string): Record<string, unknown> {
+    if (!B64URL.test(part)) throw refuse('malformed');
+    let value: unknown;
+    try {
+        value = JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+    } catch {
+        throw refuse('malformed');
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw refuse('malformed');
+    return value as Record<string, unknown>;
+}
+
+const isString = (value: unknown, min = 1, max = 255): value is string =>
+    typeof value === 'string' && value.length >= min && value.length <= max;
+
+const isInteger = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isSafeInteger(value);
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === 'object' && !Array.isArray(value);
+
+/** Whether an object has only the keys listed (the claim set is closed). */
+const onlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
+    Object.keys(value).every((key) => keys.includes(key));
+
+const CLAIM_KEYS: readonly string[] = [
+    'iss',
+    'aud',
+    'jti',
+    'iat',
+    'exp',
+    'typ',
+    'ever_purpose',
+    'job_id',
+    'step_seq',
+    'idempotency_key',
+    'org',
+    'product',
+    'tier',
+    'features',
+    'person',
+    'billing',
+    'instance_id',
+    'consent_id',
+    'mode',
+    'callback',
+    'return_to',
+];
+
+/** Whether `url` is a page of Ever Platform's web app a request may send the person back to. */
+export function returnToAllowed(url: unknown, localPlatform = false): boolean {
+    if (!isString(url, 1, 2048)) return false;
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return false;
+    }
+    if (parsed.username || parsed.password) return false;
+    if (RETURN_ORIGINS.includes(parsed.origin)) return true;
+    if (!localPlatform) return false;
+    const host = parsed.hostname.toLowerCase();
+    return (
+        (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+        (host === 'localhost' || host === '127.0.0.1')
+    );
+}
+
+function signatureValid(x: string, signingInput: string, signature: string): boolean {
+    try {
+        const publicKey = createPublicKey({
+            key: { kty: 'OKP', crv: 'Ed25519', x },
+            format: 'jwk',
+        });
+        return verifySignature(
+            null,
+            Buffer.from(signingInput, 'ascii'),
+            publicKey,
+            Buffer.from(signature, 'base64url'),
+        );
+    } catch {
+        return false;
+    }
+}
+
+function checkOrg(org: unknown): ProvisionIntentClaims['org'] {
+    if (!isObject(org)) throw refuse('org');
+    if (!onlyKeys(org, ['id', 'handle', 'display_name', 'legal_name', 'country', 'website'])) {
+        throw refuse('org');
+    }
+    if (!isString(org.id, 26, 26) || !ULID.test(org.id)) throw refuse('org');
+    if (!isString(org.handle, 1, 64) || !isString(org.display_name, 1, 200)) throw refuse('org');
+    if (org.legal_name !== undefined && !isString(org.legal_name, 0, 200)) throw refuse('org');
+    if (
+        org.country !== undefined &&
+        !(typeof org.country === 'string' && /^[A-Z]{2}$/.test(org.country))
+    ) {
+        throw refuse('org');
+    }
+    if (org.website !== undefined && !isString(org.website, 1, 2048)) throw refuse('org');
+    return org as ProvisionIntentClaims['org'];
+}
+
+function checkFeatures(features: unknown): void {
+    if (!isObject(features)) throw refuse('schema_violation');
+    if (!onlyKeys(features, ['teams', 'register_company', 'staff_template', 'first_mission'])) {
+        throw refuse('schema_violation');
+    }
+    if (features.teams !== undefined && typeof features.teams !== 'boolean') {
+        throw refuse('schema_violation');
+    }
+    // A request for Works asks for a company; anything else is not one this route answers.
+    if (features.register_company !== true) throw refuse('schema_violation');
+    if (
+        features.staff_template !== undefined &&
+        !(
+            typeof features.staff_template === 'string' &&
+            /^[a-z0-9-]{1,64}$/.test(features.staff_template)
+        )
+    ) {
+        throw refuse('schema_violation');
+    }
+    const mission = features.first_mission;
+    if (mission !== undefined) {
+        if (
+            !isObject(mission) ||
+            !onlyKeys(mission, ['title', 'goal']) ||
+            !isString(mission.title, 1, 200) ||
+            !isString(mission.goal, 1, 10_000)
+        ) {
+            throw refuse('schema_violation');
+        }
+    }
+}
+
+/**
+ * Verifies a provisioning request from Ever Platform, failing closed at the
+ * first check that does not pass, in this order: the compact JWS and its header
+ * (`typ`, `alg = EdDSA`, `kid`, no `crit`) → the key, from the root-verified key
+ * manifest, of purpose `intent` and in its window (an unknown `kid` refreshes
+ * the manifest once) → the Ed25519 signature → `iss` → `aud` → `instance_id`
+ * (required: only the addressed installation answers) → `typ`, `ever_purpose`
+ * and the closed claim set → `iat` and `exp` → `product` (422) → `mode` →
+ * `callback` and `return_to` → the rest of the claims.
+ *
+ * @throws IntentRefusedError
+ */
+export async function verifyProvisionIntent(
+    jws: unknown,
+    source: IntentKeySource,
+    expected: IntentExpectations,
+): Promise<ProvisionIntentClaims> {
+    if (typeof jws !== 'string' || jws.length > MAX_JWS_LENGTH) throw refuse('malformed');
+    const parts = jws.split('.');
+    if (parts.length !== 3 || !parts[2] || !B64URL.test(parts[2])) throw refuse('malformed');
+
+    const header = decodePart(parts[0]);
+    if (header.typ !== INTENT_HEADER_TYP) throw refuse('bad_typ');
+    if (header.alg !== 'EdDSA' || 'crit' in header) throw refuse('bad_alg');
+    const kid = header.kid;
+    if (!isString(kid, 1, 128)) throw refuse('unknown_kid');
+
+    let keySet = await source.keys();
+    let key = keySet.find(kid, 'intent', expected.now);
+    if (!key && !keySet.has(kid) && keySet.unknownKidRefreshAllowed(expected.now)) {
+        keySet = await source.refresh();
+        key = keySet.find(kid, 'intent', expected.now);
+    }
+    if (!key) throw refuse('unknown_kid');
+    if (expected.now >= keySet.manifest.expiresAt) throw refuse('manifest_expired');
+
+    if (!signatureValid(key.x, `${parts[0]}.${parts[1]}`, parts[2])) throw refuse('bad_signature');
+
+    const claims = decodePart(parts[1]);
+    if (claims.iss !== expected.issuer || keySet.issuer !== expected.issuer) {
+        throw refuse('issuer_mismatch');
+    }
+    if (claims.aud !== INTENT_AUDIENCE) throw refuse('audience_mismatch');
+    if (claims.instance_id !== expected.instanceId) throw refuse('instance_mismatch');
+    if (claims.typ !== INTENT_CLAIMS_TYP || claims.ever_purpose !== 'intent') {
+        throw refuse('schema_violation');
+    }
+    if (!onlyKeys(claims, CLAIM_KEYS)) throw refuse('schema_violation');
+
+    const { iat, exp } = claims;
+    if (!isInteger(iat) || !isInteger(exp) || exp <= iat || exp - iat > INTENT_MAX_TTL_S) {
+        throw refuse('lifetime');
+    }
+    if (iat > expected.now + INTENT_MAX_FUTURE_IAT_S) throw refuse('not_yet_valid');
+    if (expected.now >= exp) throw new IntentRefusedError(410, 'intent_expired', 'expired');
+
+    if (claims.product !== 'works') {
+        throw new IntentRefusedError(422, 'product_mismatch', 'product_mismatch');
+    }
+    if (claims.mode !== 'handoff') throw refuse('mode');
+
+    const jti = claims.jti;
+    if (!isString(jti, 26, 26) || !ULID.test(jti)) throw refuse('schema_violation');
+    const apiBase = expected.apiUrl.replace(/\/+$/, '');
+    const callbacks = new Set([
+        `${expected.issuer}/v1/provision-intents/${jti}/complete`,
+        `${apiBase}/v1/provision-intents/${jti}/complete`,
+    ]);
+    if (!callbacks.has(String(claims.callback))) throw refuse('callback');
+    if (!returnToAllowed(claims.return_to, expected.localPlatform)) throw refuse('return_to');
+
+    if (
+        !isString(claims.job_id, 1, 64) ||
+        !isInteger(claims.step_seq) ||
+        (claims.step_seq as number) < 0 ||
+        !isString(claims.idempotency_key, 1, 200) ||
+        !TIERS.includes(String(claims.tier))
+    ) {
+        throw refuse('schema_violation');
+    }
+    const org = checkOrg(claims.org);
+    checkFeatures(claims.features);
+    const person = claims.person;
+    if (
+        !isObject(person) ||
+        !onlyKeys(person, ['ever_id_sub']) ||
+        !isString(person.ever_id_sub, 1, 255)
+    ) {
+        throw refuse('schema_violation');
+    }
+    const billing = claims.billing;
+    if (
+        billing !== undefined &&
+        (!isObject(billing) ||
+            !onlyKeys(billing, ['stripe_customer_ref']) ||
+            !(
+                typeof billing.stripe_customer_ref === 'string' &&
+                /^cus_[A-Za-z0-9]+$/.test(billing.stripe_customer_ref)
+            ))
+    ) {
+        throw refuse('schema_violation');
+    }
+    const consentId = claims.consent_id;
+    if (
+        consentId !== undefined &&
+        !(typeof consentId === 'string' && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(consentId))
+    ) {
+        throw refuse('schema_violation');
+    }
+
+    return { ...(claims as unknown as ProvisionIntentClaims), org };
+}

@@ -295,7 +295,8 @@
                 "signedInAs": "Đã đăng nhập Ever ID với tư cách {name} · {email}",
                 "signedInAsEmail": "Đã đăng nhập Ever ID với tư cách {email}",
                 "submit": "Tạo tài khoản",
-                "cancel": "Hủy"
+                "cancel": "Hủy",
+                "linkedTo": "This account will be linked to ever.co/{handle}"
             },
             "accountExists": {
                 "title": "Bạn đã có tài khoản Ever Works",
@@ -896,6 +897,24 @@
                 "minLength": "Mô tả phải có ít nhất 10 ký tự.",
                 "error": "Không thể tạo nhiệm vụ. Vui lòng thử lại.",
                 "chatUnavailable": "Trò chuyện hiện không khả dụng — hãy dùng \"Tạo thủ công\"."
+            },
+            "buildOnApp": {
+                "product": "Sản phẩm",
+                "business": "Doanh nghiệp",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Chọn một App Work",
+                "noAppWorks": "Bạn chưa có App Work nào. Hãy thêm một App Work từ Works trước.",
+                "summary": "Mỗi thứ Hai lúc 08:00 UTC · tối đa {count} tác vụ mỗi tuần · {amount} mỗi lần chạy",
+                "backlogNote": "Tác vụ mới chờ bạn phê duyệt trong Backlog.",
+                "suggestedGoals": "Mục tiêu đề xuất (được tạo dưới dạng bản nháp):",
+                "rules": "Quy tắc ứng dụng đề xuất: thay đổi lược đồ do một người hợp nhất, PR tối đa {lines} dòng",
+                "proposeRules": "Đề xuất các quy tắc này",
+                "proposeNeedsAppWork": "Hãy chọn một App Work trước.",
+                "rulesProposed": "Đã mở một tác vụ trên App Work để thay đổi quy tắc ứng dụng.",
+                "rulesFailed": "Không thể mở tác vụ. Hãy thử lại.",
+                "create": "Tạo nhiệm vụ",
+                "templateUnreadable": "Không thể đọc mẫu, nên chỉ những giá trị bạn đã nhập được sử dụng.",
+                "templatePartial": "Đã tạo nhiệm vụ, nhưng không thể áp dụng một phần của mẫu."
             },
             "quickAdd": {
                 "label": "Start a new Mission",
@@ -11199,6 +11218,46 @@
                 "subjectRequired": "Subject is required.",
                 "bodyRequired": "Message body is required.",
                 "sendFailed": "Send failed."
+            }
+        }
+    },
+    "everConnect": {
+        "provision": {
+            "title": "Create your company in Ever Works",
+            "confirmPageTitle": "Confirm your company",
+            "checking": "One moment, checking your request…",
+            "forHandle": "{name} · ever.co/{handle}",
+            "body": "Sign in with Ever ID to confirm. Nothing is created until you confirm.",
+            "continueEverId": "Continue with Ever ID",
+            "continue": "Continue",
+            "createHere": "Create a company in Ever Works",
+            "confirmTitle": "Create company {name}?",
+            "confirmSubtitle": "For ever.co/{handle}, in Ever Works.",
+            "existsTitle": "Your company is ready",
+            "name": "Company name",
+            "legalName": "Legal name",
+            "staffing": "Starter staff",
+            "staffingNone": "None",
+            "staffingHelp": "Agents arrive paused; you turn them on.",
+            "missionTitle": "First Mission",
+            "missionGoal": "Goal",
+            "create": "Create company",
+            "decline": "Not now",
+            "connectEverId": "Connect Ever ID in Settings",
+            "failure": {
+                "incomplete": "This link is not complete. Start again from Ever.",
+                "invalid": "This link is not valid any more. Start again from Ever.",
+                "expired": "This request has expired. Start again from Ever.",
+                "used": "This link was already used. Start again from Ever.",
+                "unavailable": "Creating a company from Ever is not available on this installation.",
+                "rateLimited": "Too many attempts. Wait a minute, then try again.",
+                "mismatch": "Sign in with the same Ever ID you used on app.ever.co.",
+                "tenantLinked": "Your account already has a company linked to Ever.",
+                "organizationLinked": "This Ever organization already has a company here.",
+                "inProgress": "This company is being created. Try again in a moment.",
+                "invalidValue": "One of these values cannot be used. Check them and try again.",
+                "unreachable": "Ever Platform cannot be reached right now. Try again in a minute.",
+                "failed": "The company could not be created. Try again."
             }
         }
     }

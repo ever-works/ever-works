@@ -166,3 +166,35 @@ describe('missions outputMode and taskOutput (APW-08 T34)', () => {
         }
     });
 });
+
+describe('missions CreateMissionDto.templateInputs (APW-08 T39)', () => {
+    const errorsOf = async (body: Record<string, unknown>) =>
+        validate(plainToInstance(CreateMissionDto, body));
+    const valid = {
+        product: 'Booking',
+        business: 'Yoga Loft',
+        appWorkId: '11111111-1111-4111-8111-111111111111',
+    };
+
+    it('accepts the three inputs with a template, and an omitted field', async () => {
+        expect(
+            await errorsOf({
+                ...baseCreate,
+                missionTemplateRepo: 'build-on-open-source-app',
+                templateInputs: valid,
+            }),
+        ).toHaveLength(0);
+        expect(await errorsOf({ ...baseCreate })).toHaveLength(0);
+    });
+
+    it.each([
+        { ...valid, product: '' },
+        { ...valid, product: 'p'.repeat(81) },
+        { ...valid, business: 'b'.repeat(81) },
+        { ...valid, appWorkId: 'not-a-uuid' },
+        { product: 'Booking', business: 'Yoga Loft' },
+    ])('rejects %p', async (templateInputs) => {
+        const errs = await errorsOf({ ...baseCreate, templateInputs });
+        expect(errs.find((e) => e.property === 'templateInputs')).toBeDefined();
+    });
+});

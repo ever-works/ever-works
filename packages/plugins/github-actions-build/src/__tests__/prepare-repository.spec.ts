@@ -282,7 +282,11 @@ describe('prepareRepository (plan §4.6)', () => {
 		const port = fakeSecretPort();
 		const writer = fakeWriter();
 		const order: string[] = [];
-		const realCommit = writer.commitFiles.getMockImplementation();
+		// `commitFiles` is typed as a bare `vi.fn` mock, whose implementation type also admits a
+		// constructor, so name the call shape the delegate below actually makes.
+		const realCommit = writer.commitFiles.getMockImplementation() as
+			| ((request: never) => Promise<{ commitSha: string }>)
+			| undefined;
 		(writer.commitFiles as ReturnType<typeof vi.fn>).mockImplementation(async (request: never) => {
 			order.push('commit');
 			// Delegate, so the file is still stored and the writer's read-back can

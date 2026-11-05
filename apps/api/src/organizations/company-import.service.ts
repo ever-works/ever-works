@@ -1,4 +1,6 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { parse as parseYaml } from 'yaml';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { AgentFileService, AgentScope, AgentsService } from '@ever-works/agent/agents';
@@ -7,7 +9,7 @@ import { TasksService } from '@ever-works/agent/tasks-domain';
 import { TeamsService } from '@ever-works/agent/teams';
 import { WorkLifecycleService } from '@ever-works/agent/services';
 import { UserRepository } from '@ever-works/agent/database';
-import type { Organization } from '@ever-works/agent/entities';
+import { Organization, OrganizationCompanyImport } from '@ever-works/agent/entities';
 import { ScopeContextService } from '../scope/scope-context.service';
 import { OrganizationService } from './organization.service';
 import {
@@ -48,6 +50,30 @@ export interface CompanyImportInput {
     templateSlug: string;
     /** Optional Organization display-name override from the wizard. */
     name?: string;
+    /**
+     * Import into this existing Organization of the caller's Tenant instead of
+     * creating one: COMPANY.md then only fills fields the Organization left empty
+     * and never touches its display name, legal name or country. Service-level
+     * only (the company created from Ever Platform); the public DTO has no such
+     * field.
+     */
+    organizationId?: string;
+    /**
+     * With `organizationId`: the import runs once per key. A finished one answers
+     * its report again, and one that started before and did not finish answers
+     * {@link CompanyImportIncompleteError} instead of risking duplicates.
+     */
+    importKey?: string;
+}
+
+/** A keyed import started before and did not finish: it is not run again. */
+export class CompanyImportIncompleteError extends Error {
+    readonly code = 'staffing_incomplete';
+
+    constructor() {
+        super('This company template import started before and did not finish');
+        this.name = 'CompanyImportIncompleteError';
+    }
 }
 
 export interface CompanyImportReport {
@@ -88,6 +114,15 @@ function str(value: unknown): string | null {
     return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
+/** Whether this call's insert made the row (drivers differ in what they report). */
+function importInserted(
+    result: { identifiers?: unknown[]; raw?: unknown },
+    row: OrganizationCompanyImport,
+): boolean {
+    const made = result.identifiers?.[0] as { id?: string } | undefined;
+    return made?.id === row.id;
+}
+
 @Injectable()
 export class CompanyImportService {
     private readonly logger = new Logger(CompanyImportService.name);
@@ -104,9 +139,69 @@ export class CompanyImportService {
         private readonly tasksService: TasksService,
         private readonly workLifecycle: WorkLifecycleService,
         private readonly users: UserRepository,
+        // Only keyed imports into an existing Organization read and write here.
+        @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
     ) {}
 
     async importCompany(userId: string, input: CompanyImportInput): Promise<CompanyImportReport> {
+        if (!input.organizationId || !input.importKey) return this.runImport(userId, input);
+
+        const dataSource = this.dataSource;
+        if (!dataSource) throw new Error('A keyed company import needs the database');
+        const organization = await this.loadTargetOrganization(userId, input.organizationId);
+        const keyed = dataSource.getRepository(OrganizationCompanyImport);
+        const key = { organizationId: organization.id, importKey: input.importKey };
+        const inserted = await keyed
+            .createQueryBuilder()
+            .insert()
+            .into(OrganizationCompanyImport)
+            .values({ ...key, templateSlug: input.templateSlug, status: 'running' })
+            .orIgnore()
+            .execute();
+        const row = await keyed.findOneOrFail({ where: key });
+        if (!importInserted(inserted, row)) {
+            if (row.status === 'created' && row.reportJson) {
+                return {
+                    ...(row.reportJson as unknown as Omit<CompanyImportReport, 'organization'>),
+                    organization,
+                };
+            }
+            throw new CompanyImportIncompleteError();
+        }
+        try {
+            const report = await this.runImport(userId, input, organization);
+            await keyed.update(key, {
+                status: 'created',
+                reportJson: { created: report.created, skipped: report.skipped },
+            });
+            return report;
+        } catch (error) {
+            await keyed.update(key, { status: 'failed' }).catch(() => undefined);
+            throw error;
+        }
+    }
+
+    /** The Organization a keyed import goes into: it must be of the caller's Tenant. */
+    private async loadTargetOrganization(
+        userId: string,
+        organizationId: string,
+    ): Promise<Organization> {
+        const dataSource = this.dataSource as DataSource;
+        const user = await this.users.findById(userId);
+        const organization = await dataSource
+            .getRepository(Organization)
+            .findOne({ where: { id: organizationId } });
+        if (!organization || !user?.tenantId || organization.tenantId !== user.tenantId) {
+            throw new NotFoundException(`Organization ${organizationId} not found`);
+        }
+        return organization;
+    }
+
+    private async runImport(
+        userId: string,
+        input: CompanyImportInput,
+        existing?: Organization,
+    ): Promise<CompanyImportReport> {
         const pkg = await this.catalog.getPackage(input.templateSlug);
         if (!pkg) {
             throw new NotFoundException(`Company template ${input.templateSlug} not found`);
@@ -212,7 +307,9 @@ export class CompanyImportService {
         ]);
 
         // ── pivot: create the Organization (lazy Tenant bootstrap included) ──
-        const org = await this.organizationService.createOrganization(userId, orgName);
+        // (or, for a keyed import, the Organization that exists: no second one)
+        const org =
+            existing ?? (await this.organizationService.createOrganization(userId, orgName));
         const user = await this.users.findById(userId);
         if (!user) {
             throw new NotFoundException(`User ${userId} not found`);

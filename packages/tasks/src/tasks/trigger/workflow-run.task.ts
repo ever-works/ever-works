@@ -8,7 +8,7 @@ import { TriggerWorkflowRunSweeperModule } from '../../trigger/worker/modules/tr
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 // Security: validate payload ids before any DB access (defence in depth,
 // mirrors every other task that takes ids off a queue payload).
-import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+import { assertUuid } from '../../trigger/worker/utils/assert-uuid.utils';
 
 /**
  * Judgment layer G5 — execute a SAVED workflow graph.

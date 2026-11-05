@@ -72,6 +72,7 @@ jobs:
             echo "::endgroup::"
           done < <(find "$FIXTURES" -mindepth 3 -maxdepth 3 -type d -path '*/skills/*' | sort)
           echo
+          echo "Aggregate skills-ref status: $status"
           echo "Fixture corpus deliberately contains INVALID skills, so a non-zero"
           echo "aggregate is expected. What matters is whether skills-ref and this"
           echo "library disagree about any INDIVIDUAL skill — compare the groups"

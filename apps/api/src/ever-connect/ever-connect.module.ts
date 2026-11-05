@@ -73,7 +73,13 @@ import {
         EverIdLoginHandler,
         PersonRequestsHandler,
     ],
-    exports: [EverConnectService, EverIdLoginHandler, PersonRequestsHandler],
+    exports: [
+        EverConnectService,
+        EverIdLoginHandler,
+        PersonRequestsHandler,
+        EverConnectLeaseService,
+        EVER_CONNECT_CONFIG,
+    ],
 })
 export class EverConnectModule {}
 

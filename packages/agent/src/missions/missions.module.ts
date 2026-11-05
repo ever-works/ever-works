@@ -17,6 +17,7 @@ import { UserResearchModule } from '../user-research/user-research.module';
 import { WorkAgentModule } from '../work-agent/work-agent.module';
 import { MissionCloneService } from './mission-clone.service';
 import { MissionTemplateManifestService } from './mission-template-manifest.service';
+import { MissionTemplateManifestReader } from './mission-template-manifest.reader';
 import { MissionsService } from './missions.service';
 import { MissionTickService } from './mission-tick.service';
 import { Task } from '../entities/task.entity';
@@ -84,6 +85,9 @@ import { MissionTaskPlannerService } from './mission-task-planner.service';
         MissionTickService,
         MissionCloneService,
         MissionTemplateManifestService,
+        // APW-08 T38 (APW08-G13) — reads a catalog template's `.works/mission.yml` through the git
+        // facade (FacadesModule, imported above) so MissionsService.create applies its defaults.
+        MissionTemplateManifestReader,
         MissionAttachmentRepository,
         // APW-08 T35 (FR-51) — proposes the Tasks a Mission files on its App Works.
         MissionTaskPlannerService,
@@ -94,6 +98,7 @@ import { MissionTaskPlannerService } from './mission-task-planner.service';
         MissionTickService,
         MissionCloneService,
         MissionTemplateManifestService,
+        MissionTemplateManifestReader,
         MissionAttachmentRepository,
     ],
 })

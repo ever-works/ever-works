@@ -298,3 +298,7 @@ export * from './ever-connect-connection.entity';
 export * from './ever-connect-integration.entity';
 export * from './ever-connect-outbox.entity';
 export * from './ever-connect-lease.entity';
+export * from './ever-connect-provision-intent.entity';
+export * from './ever-connect-provision-record.entity';
+export * from './ever-connect-link.entity';
+export * from './organization-company-import.entity';
