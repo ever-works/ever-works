@@ -22,7 +22,7 @@ import { loginViaUI } from './helpers/auth';
  *   /settings           → ProfileSettings  (settings index, NOT a dashboard)
  *   /settings/security   → <SecuritySettings/>  — ONLY a change-password form today.
  *   /settings/api-keys   → <ApiKeysSettings initialKeys={…}/> — table + create/revoke dialogs.
- *   /settings/danger     → <DangerZone/> — disabled data-export + delete-account gate.
+ *   /settings/danger     → <DangerZone/> — disabled data-export + the (real, #2986) delete-account gate.
  *
  * PASSWORD CHANGE — server action `updatePassword` → POST /api/auth/update-password
  *   DTO {currentPassword, newPassword}; @UseGuards(AuthSessionGuard). PROBED:
@@ -58,12 +58,13 @@ import { loginViaUI } from './helpers/auth';
  *   state (no enroll / no session-list control surface) and skip-up the moment a real
  *   endpoint lands — never a fictional contract.
  *
- * DANGER ZONE — `deleteAccount` server action is INTENTIONALLY a no-op in this build:
- *   it returns {success:false, error:"Account deletion is disabled in demo"} WITHOUT
- *   calling any delete API. So the testable contract is the GATE, not the deletion:
- *   the confirm button stays disabled until the typed email === the account email
- *   exactly; clicking it surfaces the "disabled" error toast and the account SURVIVES
- *   (login still works). The data-export button is permanently `disabled`.
+ * DANGER ZONE — since #2986 the confirm calls the real `POST /api/account-deletion/me`
+ *   (`deleteMyAccount` server action; it used to be a no-op answering "Account deletion
+ *   is disabled in demo"). The testable contract is the GATE and the real outcome: the
+ *   confirm button stays disabled until the typed email === the account email exactly;
+ *   clicking it deletes the account, lands on `/login?accountDeleted=1`, and the
+ *   credentials stop working — so it only ever runs on a disposable user. The
+ *   data-export button is permanently `disabled`.
  *
  * ── ANTI-DUPLICATION ─────────────────────────────────────────────────────────
  * Deliberately NOT re-covered (already deep elsewhere):
@@ -502,14 +503,14 @@ test.describe('flow-settings-security-deep', () => {
     /**
      * FLOW 4 — DANGER-ZONE gating state machine on /settings/danger.
      *
-     * The deleteAccount server action is a deliberate no-op (returns the "disabled"
-     * error without calling any delete API), so the real contract is the GATE: the
-     * confirm button is disabled until the typed email matches EXACTLY, a wrong email
-     * is rejected, and clicking the (enabled) button surfaces the "disabled" toast
-     * while the account SURVIVES. Run on a FRESH user so even an accidental deletion
-     * could never harm the seeded account; we then prove the account still logs in.
+     * Since #2986 the Danger Zone's confirm calls the real `POST /api/account-deletion/me`
+     * (it used to be a no-op server action answering "disabled in demo"). The contract is the
+     * GATE plus the real outcome: the confirm button is disabled until the typed email matches
+     * EXACTLY, a wrong email keeps it disabled, and clicking the enabled button deletes the
+     * account — the browser lands on `/login?accountDeleted=1` and the credentials stop
+     * working. Run on a FRESH user in its own context, never the shard's seeded account.
      */
-    test('delete-account gate stays disabled until email matches, then the disabled action keeps the account alive', async ({
+    test('delete-account gate stays disabled until email matches, then the confirmed delete really removes the account', async ({
         browser,
         request,
     }) => {
@@ -555,25 +556,19 @@ test.describe('flow-settings-security-deep', () => {
             await emailField.fill(account.email);
             await expect(confirmBtn).toBeEnabled({ timeout: 8_000 });
 
-            // Clicking the enabled-but-disabled-server-action button surfaces the
-            // "disabled in demo" error toast — and the account is NOT deleted.
+            // Confirm. The delete is real (#2986): the session cookie is cleared and the browser
+            // does a full load of the login page with the "account deleted" notice.
             await confirmBtn.click();
-            const errorToast = page.getByText(/disabled in demo/i).first();
-            const failToast = page.getByText(/failed to delete account/i).first();
-            await expect(errorToast.or(failToast)).toBeVisible({ timeout: 12_000 });
+            await expect(page, 'a real delete signs the user out to the login page').toHaveURL(
+                /\/login\?accountDeleted=1/,
+                { timeout: 30_000 },
+            );
 
-            // Ground truth: the account still authenticates after the "delete".
-            await expect
-                .poll(
-                    async () =>
-                        (
-                            await request.post(LOGIN, {
-                                data: { email: account.email, password: ORIGINAL_PASSWORD },
-                            })
-                        ).status(),
-                    { message: 'account must survive the disabled delete (200)', timeout: 15_000 },
-                )
-                .toBe(200);
+            // Ground truth: the deleted account no longer authenticates.
+            const login = await request.post(LOGIN, {
+                data: { email: account.email, password: ORIGINAL_PASSWORD },
+            });
+            expect(login.status(), 'the deleted account can no longer sign in').toBe(401);
         } finally {
             await context.close();
         }

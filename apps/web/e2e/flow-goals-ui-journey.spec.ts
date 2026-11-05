@@ -506,20 +506,18 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         // control rather than an unopened tab.
         // Same hydration caveat as above — the trigger below only exists once
         // the Progress panel is actually open.
+        //
+        // The outcome override is pinned by its own test id. A structural
+        // `button[aria-haspopup="listbox"]` locator is ambiguous on this page:
+        // the chat composer's voice-provider picker is one (a350801a), and since
+        // APW-08 T33 (09d096406) the same Progress panel carries the Goal's Work
+        // picker (`goal-detail-work-select`) — strict mode then throws inside
+        // the predicate, which never turns true.
+        const trigger = page.getByTestId('goal-detail-outcome-select');
         await clickUntil(page.getByRole('tab', { name: 'Progress log' }), () =>
-            page
-                .locator('#main-content button[aria-haspopup="listbox"]')
-                .isVisible()
-                .catch(() => false),
+            trigger.isVisible(),
         );
 
-        // The only listbox trigger INSIDE the page content is the outcome
-        // override. Scoped to #main-content because since a350801a the chat
-        // composer carries a second listbox trigger (the voice-provider
-        // picker, data-testid="chat-dictation-provider") which mounts outside
-        // #main-content but stays in the DOM while the panel is closed — the
-        // unscoped locator resolved to 2+ buttons and strict mode threw.
-        const trigger = page.locator('#main-content button[aria-haspopup="listbox"]');
         const achieved = page.getByRole('option', { name: 'Achieved' });
         // Post-condition of OPENING: the option row is on screen. The dropdown
         // is rendered by client state, so a trigger click before hydration is

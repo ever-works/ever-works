@@ -59,6 +59,15 @@ on:
   push:
     branches: [stage]
   workflow_dispatch:
+    inputs:
+      shards:
+        description: >-
+          JSON array of the shard numbers (1-32) to run, e.g. [3,7,11]. Empty runs all 32.
+          A shard is the same slice of the suite either way (--shard=N/32), so a subset
+          re-runs exactly the tests a stage run put on those shards.
+        required: false
+        default: ''
+        type: string
 
 # M-12: minimum default permissions. Individual jobs can elevate where needed.
 permissions:
@@ -71,11 +80,15 @@ concurrency:
 jobs:
   e2e:
     runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
-    # Each shard runs ~1/E2E_SHARDS of the 1670-test suite. 90 min keeps
-    # plenty of headroom for the slowest shard (cold dev-mode compile +
-    # retries) while letting GitHub kill genuine hangs reasonably fast.
-    # Bump back to ~150 if you reduce shard count below 4.
-    timeout-minutes: 90
+    # Each shard runs ~1/E2E_SHARDS of the suite. The job budget covers the
+    # BUILD as well as the tests, and the build is what varies: 25-38 min
+    # normally, 65 min on a contended runner (stage run 41605694388, shard 13
+    # and e2e-app-works-flags-on), which left shard 13 cancelled at the old
+    # 90-min cap 17 min into its tests; 74 min on dispatch run 42021294792
+    # (shard 11 reached its tests 90 min in). 150 absorbs a slow build; a
+    # genuine hang in the tests is still killed by the Playwright step's own
+    # 50-min cap below (a shard's tests take 7-20 min).
+    timeout-minutes: 150
 
     strategy:
       # Shard the Playwright suite across multiple machines. Each shard
@@ -104,11 +117,9 @@ jobs:
         # 32 shards drops it to ~190/shard. Pure parallelism, zero behaviour
         # change. Each runner is its own box. Keep the `--shard=X/N` total below in
         # sync with this array length.
-        shard:
-            [
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                24, 25, 26, 27, 28, 29, 30, 31, 32,
-            ]
+        # A `workflow_dispatch` may name a subset (`inputs.shards`, a JSON array); a push
+        # (and an empty input) runs all 32. The default list is the full set.
+        shard: ${{ fromJSON(inputs.shards || '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32]') }}
 
     # Service containers — let the e2e suite exercise features that would
     # otherwise skip themselves because the dependency isn't reachable.
@@ -138,6 +149,20 @@ jobs:
           --health-retries 5
 
     steps:
+      # A dispatched `shards` list is free text: refuse a value outside 1-32 before
+      # the install and build spend half an hour on a shard Playwright will reject.
+      - name: Check the shard number
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          # Canonical numbers only: a `01` would also name its job `e2e (26.x, 01)`,
+          # which the promotion gate's shard count would not recognise as shard 1.
+          # (A pure pattern, so an oversized number cannot slip past an arithmetic test.)
+          if ! [[ "$SHARD" =~ ^([1-9]|[12][0-9]|3[0-2])$ ]]; then
+            echo "::error::shard must be an integer from 1 to 32, got '$SHARD'"
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v7
 
@@ -182,6 +207,8 @@ jobs:
         # web's lib/constants.ts auto-appends '/api', and helpers/api.ts
         # prepends '/api/...' to each request. Keep these aligned.
         working-directory: apps/web
+        # The hang guard for the test half (see the job's timeout-minutes).
+        timeout-minutes: 50
         run: |
           set -e
 
@@ -677,7 +704,10 @@ jobs:
     # job into "exceeded the maximum execution time" — a pure-infra red with no
     # failing test (observed on run 30154911523). The cap is a runaway backstop,
     # not a performance budget; 90m keeps it that way as the build keeps growing.
-    timeout-minutes: 90
+    # 150m since stage run 41605694388, where a contended runner took 65 min for
+    # the same build (shard 13 was cancelled at the matrix's then-90m cap), and
+    # 74 min on dispatch run 42021294792.
+    timeout-minutes: 150
 
     strategy:
       fail-fast: false
@@ -846,8 +876,9 @@ jobs:
   e2e-app-works-flags-on:
     runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     # One shard of ~12 tests, but the same cold `pnpm build` + dev-stack boot
-    # as every matrix shard and the prod-build job — the same 90-minute cap.
-    timeout-minutes: 90
+    # as every matrix shard and the prod-build job — the same 150-minute cap (this
+    # job's build alone took 65 min on stage run 41605694388).
+    timeout-minutes: 150
 
     strategy:
       fail-fast: false

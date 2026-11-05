@@ -53,6 +53,17 @@
  *     `GET /api/works?limit=50`, `GET /api/activity-log?limit=50`,
  *     `GET /api/notifications?limit=50`; `GET /api/works/:id/app-env` → `404`
  *   - absent from the fake's entire call ledger (162 calls recorded at probe time)
+ *
+ * ## Re-measured on stage (run 41605694388, 2026-11-03)
+ *
+ * APW-07 has since mounted `GET /api/works/:id/app-env`
+ * (`apps/api/src/works/work-app-env.controller.ts`): the owner gets `200`
+ * `{"workId":…,"secureStorage":false,"canEdit":true,"summary":{…},"entries":[…]}`.
+ * The two running pins that asserted its `404` now assert what the route does: it
+ * joins the sweep (no prompted value in its answer), another account gets the same
+ * `404 notAppWork` a missing Work gets, and no session gets `401`. The fixme below
+ * (the entry metadata, the events, the fingerprint) is no longer blocked by the route
+ * being absent; it is left for the APW-07 owners to un-fixme against the shipped shape.
  */
 import { randomInt } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -364,18 +375,24 @@ test.describe('ACC-NEG-12 — a prompted value is accepted write-only and never 
             "the fake GitHub's whole call ledger must not carry the prompted value",
         ).toBe(false);
 
-        // The env read the case is built on is not mounted: asserted here so the
-        // sweep above is never mistaken for evidence about that route.
+        // The env read the case is built on — APW-07's `GET /api/works/:id/app-env`
+        // (`work-app-env.controller.ts`) — is mounted now (this used to pin its 404; stage
+        // run 41605694388, shard 28, measured 200). It is one more readable surface, and the
+        // one built to describe exactly these entries: it answers the owner, and it must not
+        // carry the prompted value either.
         const envRead = await getAppEnvNames(request, { token: user.access_token, workId });
         expect(
             envRead.status,
-            `GET /api/works/:id/app-env body=${envRead.text.slice(0, 200)} — APW-07's read does ` +
-                'not exist on this API yet, which is the blocker the fixme below names',
-        ).toBe(404);
-        expect(envRead.text).toContain('Cannot GET');
+            `GET /api/works/:id/app-env body=${envRead.text.slice(0, 200)}`,
+        ).toBe(200);
+        expect(envRead.text).toContain(`"workId":"${workId}"`);
+        expect(
+            envRead.text.includes(secret),
+            'GET /api/works/:id/app-env must not carry the prompted value',
+        ).toBe(false);
     });
 
-    test('the app-env route is 404 for the owner, for another account and for nobody — never a 403 that would confirm it exists', async ({
+    test('the app-env route answers the owner, is a 404 for another account and a 401 for nobody — never a 403 that would confirm it exists', async ({
         request,
     }) => {
         const run = stamp();
@@ -400,16 +417,29 @@ test.describe('ACC-NEG-12 — a prompted value is accepted write-only and never 
         expect(created.status, `create body=${created.text.slice(0, 300)}`).toBe(200);
         const workId = created.body.work?.id ?? '';
 
-        for (const [who, token] of [
-            ['owner', owner.access_token],
-            ['another account', other.access_token],
-            ['no session', ''],
-        ] as const) {
-            const result = await getAppEnvNames(request, { token, workId });
-            expect(result.status, `GET app-env (${who}) body=${result.text.slice(0, 200)}`).toBe(
-                404,
-            );
-        }
+        // APW-07 mounted the route (stage run 41605694388 measured the owner's 200; this
+        // used to pin a 404 for everyone). The security property this test is named for
+        // still holds and is what it pins now: another account gets the SAME 404
+        // (`notAppWork`) a missing Work gets — never a 403 that would confirm the Work
+        // exists — and no session is refused by the auth guard before anything is read.
+        const mine = await getAppEnvNames(request, { token: owner.access_token, workId });
+        expect(mine.status, `GET app-env (owner) body=${mine.text.slice(0, 200)}`).toBe(200);
+
+        const theirs = await getAppEnvNames(request, { token: other.access_token, workId });
+        expect(
+            theirs.status,
+            `GET app-env (another account) body=${theirs.text.slice(0, 200)}`,
+        ).toBe(404);
+        expect(theirs.text).toContain('"code":"notAppWork"');
+        const missing = await getAppEnvNames(request, {
+            token: other.access_token,
+            workId: '00000000-0000-4000-8000-000000000000',
+        });
+        expect(missing.status, 'a Work that does not exist answers the same 404').toBe(404);
+        expect(missing.text).toContain('"code":"notAppWork"');
+
+        const anon = await getAppEnvNames(request, { token: '', workId });
+        expect(anon.status, `GET app-env (no session) body=${anon.text.slice(0, 200)}`).toBe(401);
     });
 });
 
