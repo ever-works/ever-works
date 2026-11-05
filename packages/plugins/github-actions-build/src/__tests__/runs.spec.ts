@@ -447,7 +447,7 @@ describe('GitHubActionsBuildPlugin — the four members T12 fills', () => {
 	});
 
 	it('sends the optional inputs only when they have a value', async () => {
-		const dispatchWorkflow = vi.fn(async () => undefined);
+		const dispatchWorkflow = vi.fn<ActionsRunsPort['dispatchWorkflow']>(async () => undefined);
 		const plugin = new TestPlugin(fakePort({ dispatchWorkflow, listWorkflowRuns: async () => [] }));
 
 		await plugin.startBuild(
