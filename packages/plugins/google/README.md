@@ -27,7 +27,7 @@ This plugin connects Ever Works to Google's Gemini models. Gemini provides a str
 
 ## How it works in Ever Works
 
-When selected as the AI provider, Gemini handles content generation during work creation, powers the conversational AI assistant, and produces text embeddings for semantic search. Gemini Flash is well-suited for simple pipeline tasks, while Gemini Pro handles complex content generation.
+When selected as the AI provider, Gemini handles content generation during work creation, powers the conversational AI assistant, and produces text embeddings for semantic search. Gemini Flash-Lite and Flash are well-suited for simple and standard pipeline tasks, while Gemini 4 Argon handles complex content generation.
 
 ## Getting started
 
@@ -46,6 +46,22 @@ When selected as the AI provider, Gemini handles content generation during work 
 - **Base URL** — custom API endpoint for proxies or compatible services (hidden, advanced).
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
+
+## Model defaults
+
+Model defaults as of 2026-11-05 — source: [aistudio.google.com/docs/models](https://aistudio.google.com/docs/models) (the `ai.google.dev/gemini-api/docs` pages redirect there; shutdown dates: [deprecations](https://aistudio.google.com/docs/deprecations)). Availability depends on your account/plan/region; the picker lists the vendor's live models, accepts a custom model id, and keeps existing saved selections.
+
+| Setting                                                  | Default (2026-11-05)           | Previous default                                  |
+| -------------------------------------------------------- | ------------------------------ | ------------------------------------------------- |
+| Default Model                                            | `models/gemini-3.8-flash`      | `models/gemini-2.5-flash` (deprecated 2026-11-02) |
+| Simple Tasks Model                                       | `models/gemini-3.5-flash-lite` | `models/gemini-2.0-flash` (shut down 2026-06-01)  |
+| Standard Tasks Model                                     | `models/gemini-3.8-flash`      | `models/gemini-2.5-flash` (deprecated 2026-11-02) |
+| Complex Tasks Model                                      | `models/gemini-4-argon`        | `models/gemini-2.5-pro` (deprecated 2026-11-02)   |
+| Bootstrap and fallback (`onLoad`, `getDefaultModelId()`) | `models/gemini-3.8-flash`      | `models/gemini-2.5-flash`                         |
+
+Each tier gets the vendor's current model for its role: Gemini 3.5 Flash-Lite (fastest, most cost-effective) for simple tasks, Gemini 3.8 Flash for standard tasks and the flagship Gemini 4 Argon for complex tasks. Gemini 4 Argon's price doubles after 2026-11-30 ($2 / $10 per million input / output tokens until then, $4 / $20 after).
+
+**Default shift.** Upgrading moves every config that never saved a model to the defaults above; for the simple tier this is a fix, because `gemini-2.0-flash` no longer answers. A model you saved explicitly is kept and still sent to Gemini unchanged; the deprecated 2.5 models serve existing users only and are re-routed from 2026-12-01, so switch away from them. Nothing is migrated: Ever Works has no production users yet, and the owner accepted the shift on 2026-11-05.
 
 ## Troubleshooting
 

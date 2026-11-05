@@ -16,7 +16,7 @@ OpenAI AI provider plugin for Ever Works platform
 
 ## What is the OpenAI plugin?
 
-This plugin connects Ever Works directly to OpenAI's API, providing access to models such as GPT-4o, GPT-4o mini, and OpenAI's text-embedding models. Use it when you prefer a direct connection to OpenAI with your own API key.
+This plugin connects Ever Works directly to OpenAI's API, providing access to models such as GPT-6 Astra, GPT-6.1 Sol, GPT-6 Luna, and OpenAI's text-embedding models. Use it when you prefer a direct connection to OpenAI with your own API key.
 
 ## Why use it?
 
@@ -46,6 +46,24 @@ When selected as the AI provider, OpenAI handles content generation during work 
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
 - **Base URL** — OpenAI API endpoint (hidden, advanced).
+
+## Model defaults
+
+Model defaults as of 2026-11-05 — source: [developers.openai.com/api/docs/models](https://developers.openai.com/api/docs/models) (shutdown dates: [developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)). Availability depends on your account/plan/region; the picker lists the vendor's live models, accepts a custom model id, and keeps existing saved selections.
+
+| Setting                                                  | Default (2026-11-05) | Previous default | Previous default's shutdown |
+| -------------------------------------------------------- | -------------------- | ---------------- | --------------------------- |
+| Default Model                                            | `gpt-6-astra`        | `gpt-5.1`        | 2027-04-01                  |
+| Simple Tasks Model                                       | `gpt-6-luna`         | `gpt-5-nano`     | 2026-12-11                  |
+| Standard Tasks Model                                     | `gpt-6.1-sol`        | `gpt-4o-mini`    | 2027-01-14                  |
+| Complex Tasks Model                                      | `gpt-6-astra`        | `gpt-5.1`        | 2027-04-01                  |
+| Bootstrap and fallback (`onLoad`, `getDefaultModelId()`) | `gpt-6-luna`         | `gpt-5-nano`     | 2026-12-11                  |
+
+Each tier gets the vendor's current model for its role: GPT-6 Luna for cost-sensitive, high-volume work, GPT-6.1 Sol to balance intelligence and cost, and GPT-6 Astra, the flagship. GPT-6 Astra is also the most expensive of the three ($10 / $50 per million input / output tokens on 2026-11-05); pick a cheaper id for the Default and Complex Tasks Model if cost matters more than quality.
+
+**Default shift.** Upgrading moves every config that never saved a model to the defaults above. A model you saved explicitly is kept and still sent to OpenAI unchanged, including the deprecated ids in the table, so switch away from those before their shutdown date. Nothing is migrated: Ever Works has no production users yet, and the owner accepted the shift on 2026-11-05.
+
+The embedding default (`text-embedding-3-small`) and the transcription default (`whisper-1`) are unchanged.
 
 ## Troubleshooting
 
