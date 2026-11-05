@@ -4,7 +4,12 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileWithVerifiedCancellation, ProcessTreeTerminationError } from '../verified-exec.js';
+import {
+	execFileWithVerifiedCancellation,
+	linuxProcessGroupHasOnlyExitedMembers,
+	ProcessTreeTerminationError,
+	type ProcFsReader
+} from '../verified-exec.js';
 
 const roots: string[] = [];
 const ownedPids: number[] = [];
@@ -133,11 +138,113 @@ describe('verified Git/helper process cancellation', () => {
 	);
 });
 
+describe('a process group whose members all exited (Linux, no reaping PID 1)', () => {
+	// Captured from a container whose PID 1 is a plain `sleep` (no init): a detached
+	// group led by pid 13 was SIGKILLed; its child 15 was re-parented to PID 1 and is
+	// left a zombie in group 13, so `kill(-13, 0)` keeps succeeding (stage 2026-11-05).
+	const SELF = '7 (sh) S 0 7 7 0 -1 4194560 1121 541 0 0 5 2 0 0 20 0 1 0 4726693';
+	const PID1 = '1 (sleep) S 0 1 1 0 -1 4194560 1078 0 0 0 3 3 0 0 20 0 1 0 4726503';
+	const ZOMBIE = '15 (sleep) Z 1 13 13 0 -1 4228108 55 0 0 0 0 0 0 0 20 0 1 0 4726701 0 0';
+	const PROC_MOUNT = '591 589 0:115 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw';
+
+	function reader(
+		stats: Record<string, string | NodeJS.ErrnoException>,
+		mountinfo = `${PROC_MOUNT}\n`
+	): ProcFsReader {
+		return {
+			readdir: () => ['self', 'thread-self', 'sys', ...Object.keys(stats)],
+			readFile: (path) => {
+				if (path === '/proc/self/stat') return SELF;
+				if (path === '/proc/self/mountinfo') return mountinfo;
+				const value = stats[/^\/proc\/(\d+)\/stat$/.exec(path)?.[1] ?? ''];
+				if (value === undefined) throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
+				if (typeof value !== 'string') throw value;
+				return value;
+			}
+		};
+	}
+	const errno = (code: string) => Object.assign(new Error(code), { code });
+
+	it('calls a group stopped when every member is a zombie', () => {
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 1: PID1, 7: SELF, 15: ZOMBIE }), 7)).toBe(true);
+	});
+
+	it('keeps a group alive while any member still runs', () => {
+		const live = '16 (git-remote-https) S 15 13 13 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 4726702';
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 1: PID1, 15: ZOMBIE, 16: live }), 7)).toBe(false);
+	});
+
+	it('reads the state after the LAST parenthesis, whatever the command name holds', () => {
+		const tricky = '16 (a) Z 1 13 13 (b) S 15 13 13 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 1';
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE, 16: tricky }), 7)).toBe(false);
+	});
+
+	it('proves nothing from a group with no listed member', () => {
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 1: PID1, 7: SELF }), 7)).toBe(false);
+	});
+
+	it('skips an entry reaped mid-scan, and refuses one it cannot read', () => {
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE, 20: errno('ENOENT') }), 7)).toBe(true);
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE, 20: errno('ESRCH') }), 7)).toBe(true);
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE, 20: errno('EACCES') }), 7)).toBe(false);
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE, 20: 'garbage' }), 7)).toBe(false);
+	});
+
+	it('refuses a /proc from another PID namespace', () => {
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }), 4242)).toBe(false);
+	});
+
+	it.each(['hidepid=2', 'hidepid=invisible', 'hidepid=1', 'hidepid=noaccess', 'hidepid=ptraceable'])(
+		'refuses a /proc mounted with %s (a live member could be hidden)',
+		(option) => {
+			const superOptions = PROC_MOUNT.replace(/ rw$/, ` rw,${option}`);
+			const perMount = PROC_MOUNT.replace('relatime -', `relatime,${option} -`);
+			expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }, superOptions), 7)).toBe(false);
+			expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }, perMount), 7)).toBe(false);
+		}
+	);
+
+	it('accepts hidepid=0 / off, and refuses when no /proc mount is listed at all', () => {
+		const off = PROC_MOUNT.replace(/ rw$/, ' rw,hidepid=off');
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }, off), 7)).toBe(true);
+		const zero = PROC_MOUNT.replace(/ rw$/, ' rw,hidepid=0');
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }, zero), 7)).toBe(true);
+		const procSub = '600 591 0:115 / /proc/sys ro,nosuid - proc proc rw';
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, reader({ 15: ZOMBIE }, procSub), 7)).toBe(false);
+	});
+
+	it('refuses when /proc cannot be listed', () => {
+		const broken: ProcFsReader = {
+			...reader({ 15: ZOMBIE }),
+			readdir: () => {
+				throw errno('EACCES');
+			}
+		};
+		expect(linuxProcessGroupHasOnlyExitedMembers(13, broken, 7)).toBe(false);
+	});
+});
+
+/**
+ * Whether `pid` can still run. A zombie (state `Z`) has exited; it only waits to be
+ * reaped, and a container whose PID 1 reaps nothing (the in-cluster CI runner) keeps
+ * a killed, re-parented descendant one forever — `kill(pid, 0)` alone would call it alive.
+ */
 function isAlive(pid: number): boolean {
 	try {
 		process.kill(pid, 0);
-		return true;
 	} catch (error) {
 		return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+	}
+	if (process.platform !== 'linux') return true;
+	try {
+		const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+		const state = stat
+			.slice(stat.lastIndexOf(')') + 1)
+			.trim()
+			.split(/\s+/)[0];
+		return state !== 'Z' && state !== 'X';
+	} catch {
+		// Gone between the two reads, or unreadable: only a vanished entry is "dead".
+		return existsSync(`/proc/${pid}`);
 	}
 }
