@@ -118,7 +118,7 @@ type AppSourceDeployTargetsShape = AppSourceInspectResponse['deployTargets'];
 
 /** `AppSourceInspectResponse.repository` (plan §3.2, `plan.md:372-390`). */
 export class AppSourceRepositoryDto implements AppSourceRepositoryShape {
-    @ApiProperty({ example: 'ever-works' })
+    @ApiProperty({ example: 'ever-co' })
     owner!: string;
 
     @ApiProperty({ example: 'ever-works' })

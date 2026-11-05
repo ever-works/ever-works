@@ -134,7 +134,10 @@ jobs:
       - name: Release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GitHub Packages files `@ever-works/*` under the ever-works org, and a
+          # GITHUB_TOKEN of this repository (ever-co) cannot write there. Set the
+          # secret GH_PACKAGES_TOKEN (classic PAT, write:packages on ever-works).
+          GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'publish' }}
           REGISTRIES: ${{ github.event_name == 'workflow_dispatch' && inputs.registries || 'npm,github' }}
           FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.filter || '' }}

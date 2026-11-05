@@ -229,8 +229,10 @@ jobs:
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # Read-only here, but a package that is not public yet can only be read
+          # with a token of IMAGE_OWNER's org; see the login step in k8s-build.yml.
+          username: ${{ vars.GH_PACKAGES_USER || github.actor }}
+          password: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0

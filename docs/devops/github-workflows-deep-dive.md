@@ -142,10 +142,14 @@ variable, `IMAGE_OWNER: ${{ vars.GHCR_IMAGE_OWNER || 'ever-works' }}`, instead o
 owner, so the clusters, ArgoCD Image Updater and the pull secrets keep reading the same paths.
 Set `GHCR_IMAGE_OWNER` (lower case) only together with the matching k8s-gitops change.
 
-`GITHUB_TOKEN` can write only the packages of the repository's own organization. Where the
-repository and `IMAGE_OWNER` differ, set the secret `GHCR_PUSH_TOKEN` (a classic PAT with
-`write:packages` on the image owner) and the variable `GHCR_PUSH_USER` (that PAT's login); the
-GHCR login steps of the pushing workflows use them when they are set and `GITHUB_TOKEN` otherwise.
+A `GITHUB_TOKEN` can write only the packages of its own repository's organization, and a package
+cannot be connected to a repository in another organization. So a GitHub-hosted run of this
+repository cannot push to `ghcr.io/ever-works/*` (or publish `@ever-works/*` to GitHub Packages)
+with its own token. Set the secret `GH_PACKAGES_TOKEN` (a classic PAT with `write:packages` on
+`ever-works`) and the variable `GH_PACKAGES_USER` (that PAT's login). The GHCR logins of
+`k8s-build.yml`, `docker-build-publish-*.yml` and `docker-hub-publish.yml`, and the GitHub
+Packages leg of `publish-plugins.yml`, use them when they are set and `GITHUB_TOKEN` otherwise.
+Without them such a push fails with 403; it never falls back to publishing under `ever-co`.
 
 ## Docker Hub Publish Workflow (`docker-hub-publish.yml`)
 

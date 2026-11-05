@@ -11,7 +11,7 @@ Thank you for your interest in contributing to Ever Works. This guide covers eve
 
 ## Repositories
 
-Ever Works is split across multiple repositories under the [ever-works](https://github.com/ever-works) GitHub organization:
+Ever Works is split across multiple repositories. The platform monorepo lives in the [ever-co](https://github.com/ever-co) GitHub organization; the templates and other Ever Works repositories live in the [ever-works](https://github.com/ever-works) organization:
 
 | Repository                                                                           | Description                                                      |
 | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
