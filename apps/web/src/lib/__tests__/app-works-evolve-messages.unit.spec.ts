@@ -56,6 +56,8 @@ const SUBTREES = [
     'dashboard.goalNew.work',
     'dashboard.goalDetail.work',
     'dashboard.missionDetail.output',
+    // APW-08 P3 T40 — the Build on an open-source app template's form.
+    'dashboard.missionsPage.buildOnApp',
 ] as const;
 
 type Tree = { [key: string]: string | Tree };
@@ -174,6 +176,43 @@ describe('APW-08 evolve copy (T28)', () => {
         expect(at(en, 'dashboard.missionDetail.output.appliesTo')).toBe(
             'Applies to Works attached as Improves or Operates.',
         );
+    });
+
+    it('carries the APW-08 P3 copy: the Build on an open-source app template form (T40)', () => {
+        const en = bundle('en');
+        // Plan §6 copy, verbatim.
+        const plan: Record<string, string> = {
+            product: 'Product',
+            business: 'Business',
+            appWork: 'App Work',
+            summary: 'Every Monday 08:00 UTC · up to {count} Tasks a week · {amount} per run',
+            backlogNote: 'New Tasks wait in Backlog for your approval.',
+            suggestedGoals: 'Suggested Goals (created as drafts):',
+            rules: 'Recommended app rules: schema changes merged by a person, {lines}-line PRs',
+            proposeRules: 'Propose these rules',
+            create: 'Create Mission',
+        };
+        for (const [key, copy] of Object.entries(plan)) {
+            expect(at(en, `dashboard.missionsPage.buildOnApp.${key}`)).toBe(copy);
+        }
+        for (const path of [
+            'dashboard.missionsPage.buildOnApp.appWorkPlaceholder',
+            'dashboard.missionsPage.buildOnApp.noAppWorks',
+            'dashboard.missionsPage.buildOnApp.rulesProposed',
+            'dashboard.missionsPage.buildOnApp.rulesFailed',
+        ]) {
+            expect(enLeaves).toContain(path);
+        }
+        // Real translations, not English copies: the sentences differ from English everywhere.
+        const copied: string[] = [];
+        for (const locale of locales().filter((name) => name !== 'en')) {
+            const json = bundle(locale);
+            for (const key of ['backlogNote', 'suggestedGoals', 'proposeRules', 'rulesFailed']) {
+                const path = `dashboard.missionsPage.buildOnApp.${key}`;
+                if (at(json, path) === at(en, path)) copied.push(`${locale}: ${path}`);
+            }
+        }
+        expect(copied).toEqual([]);
     });
 
     // Review of #3061 — two leaves outside the sub-trees above: the Activity feed's line for a

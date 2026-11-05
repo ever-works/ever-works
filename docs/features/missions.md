@@ -92,6 +92,26 @@ Cap resolution priority:
 
 Set the cap on the Mission detail page under **Settings**. The current count vs cap shows live on the page so you can see why a tick was a no-op.
 
+## Output
+
+A Mission's **Output** decides what its tick files. Set it in the **Output** card on the Mission page:
+
+| Output                          | What each tick does                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Ideas** (the default)         | Proposes Ideas, as every Mission did before.                                                                  |
+| **Tasks on attached App Works** | Plans small changes and files them as Tasks on the [App Works](./app-works.md) attached as Improves/Operates. |
+| **Both**                        | Ideas first, then Tasks.                                                                                      |
+
+When the Mission files Tasks:
+
+- It works on at most 5 App Works attached as **Improves** (product changes) or **Operates** (maintenance). A Mission with Task output and no such App Work is saved all the same, and says so: _Attach an App Work as Improves or Operates to file Tasks on it._
+- **Tasks per tick** (1–3) caps how many Tasks one tick files on each App Work, and **Open Tasks cap per Work** (1–10) stops filing while that many of the Mission's Tasks are still open there. A proposal whose title matches an open Task on that Work is dropped.
+- With **Require approval before creating** in the Mission's guardrails, new Tasks wait in **Backlog** until you move them to **To do**; otherwise they start right away with the Mission's Agent (or the Work's default one).
+- Each run is capped by the Mission's per-run budget (`maxBudgetCentsPerRun`).
+- A tick with nothing to file records one Activity entry per Mission per day.
+
+The Mission page lists them under **Tasks on attached Works**, newest first, 20 per page. Each Task then follows the App Work's delivery chain until it is live — see [Evolving an App Work](./app-works-evolve.md). The [Build on an open-source app](./mission-templates.md#templates-about-an-app-work) template sets all of this up in one step.
+
 ## Attached Works and relations
 
 The **Related Works** panel on a Mission's detail page is _derived_ — it lists the Works that were built from that Mission's accepted Ideas. Sitting beside it is **Attached Works**, an explicit, typed reference list that lets you say _how_ a Mission relates to any Work you own, whether or not that Mission produced it.

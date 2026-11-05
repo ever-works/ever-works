@@ -898,6 +898,24 @@
                 "error": "Tidak dapat membuat Misi. Silakan coba lagi.",
                 "chatUnavailable": "Chat sedang tidak tersedia — gunakan \"Buat manual\"."
             },
+            "buildOnApp": {
+                "product": "Produk",
+                "business": "Bisnis",
+                "appWork": "App Work",
+                "appWorkPlaceholder": "Pilih App Work",
+                "noAppWorks": "Anda belum punya App Work. Tambahkan dulu dari Works.",
+                "summary": "Setiap Senin pukul 08:00 UTC · hingga {count} tugas per minggu · {amount} per eksekusi",
+                "backlogNote": "Tugas baru menunggu persetujuan Anda di Backlog.",
+                "suggestedGoals": "Sasaran yang disarankan (dibuat sebagai draf):",
+                "rules": "Aturan aplikasi yang disarankan: perubahan skema digabungkan oleh seseorang, PR paling banyak {lines} baris",
+                "proposeRules": "Usulkan aturan ini",
+                "proposeNeedsAppWork": "Pilih App Work terlebih dahulu.",
+                "rulesProposed": "Tugas untuk mengubah aturan aplikasi telah dibuka di App Work.",
+                "rulesFailed": "Tugas tidak dapat dibuka. Coba lagi.",
+                "create": "Buat Misi",
+                "templateUnreadable": "Template tidak dapat dibaca, jadi hanya nilai yang Anda masukkan yang digunakan.",
+                "templatePartial": "Misi telah dibuat, tetapi sebagian templatenya tidak dapat diterapkan."
+            },
             "quickAdd": {
                 "label": "Start a new Mission",
                 "submitTitle": "Create Mission",
