@@ -266,6 +266,7 @@ export class AiProviderRegistryService {
             models: [
                 'openai/gpt-oss-120b',
                 'openai/gpt-oss-20b',
+                // Preview ("not for production use" on Groq's models page).
                 'qwen/qwen3.8-27b',
                 // Enterprise plans only since 2026-08-16.
                 'llama-3.3-70b-versatile',

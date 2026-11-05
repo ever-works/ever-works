@@ -3,14 +3,14 @@
  * Manages reasoning effort settings across different providers.
  */
 
-type Effort = 'none' | 'minimal' | 'low';
+type Effort = 'none' | 'minimal' | 'low' | 'medium';
 
 type ReasoningConfig = {
 	pattern: RegExp;
 	openai?: { reasoning: { effort: Effort } };
 	openrouter?: { reasoning: { effort: Effort } };
 	google?: { reasoning_effort: Effort };
-	groq?: { reasoning_effort: 'none' | 'low'; reasoning_format?: 'hidden' };
+	groq?: { reasoning_effort: 'none' | 'low'; include_reasoning?: boolean };
 };
 
 /**
@@ -30,11 +30,16 @@ type ReasoningConfig = {
  *  - OpenRouter https://openrouter.ai/api/v1/models (`reasoning.mandatory`,
  *    `supported_efforts`): Claude Opus/Sonnet 5.5 and Fable are mandatory
  *    (lowest `low`); Claude Haiku 5.5 accepts `none`; Gemini 3.5 Flash-Lite /
- *    3.6 Flash accept `minimal`, 3.7+/4 only `low` and up.
+ *    3.6 Flash accept `minimal`, 3.7+/4 only `low` and up; gpt-5.2/5.4/5.5-pro
+ *    accept only `medium` and up; gpt-5.1-codex* and gpt-5.2-codex are mandatory
+ *    (lowest `low`).
+ *  - Groq https://console.groq.com/docs/reasoning: for gpt-oss "the
+ *    `reasoning_format` parameter is not supported"; `include_reasoning: false`
+ *    hides the reasoning instead.
  */
 const REASONING_MODELS: ReasoningConfig[] = [
 	{
-		pattern: /^gpt-6-astra|^gpt-6\.1-sol|^gpt-6(?:\.\d+)?-[a-z]+-pro/,
+		pattern: /^gpt-6-astra|^gpt-6\.1-sol|^gpt-6\.\d+-[a-z]+-pro/,
 		openai: { reasoning: { effort: 'low' } },
 		openrouter: { reasoning: { effort: 'low' } }
 	},
@@ -42,6 +47,16 @@ const REASONING_MODELS: ReasoningConfig[] = [
 		pattern: /^gpt-6/,
 		openai: { reasoning: { effort: 'none' } },
 		openrouter: { reasoning: { effort: 'none' } }
+	},
+	{
+		pattern: /gpt-5\.[2-5]-pro/,
+		openai: { reasoning: { effort: 'medium' } },
+		openrouter: { reasoning: { effort: 'medium' } }
+	},
+	{
+		pattern: /gpt-5\.[12]-codex/,
+		openai: { reasoning: { effort: 'low' } },
+		openrouter: { reasoning: { effort: 'low' } }
 	},
 	{
 		pattern: /gpt-5\.[1-9]/,
@@ -59,7 +74,7 @@ const REASONING_MODELS: ReasoningConfig[] = [
 		openrouter: { reasoning: { effort: 'minimal' } }
 	},
 	{
-		pattern: /gemini-(?:[4-9]|3\.[7-9])|gemini-[23](?:\.\d+)?-pro/,
+		pattern: /gemini-(?:[4-9]|3\.[7-9])|gemini-(?:2\.5|3(?:\.\d+)?)-pro/,
 		google: { reasoning_effort: 'low' },
 		openrouter: { reasoning: { effort: 'low' } }
 	},
@@ -87,7 +102,7 @@ const REASONING_MODELS: ReasoningConfig[] = [
 	},
 	{
 		pattern: /gpt-oss/,
-		groq: { reasoning_effort: 'low', reasoning_format: 'hidden' }
+		groq: { reasoning_effort: 'low', include_reasoning: false }
 	},
 	{
 		pattern: /qwen3/,
@@ -167,6 +182,6 @@ export function getGoogleReasoningConfig(model?: string): { reasoning_effort: Ef
 
 export function getGroqReasoningConfig(
 	model?: string
-): { reasoning_effort: 'none' | 'low'; reasoning_format?: 'hidden' } | undefined {
+): { reasoning_effort: 'none' | 'low'; include_reasoning?: boolean } | undefined {
 	return findReasoningConfig(model)?.groq;
 }

@@ -612,7 +612,13 @@ export class AiOperations {
 		if (!(error instanceof Error)) return undefined;
 		const msg = error.message.toLowerCase();
 		if (namesParam(msg, 'temperature')) return 'temperature';
-		if (namesParam(msg, 'reasoning') || namesParam(msg, 'reasoning_effort')) return 'reasoning';
+		if (
+			namesParam(msg, 'reasoning') ||
+			namesParam(msg, 'reasoning_effort') ||
+			namesParam(msg, 'reasoning_format') ||
+			namesParam(msg, 'include_reasoning')
+		)
+			return 'reasoning';
 		if (msg.includes('json_schema') || msg.includes('response_format') || msg.includes('structured output'))
 			return 'structured_output';
 		// A refused tool CHOICE keeps the tools: only a forced choice is dropped

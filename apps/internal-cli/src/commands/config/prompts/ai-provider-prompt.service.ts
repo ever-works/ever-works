@@ -490,7 +490,7 @@ export class AiProviderPromptService extends BasePromptService {
             'lm-studio':
                 'Use the model id currently loaded in LM Studio (e.g. qwen2.5-7b-instruct, llama-3.2-3b-instruct)',
             vllm: 'Use the model id vLLM was launched with via --model (e.g. meta-llama/Llama-3.1-8B-Instruct)',
-            groq: 'Examples: openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.8-27b',
+            groq: 'Examples: openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.8-27b (preview)',
             custom: 'Enter any model name supported by your OpenAI-compatible endpoint',
         };
 
