@@ -265,6 +265,21 @@ describe('ClaudeCodePlugin', () => {
 			expect(itemUpdates[2].percent).toBe(46); // 30 + round(3/10 * 53) = 46
 		});
 
+		// Models refresh 2026-11-05: a saved id that left the picker list (retiring or retired)
+		// still reaches the CLI unchanged; the picker accepts custom ids.
+		it.each(['claude-sonnet-4-5-20250929', 'claude-opus-4-1-20250805'])(
+			'should pass a previously saved model (%s) to the CLI run unchanged',
+			async (model) => {
+				const ctx = createMockContext({ oauthToken: 'test-token', version: '2.1.37', maxTurns: 20, model });
+				await plugin.onLoad(ctx);
+
+				await plugin.execute(work, request, existing);
+
+				const { executeClaudeCode } = await import('../utils/process-runner');
+				expect(vi.mocked(executeClaudeCode)).toHaveBeenCalledWith(expect.objectContaining({ model }));
+			}
+		);
+
 		it('should stream structured Claude Code logs during generation', async () => {
 			const { executeClaudeCode } = await import('../utils/process-runner');
 			vi.mocked(executeClaudeCode).mockImplementationOnce((options) => {

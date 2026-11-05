@@ -512,6 +512,29 @@ describe('CodexPlugin', () => {
 			);
 		});
 
+		// Models refresh 2026-11-05: an unsaved model follows the new default (decision B, no
+		// backfill); a saved id, current or retired, reaches the Codex run unchanged.
+		it('runs an unsaved model on the new default gpt-6.1-sol', async () => {
+			vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValueOnce({ apiKey: 'sk-test' });
+
+			await plugin.onLoad(createMockContext());
+			await plugin.execute(work, request, existing);
+
+			expect(processRunner.executeCodex).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-6.1-sol' }));
+		});
+
+		it.each(['gpt-5.4', 'codex-mini-latest'])(
+			'passes a previously saved model (%s) to the Codex run unchanged',
+			async (model) => {
+				vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValueOnce({ apiKey: 'sk-test', model });
+
+				await plugin.onLoad(createMockContext());
+				await plugin.execute(work, request, existing);
+
+				expect(processRunner.executeCodex).toHaveBeenCalledWith(expect.objectContaining({ model }));
+			}
+		);
+
 		it('completes the screenshot step when a screenshot facade is available', async () => {
 			await plugin.onLoad(createMockContext());
 
