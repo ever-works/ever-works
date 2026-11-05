@@ -99,6 +99,42 @@ jobs:
               "https://api.github.com/repos/$REPO/$1"
           }
 
+          # Our own repo builds in-cluster (ever-co/k8s-gitops apps/ci-builds): one commit status per job and
+          # shard, `ci-builds/e2e.yml:<job>[/shard:<n>]`, and no Actions run. A fork on Actions has no such
+          # status and takes the run lookup below. Same rule as there: a failed lookup is a broken gate, not a
+          # verdict, and only all-green passes.
+          STATUS_RAW=$(api "commits/$HEAD_SHA/status?per_page=100")
+          STATUS_RC=$?
+          STATUS_CODE=$(printf '%s' "$STATUS_RAW" | tail -n1)
+          STATUS_BODY=$(printf '%s' "$STATUS_RAW" | sed '$d')
+          if [ "$STATUS_RC" -ne 0 ] || [ "$STATUS_CODE" != "200" ]; then
+            echo "::error::E2E STATUS LOOKUP FAILED (curl rc=$STATUS_RC, http=$STATUS_CODE): this is a BROKEN GATE, not a verdict."
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present: allowing despite a BROKEN LOOKUP."; exit 0; }
+            exit 1
+          fi
+          LEGS=$(printf '%s' "$STATUS_BODY" | jq -c '[.statuses[] | select(.context | startswith("ci-builds/e2e.yml"))]')
+          LEG_TOTAL=$(printf '%s' "$LEGS" | jq 'length')
+          if [ "$LEG_TOTAL" -gt 0 ]; then
+            NOT_GREEN=$(printf '%s' "$LEGS" | jq -r '.[] | select(.state != "success") | "  \(.state): \(.context)"')
+            SHARDS=$(printf '%s' "$LEGS" | jq '[.[].context | select(test("^ci-builds/e2e.yml:e2e/shard:[0-9]+$"))] | unique | length')
+            if [ "$SHARDS" -ne 32 ]; then
+              NOT_GREEN="$NOT_GREEN  missing: only $SHARDS of the 32 shards reported"
+            fi
+            JOBS=$(printf '%s' "$LEGS" | jq '[.[].context | select(. == "ci-builds/e2e.yml:e2e-prod-build" or . == "ci-builds/e2e.yml:e2e-app-works-flags-on")] | unique | length')
+            if [ "$JOBS" -ne 2 ]; then
+              NOT_GREEN="$NOT_GREEN  missing: only $JOBS of e2e-prod-build and e2e-app-works-flags-on reported"
+            fi
+            if [ -z "$NOT_GREEN" ]; then
+              echo "E2E is green for the commit being promoted ($LEG_TOTAL in-cluster jobs and shards)."
+              exit 0
+            fi
+            echo "::error::E2E for $HEAD_SHA is not green in-cluster:"
+            printf '%s\n' "$NOT_GREEN"
+            echo "Logs: kubectl -n ci-builds logs <workflow> -c main"
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present: promotion allowed despite that."; exit 0; }
+            exit 1
+          fi
+
           RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=100")
           CURL_RC=$?
           CODE=$(printf '%s' "$RAW" | tail -n1)
