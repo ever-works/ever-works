@@ -13,7 +13,7 @@ vi.mock('../utils/platform', () => ({
 		platformString: 'linux-x64',
 		isMusl: false
 	}),
-	getBinaryPath: vi.fn().mockReturnValue('/tmp/opencode-generator/bin/opencode-v1.0.223-linux-x64')
+	getBinaryPath: vi.fn().mockReturnValue('/tmp/opencode-generator/bin/opencode-v1.19.5-linux-x64')
 }));
 
 // Mock https module for downloads
@@ -47,7 +47,7 @@ describe('binary-manager', () => {
 
 			const result = await ensureBinary('2.1.37', mockLogger);
 
-			expect(result).toBe('/tmp/opencode-generator/bin/opencode-v1.0.223-linux-x64');
+			expect(result).toBe('/tmp/opencode-generator/bin/opencode-v1.19.5-linux-x64');
 			expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('already cached'));
 		});
 

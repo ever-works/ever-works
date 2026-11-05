@@ -406,6 +406,43 @@ describe('CodexPlugin', () => {
 			recoverySpy.mockRestore();
 		});
 
+		// Models refresh review (2026-11-06): since rust-v0.129.0 the Linux sandbox needs a system
+		// bwrap or the bundled codex-resources/bwrap; without either, codex-rs/linux-sandbox
+		// launcher.rs panics with this text. Operators must get the sandbox hint, never a bypass.
+		it('reports the bubblewrap-unavailable panic as a sandbox block with a bubblewrap hint (setting off)', async () => {
+			const recoverySpy = vi
+				.spyOn(plugin as never, 'recoverItemsFromStructuredOutput')
+				.mockResolvedValue([] as never);
+			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValue([]);
+			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: '',
+					stderr:
+						"thread 'main' panicked at linux-sandbox/src/launcher.rs:60:13:\n" +
+						'bubblewrap is unavailable: no system bwrap was found on PATH and no bundled ' +
+						'codex-resources/bwrap binary was found next to the Codex executable',
+					exitCode: 0,
+					killed: false,
+					duration: 1000
+				}),
+				kill: vi.fn()
+			});
+
+			const context = createMockContext();
+			await plugin.onLoad(context);
+			await plugin.execute(work, request, existing);
+
+			expect(processRunner.executeCodex).toHaveBeenCalledTimes(1);
+			expect(processRunner.executeCodex).toHaveBeenCalledWith(
+				expect.objectContaining({ bypassApprovalsAndSandbox: false })
+			);
+			expect(context.logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('NOT retrying with sandbox bypass')
+			);
+			expect(context.logger.warn).toHaveBeenCalledWith(expect.stringContaining('Install bubblewrap'));
+			recoverySpy.mockRestore();
+		});
+
 		it('never adds a bypass retry even when the operator enabled unsafeBypassSandbox (first run already bypassed)', async () => {
 			vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValueOnce({
 				apiKey: 'sk-test',

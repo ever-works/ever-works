@@ -17,7 +17,7 @@ vi.mock('fs/promises', () => {
 	return { ...mocked, default: mocked };
 });
 
-import { detectPlatform } from '../utils/platform.js';
+import { detectPlatform, getBinaryPath, getInstallDir } from '../utils/platform.js';
 
 /**
  * openai/codex stopped publishing `*-unknown-linux-gnu` release assets in 0.128.0 (#19445);
@@ -65,6 +65,32 @@ describe('codex platform → release asset mapping', () => {
 	] as const)('keeps macOS %s on the apple-darwin asset', async (arch, assetName) => {
 		host('darwin', arch, 'none');
 		expect((await detectPlatform()).assetName).toBe(assetName);
+	});
+
+	// Since rust-v0.129.0 the Linux binary no longer compiles bubblewrap in: its sandbox looks for
+	// `codex-resources/bwrap` next to the executable, published as a separate release asset.
+	it.each([
+		['x64', 'glibc', 'bwrap-x86_64-unknown-linux-musl.tar.gz'],
+		['x64', 'musl', 'bwrap-x86_64-unknown-linux-musl.tar.gz'],
+		['arm64', 'glibc', 'bwrap-aarch64-unknown-linux-musl.tar.gz'],
+		['arm64', 'musl', 'bwrap-aarch64-unknown-linux-musl.tar.gz']
+	] as const)('names the bubblewrap asset for %s Linux (%s)', async (arch, libc, bwrapAssetName) => {
+		host('linux', arch, libc);
+		expect((await detectPlatform()).bwrapAssetName).toBe(bwrapAssetName);
+	});
+
+	it('names no bubblewrap asset on macOS', async () => {
+		host('darwin', 'arm64', 'none');
+		expect((await detectPlatform()).bwrapAssetName).toBeUndefined();
+	});
+
+	it('installs each CLI version into its own directory, binary at <dir>/codex', () => {
+		const installDir = getInstallDir('0.166.0', 'linux-x64');
+		expect(installDir.replace(/\\/g, '/')).toBe('/tmp/codex-generator/bin/codex-0.166.0-linux-x64');
+		expect(getBinaryPath('0.166.0', 'linux-x64').replace(/\\/g, '/')).toBe(
+			'/tmp/codex-generator/bin/codex-0.166.0-linux-x64/codex'
+		);
+		expect(getInstallDir('0.165.0', 'linux-x64')).not.toBe(installDir);
 	});
 
 	it('never resolves a linux-gnu asset, which current releases do not publish', async () => {

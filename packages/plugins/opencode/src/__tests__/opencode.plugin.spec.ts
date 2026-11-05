@@ -8,7 +8,7 @@ let capturedWatcherOptions: TaxonomyWatcherOptions | null = null;
 
 // Mock all utility modules
 vi.mock('../utils/binary-manager', () => ({
-	ensureBinary: vi.fn().mockResolvedValue('/tmp/opencode-generator/bin/opencode-v1.0.223-linux-x64')
+	ensureBinary: vi.fn().mockResolvedValue('/tmp/opencode-generator/bin/opencode-v1.19.5-linux-x64')
 }));
 
 vi.mock('../utils/workspace-manager', () => ({
@@ -116,7 +116,7 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 		services: {},
 		getSettings: vi.fn().mockResolvedValue(
 			settingsOverride ?? {
-				version: 'v1.0.223'
+				version: 'v1.19.5'
 			}
 		),
 		getResolvedSettings: vi.fn(),

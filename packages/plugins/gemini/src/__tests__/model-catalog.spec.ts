@@ -94,7 +94,8 @@ describe('gemini CLI model catalog (models refresh 2026-11-05)', () => {
 		for (const id of ['gemini-3.1-pro-preview', 'gemini-3-flash-preview']) {
 			expect(models.find((m) => m.id === id)?.name, id).toContain('(Preview)');
 		}
-		// Shut down 2026-05-25. It stays usable as free text (see below).
+		// Shut down 2026-05-25. Still accepted and passed through unchanged (see below); Google
+		// rejects it at run time.
 		expect(models.map((m) => m.id)).not.toContain('gemini-3.1-flash-lite-preview');
 	});
 
@@ -118,7 +119,8 @@ describe('gemini CLI model catalog (models refresh 2026-11-05)', () => {
 		expect(semverAtLeast(DEFAULT_CLI_VERSION, '0.62.0')).toBe(true);
 	});
 
-	describe('previously shipped ids keep working as free text', () => {
+	// Retired ids are still accepted and passed through unchanged; the vendor rejects them at run time.
+	describe('previously shipped ids are still accepted and passed through unchanged', () => {
 		it.each(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-flash-lite-preview'])(
 			'%s passes settings validation',
 			(model) => {

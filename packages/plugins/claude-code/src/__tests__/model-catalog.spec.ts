@@ -96,7 +96,8 @@ describe('claude-code model catalog (models refresh 2026-11-05)', () => {
 			'(legacy, retires 2026-11-30)'
 		);
 		expect(models.find((m) => m.id === 'claude-haiku-4-5-20251001')?.name).toContain('(legacy)');
-		// Retired 2026-08-05 (D2). It stays usable as free text (see below).
+		// Retired 2026-08-05 (D2). Still accepted and passed through unchanged (see below); Anthropic
+		// rejects it at run time.
 		expect(models.map((m) => m.id)).not.toContain('claude-opus-4-1-20250805');
 	});
 
@@ -129,7 +130,8 @@ describe('claude-code model catalog (models refresh 2026-11-05)', () => {
 		expect(DEFAULT_CLI_VERSION).toBe('2.1.311');
 	});
 
-	describe('previously shipped ids keep working as free text', () => {
+	// Retired ids are still accepted and passed through unchanged; the vendor rejects them at run time.
+	describe('previously shipped ids are still accepted and passed through unchanged', () => {
 		it.each(['claude-sonnet-4-5-20250929', 'claude-opus-4-1-20250805', 'claude-haiku-4-5-20251001'])(
 			'%s passes settings validation',
 			(model) => {
@@ -159,6 +161,8 @@ describe('claude-code model catalog (models refresh 2026-11-05)', () => {
 		});
 
 		it.each([
+			// Claude Code docs: for Anthropic API users the `default` model is Opus 5.5.
+			['default', 'claude-opus-5-5'],
 			['sonnet', 'claude-sonnet-5-5'],
 			['opus', 'claude-opus-5-5'],
 			['haiku', 'claude-haiku-5-5'],
@@ -178,6 +182,20 @@ describe('claude-code model catalog (models refresh 2026-11-05)', () => {
 			await plugin.validateConnection({ apiKey: 'sk-ant-test', model: saved });
 
 			expect(sentPayloads[0].body.model).toBe(probed);
+		});
+
+		// Opus 5.5 and Fable 5.1 always think, and thinking counts toward max_tokens. The API has no
+		// minimum max_tokens: a response that hits the cap ends with stop_reason "max_tokens" (HTTP
+		// 200), which is all this key check reads. So the probe stays at 8 tokens and sends no
+		// `thinking` field (Fable 5.1 and Opus 5.5 reject thinking "disabled" with a 400).
+		// https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting (2026-11-06)
+		it('keeps the probe small and leaves thinking at the model default', async () => {
+			answerProbesWith(200);
+
+			await plugin.validateConnection({ apiKey: 'sk-ant-test', model: 'fable' });
+
+			expect(sentPayloads[0].body.max_tokens).toBe(8);
+			expect(sentPayloads[0].body).not.toHaveProperty('thinking');
 		});
 
 		it('sends no temperature (API version 2026-10-21 removed it)', async () => {

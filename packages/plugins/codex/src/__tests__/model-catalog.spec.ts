@@ -39,7 +39,8 @@ describe('codex model catalog (models refresh 2026-11-05)', () => {
 		const models = await plugin.listModels();
 		expect(models.find((m) => m.id === 'gpt-5.4')?.name).toContain('(legacy)');
 		const ids = models.map((m) => m.id);
-		// Retired 2026-02-12 and 2026-07-23. They stay usable as free text (see below).
+		// Retired 2026-02-12 and 2026-07-23. Still accepted and passed through unchanged (see below);
+		// OpenAI rejects them at run time.
 		expect(ids).not.toContain('codex-mini-latest');
 		expect(ids).not.toContain('gpt-5.2-codex');
 	});
@@ -69,7 +70,8 @@ describe('codex model catalog (models refresh 2026-11-05)', () => {
 		expect(DEFAULT_CLI_VERSION).toBe('0.166.0');
 	});
 
-	describe('previously shipped ids keep working as free text', () => {
+	// Retired ids are still accepted and passed through unchanged; the vendor rejects them at run time.
+	describe('previously shipped ids are still accepted and passed through unchanged', () => {
 		it.each(['codex-mini-latest', 'gpt-5.4', 'gpt-5.2-codex'])('%s passes settings validation', (model) => {
 			expect(plugin.validateSettings({ model }).valid).toBe(true);
 			const properties = plugin.settingsSchema.properties as Record<string, PluginSettingsSchemaProperty>;
