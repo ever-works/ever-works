@@ -6,7 +6,7 @@ import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 // Security: validate every payload id before any DB access.
-import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+import { assertUuid } from '../../trigger/worker/utils/assert-uuid.utils';
 
 /** `assertUuid` as a predicate — the failure hook must never throw on a bad id. */
 function isUuid(value: unknown): value is string {

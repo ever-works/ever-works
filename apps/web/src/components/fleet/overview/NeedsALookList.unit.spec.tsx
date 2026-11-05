@@ -207,7 +207,12 @@ describe('NeedsALookList failures stay in the list (U11, review of PR 2)', () =>
             ),
         );
         expect(screen.getAllByRole('listitem')).toHaveLength(1);
-        expect(button).not.toBeDisabled();
+        // The button is freed by TWO commits, not one. `setRunning(null)` and the error are set
+        // after the handler's `await`, so React renders them as ordinary updates; `isPending`
+        // only drops when the async transition itself settles, in a later commit. Asserting it in
+        // the same tick as the error text raced that second commit and lost on loaded CI runners
+        // (stage runs 40725275072 and 41605694347). Wait for the state the test is about.
+        await waitFor(() => expect(button).not.toBeDisabled());
         expect(fetchFleetNeedsALookAction).not.toHaveBeenCalled();
     });
 
