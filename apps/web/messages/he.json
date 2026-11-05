@@ -958,7 +958,9 @@
                 "proposeNeedsAppWork": "בחרו App Work קודם.",
                 "rulesProposed": "נפתחה משימה ב-App Work לשינוי כללי האפליקציה.",
                 "rulesFailed": "לא ניתן היה לפתוח את המשימה. נסו שוב.",
-                "create": "צור משימה"
+                "create": "צור משימה",
+                "templateUnreadable": "לא ניתן היה לקרוא את התבנית, ולכן נעשה שימוש רק בערכים שהזנתם.",
+                "templatePartial": "המשימה נוצרה, אך לא ניתן היה להחיל חלק מהתבנית שלה."
             }
         },
         "memoryPage": {

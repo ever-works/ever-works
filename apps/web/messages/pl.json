@@ -912,7 +912,9 @@
                 "proposeNeedsAppWork": "Najpierw wybierz App Work.",
                 "rulesProposed": "W App Work otwarto zadanie zmiany reguł aplikacji.",
                 "rulesFailed": "Nie udało się otworzyć zadania. Spróbuj ponownie.",
-                "create": "Utwórz misję"
+                "create": "Utwórz misję",
+                "templateUnreadable": "Nie udało się odczytać szablonu, więc użyto tylko wprowadzonych przez Ciebie wartości.",
+                "templatePartial": "Misja została utworzona, ale części jej szablonu nie udało się zastosować."
             },
             "quickAdd": {
                 "label": "Start a new Mission",

@@ -958,7 +958,9 @@
                 "proposeNeedsAppWork": "Elige primero un App Work.",
                 "rulesProposed": "Se abrió una tarea en el App Work para cambiar las reglas de la app.",
                 "rulesFailed": "No se pudo abrir la tarea. Inténtalo de nuevo.",
-                "create": "Crear misión"
+                "create": "Crear misión",
+                "templateUnreadable": "No se pudo leer la plantilla, así que solo se usaron los valores que introdujiste.",
+                "templatePartial": "Se creó la misión, pero no se pudo aplicar una parte de su plantilla."
             }
         },
         "memoryPage": {

@@ -150,8 +150,13 @@ const kbSchema = z
     .passthrough();
 
 // APW-08 T38 (FR-59) — a repository path glob the template recommends for the App spec. Only
-// ever SHOWN to the person and written into a change request's text; never applied.
-const appSpecPathSchema = z.string().min(1).max(300);
+// ever SHOWN to the person and written into a change request's text; never applied. No
+// whitespace, backtick or backslash, so it cannot break out of the request's code spans or lines.
+const appSpecPathSchema = z
+    .string()
+    .min(1)
+    .max(300)
+    .regex(/^[^\s`\\]+$/, 'App spec paths may not contain whitespace, backticks or backslashes');
 
 /**
  * APW-08 T38 (FR-56, FR-59) — the App Work a Mission made from this template is about, and the

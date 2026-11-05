@@ -958,7 +958,9 @@
                 "proposeNeedsAppWork": "Wählen Sie zuerst ein App Work aus.",
                 "rulesProposed": "Für das App Work wurde ein Task zur Änderung der App-Regeln eröffnet.",
                 "rulesFailed": "Der Task konnte nicht eröffnet werden. Versuchen Sie es erneut.",
-                "create": "Mission erstellen"
+                "create": "Mission erstellen",
+                "templateUnreadable": "Die Vorlage konnte nicht gelesen werden, daher wurden nur Ihre Eingaben verwendet.",
+                "templatePartial": "Die Mission wurde erstellt, aber ein Teil ihrer Vorlage konnte nicht angewendet werden."
             }
         },
         "memoryPage": {

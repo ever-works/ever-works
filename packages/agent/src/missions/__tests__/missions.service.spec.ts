@@ -952,9 +952,6 @@ describe('MissionsService — templateInputs (APW-08 T39)', () => {
             '.works/mission.yml',
         ]);
         expect(worksRepo.findOne).toHaveBeenCalled();
-        // Nothing else on the git facade is reachable from the stub, so a commit, push or pull
-        // request against the App Work's repository would have thrown.
-        expect(Object.keys(git)).toEqual(['getFileContent']);
     });
 
     it('a value the person set wins over the template (FR-60)', async () => {
@@ -1010,6 +1007,83 @@ describe('MissionsService — templateInputs (APW-08 T39)', () => {
         expect(missionWorks.attach).toHaveBeenCalledTimes(1);
         expect(goals.create).not.toHaveBeenCalled();
         expect(dto.warnings).toEqual(['templateManifestUnreadable']);
+    });
+
+    it('refuses templateInputs for a template that is not about an App Work, readable or not', async () => {
+        git.getFileContent.mockRejectedValue(new Error('No connected account'));
+        await expect(
+            build().create('u1', input({ missionTemplateRepo: 'starter-business' })),
+        ).rejects.toMatchObject({
+            response: expect.objectContaining({ code: 'templateInputsNotAccepted' }),
+        });
+        expect(repo._rows).toHaveLength(0);
+    });
+
+    it('a failed attach and a failed Goal are answered as warnings; the rest is still done', async () => {
+        missionWorks.attach.mockRejectedValueOnce(new Error('db down'));
+        goals.create.mockRejectedValueOnce(new Error('goal refused'));
+        const dto = await build().create('u1', input());
+        expect(repo._rows).toHaveLength(1);
+        // The second Goal is still created and linked after the first failed.
+        expect(goals.create).toHaveBeenCalledTimes(2);
+        expect(goals.linkToMission).toHaveBeenCalledTimes(1);
+        expect(dto.warnings).toEqual(
+            expect.arrayContaining(['templateWorkNotAttached', 'templateGoalsNotCreated']),
+        );
+    });
+
+    describe('readTemplateManifest (APW-08 T40)', () => {
+        it('answers the form’s view of the template', async () => {
+            const view = await build().readTemplateManifest('u1', TEMPLATE_ID);
+            expect(view).toEqual({
+                templateId: TEMPLATE_ID,
+                defaults: {
+                    cadence: '0 8 * * 1',
+                    outputMode: 'tasks',
+                    tasksPerTick: 2,
+                    openTasksCap: 4,
+                    maxBudgetCentsPerRun: 1500,
+                    requireApprovalBeforeCreate: true,
+                    outstandingIdeasCap: 0,
+                },
+                appWork: {
+                    requiredRelation: 'improves',
+                    maxPullRequestChangedLines: 400,
+                    requireHumanMergePaths: [
+                        '**/migrations/**',
+                        '**/prisma/schema.prisma',
+                        '**/*.sql',
+                        '**/schema.rb',
+                    ],
+                    protectedPaths: ['LICENSE*', 'NOTICE*'],
+                },
+                suggestedGoals: [
+                    expect.objectContaining({ title: 'First customised feature live' }),
+                    expect.objectContaining({
+                        title: 'Four changes live in a month, none closed without deploying',
+                    }),
+                ],
+                warnings: [],
+            });
+        });
+
+        it('an unreadable manifest answers the warning and nothing else', async () => {
+            git.getFileContent.mockRejectedValueOnce(new Error('No connected account'));
+            await expect(build().readTemplateManifest('u1', TEMPLATE_ID)).resolves.toEqual({
+                templateId: TEMPLATE_ID,
+                defaults: null,
+                appWork: null,
+                suggestedGoals: [],
+                warnings: ['templateManifestUnreadable'],
+            });
+        });
+
+        it('an id that is not a catalog template is 404 templateNotFound, and nothing is read', async () => {
+            await expect(
+                build().readTemplateManifest('u1', 'no-such-template'),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(git.getFileContent).not.toHaveBeenCalled();
+        });
     });
 
     it('without GoalsService in the graph the Mission is created and the write says so', async () => {

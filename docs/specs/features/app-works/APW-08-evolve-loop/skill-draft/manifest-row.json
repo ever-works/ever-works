@@ -2,7 +2,7 @@
 	"$comment": "manifest.json row for `ever-works/skills` (added 2026-09-17 — APW08-G14). The catalog row shape is { slug, path, name, summary, skillPath, tags, version, license, sourceUrl } — `schema/skill-manifest.schema.json` in ever-works/skills (APW-08 T41 added the required `path` and pointed `skillPath` at the SKILL.md, as that schema asks); see also docs/features/skills-catalog.md:75-78. Publish this row together with skills/evolve-app/SKILL.md (source: skill-draft/SKILL.md) in APW-08 T41. Until the row is published, T25 skips the Skill binding rather than failing the evolve request: createBinding requires an installed Skill row the user already owns (packages/agent/src/skills/skills.service.ts:281-288) and the unique index uq_skill_binding (packages/agent/src/entities/skill-binding.entity.ts:33) throws on a duplicate instead of being a no-op.",
 	"slug": "evolve-app",
 	"path": "skills/evolve-app",
-	"name": "Evolve an app",
+	"name": "Evolve an App",
 	"summary": "Change an App Work the way its own App spec allows: branch per Task, the spec's checks, protected and human-merge paths, and a change that stays open until it is live.",
 	"skillPath": "skills/evolve-app/SKILL.md",
 	"tags": ["app-works", "evolve", "pull-request", "app-spec"],

@@ -18,11 +18,12 @@ vi.mock('next-intl', () => ({
 
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
+const toastWarning = vi.fn();
 vi.mock('sonner', () => ({
     toast: {
         success: (...args: unknown[]) => toastSuccess(...args),
         error: (...args: unknown[]) => toastError(...args),
-        warning: vi.fn(),
+        warning: (...args: unknown[]) => toastWarning(...args),
     },
 }));
 
@@ -46,6 +47,7 @@ vi.mock('@/lib/hooks/use-start-from-prompt', () => ({
 // the kinds it is given — so the template's picker is pinned to App Works by its `kinds` prop.
 const WORKS = [
     { id: '11111111-1111-4111-8111-111111111111', name: 'Cal.com', kind: 'app' },
+    { id: '22222222-2222-4222-8222-222222222222', name: 'Umami', kind: 'app' },
     { id: 'w-site', name: 'Marketing site', kind: 'website' },
 ];
 const workSelectProps = vi.fn();
@@ -211,11 +213,61 @@ describe('NewMissionForm — Build on an open-source app (APW-08 T40)', () => {
                 'dashboard.missionsPage.buildOnApp.rulesProposed',
             ),
         );
-        // A second click files nothing more.
+        // A second click files nothing more for the same App Work...
         fireEvent.click(screen.getByTestId('build-on-app-propose-rules'));
         expect(proposeRules).toHaveBeenCalledTimes(1);
-        // The default wiring is the App change request action, never an App spec write.
-        expect(requestAppChangeAction).not.toHaveBeenCalled();
+        // ...while another App Work can still get its own request.
+        fireEvent.change(screen.getByTestId('build-on-app-work'), {
+            target: { value: '22222222-2222-4222-8222-222222222222' },
+        });
+        expect(screen.getByTestId('build-on-app-propose-rules')).not.toBeDisabled();
+    });
+
+    it('by default Propose these rules is the App change request action, called once', async () => {
+        render(<NewMissionForm createMission={vi.fn()} template={TEMPLATE} />);
+        chooseAppWork();
+        fireEvent.click(screen.getByTestId('build-on-app-propose-rules'));
+        await waitFor(() => expect(requestAppChangeAction).toHaveBeenCalledTimes(1));
+        const [workId, request] = requestAppChangeAction.mock.calls[0] as [string, string];
+        expect(workId).toBe(APP_WORK_ID);
+        expect(request).toContain('`.works/works.yml`');
+        expect(request).toContain('by pull request');
+    });
+
+    it('a template that was only partly applied is said after the create', async () => {
+        const createMission = vi.fn(async () => ({
+            id: 'm7',
+            warnings: ['templateGoalsNotCreated'],
+        }));
+        render(
+            <NewMissionForm
+                createMission={createMission as never}
+                template={TEMPLATE}
+                initialDescription="Build my own product on top of an open-source app."
+            />,
+        );
+        fireEvent.change(screen.getByTestId('build-on-app-product'), {
+            target: { value: 'Booking' },
+        });
+        fireEvent.change(screen.getByTestId('build-on-app-business'), {
+            target: { value: 'Yoga Loft' },
+        });
+        chooseAppWork();
+        fireEvent.click(screen.getByTestId('new-mission-submit'));
+        await waitFor(() =>
+            expect(toastWarning).toHaveBeenCalledWith(
+                'dashboard.missionsPage.buildOnApp.templatePartial',
+            ),
+        );
+    });
+
+    it('the summary line describes the template cadence only while the schedule is that cadence', () => {
+        render(<NewMissionForm createMission={vi.fn()} template={TEMPLATE} />);
+        expect(screen.getByTestId('build-on-app-summary-line')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('dashboard.missionsPage.newPage.scheduleLabel'), {
+            target: { value: '0 6 * * 3' },
+        });
+        expect(screen.queryByTestId('build-on-app-summary-line')).toBeNull();
     });
 
     it('creates the Mission with the template and its inputs; the rest comes from the manifest', async () => {

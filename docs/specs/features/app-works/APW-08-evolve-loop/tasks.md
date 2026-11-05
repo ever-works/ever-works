@@ -1103,9 +1103,19 @@ _Delivers FR-56…FR-60._
       `null`, which would have hidden every default).
     - **The read endpoint** for the form is T40's `GET /api/me/missions/templates/:templateId/manifest`.
 
-    Specs: `mission-template-defaults` 16/16 (new: the facade read at the branch, base64, both starters' defaults
+    Specs: `mission-template-defaults` 18/18 (new: the facade read at the branch, base64, both starters' defaults
     applied, explicit values and nulls win, one-shot stays one-shot, four unreadable shapes → one warning, no read
-    for a non-catalog value); `mission-template-manifest.service` and `mission-template.config` unchanged.
+    for a non-catalog value, guardrails narrowed, the read deadline); `mission-template-manifest.service` and
+    `mission-template.config` unchanged; `template-catalog.service` 65/65 (2 new: a Mission template repository is
+    never listed as a website template, and an earlier row for one is retired).
+    **Independent review (2026-11-05; CodeRabbit was rate-limited), fixed on the branch:** a template's
+    guardrails and Task output are narrowed to the keys and ranges a person may write (never an Agent) before
+    they are stored; the read gives up after 5 s (`templateManifestUnreadable`); `appWork` path globs refuse
+    whitespace, backticks and backslashes (they reach a change request's text); whether a template takes
+    `templateInputs` is the row's own `takesAppWork`, not the manifest's readability; website-template discovery
+    no longer lists a Mission template repository (`*-mission-template` or a `MISSION_TEMPLATES` row) and
+    retires a row an earlier discovery saved for one (`retiredReason: mission_template`); the form says when a
+    template was unreadable or only partly applied; the App Work picker asks the API for `kind=app`.
     **Known gap:** the two starter repositories (`ever-works/starter-business-mission-template`,
     `…/starter-content-mission-template`) do not exist on GitHub, so their Missions answer
     `templateManifestUnreadable` until they are published.
@@ -1127,7 +1137,7 @@ _Delivers FR-56…FR-60._
       suggested Goal is created through `GoalsService.create` (draft, `delivery`, `workId`, criteria filled from the
       inputs) and linked with `linkToMission`. `GoalsService` is resolved lazily (no module import, no cycle). A step
       that fails answers `templateWorkNotAttached` / `templateGoalsNotCreated`; the Mission stays. No git call is
-      made for the App Work. Specs: `missions.service` 61/61 (8 new T39 cases); `mission.dto` (6 new);
+      made for the App Work. Specs: `missions.service` 66/66 (13 new T39 / T40 cases, `readTemplateManifest` included); `mission.dto` (6 new);
       `missions.controller` 4/4 (2 new).
 
 - [x] **T40. Template form and "Propose these rules".
@@ -1155,8 +1165,8 @@ _Delivers FR-56…FR-60._
       `appWork`; every other template keeps the prompt composer). The form starts on the template's cadence and
       sends only what the person sees, so the manifest supplies the rest (FR-57) and their edits win (FR-60).
       `GET /api/me/missions/templates/:templateId/manifest` (declared before `GET :id`, 30/min, `404
-    templateNotFound`) answers the form's view. Copy `dashboard.missionsPage.buildOnApp` (plan §6 verbatim plus
-      five leaves) in all 21 locales. Specs: `NewMissionForm.unit` 6/6 (new), `app-works-evolve-messages` 8/8,
+  templateNotFound`) answers the form's view. Copy `dashboard.missionsPage.buildOnApp` (plan §6 verbatim plus
+      five leaves) in all 21 locales. Specs: `NewMissionForm.unit` 9/9 (new), `app-works-evolve-messages` 8/8,
       `NewPageClient.unit` unchanged.
 
 - [x] **T41. Catalog content and the template's real home (outside this monorepo).**

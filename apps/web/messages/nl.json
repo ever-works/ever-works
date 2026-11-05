@@ -920,7 +920,9 @@
                 "proposeNeedsAppWork": "Kies eerst een App Work.",
                 "rulesProposed": "Er is een taak geopend op het App Work om de app-regels te wijzigen.",
                 "rulesFailed": "De taak kon niet worden geopend. Probeer het opnieuw.",
-                "create": "Missie aanmaken"
+                "create": "Missie aanmaken",
+                "templateUnreadable": "De sjabloon kon niet worden gelezen, dus alleen de waarden die je invoerde zijn gebruikt.",
+                "templatePartial": "De missie is aangemaakt, maar een deel van de sjabloon kon niet worden toegepast."
             },
             "quickAdd": {
                 "label": "Start a new Mission",

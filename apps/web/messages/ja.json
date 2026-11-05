@@ -920,7 +920,9 @@
                 "proposeNeedsAppWork": "先に App Work を選択してください。",
                 "rulesProposed": "アプリルールを変更するタスクを App Work に作成しました。",
                 "rulesFailed": "タスクを作成できませんでした。もう一度お試しください。",
-                "create": "ミッションを作成"
+                "create": "ミッションを作成",
+                "templateUnreadable": "テンプレートを読み込めなかったため、入力した値のみを使用しました。",
+                "templatePartial": "ミッションは作成されましたが、テンプレートの一部を適用できませんでした。"
             },
             "quickAdd": {
                 "label": "Start a new Mission",

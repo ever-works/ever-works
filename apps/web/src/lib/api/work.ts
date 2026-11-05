@@ -790,11 +790,18 @@ const APP_WORK_SWITCHES_TIMEOUT_MS = 3_000;
 
 export const workAPI = {
     // Get all works with pagination and search
-    getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
+    getAll: async (options?: {
+        limit?: number;
+        offset?: number;
+        search?: string;
+        /** APW-08 T40 — only Works of this kind (EW-P2-4's `?kind=`). */
+        kind?: string;
+    }) => {
         const params = new URLSearchParams();
         if (options?.limit !== undefined) params.append('limit', options.limit.toString());
         if (options?.offset !== undefined) params.append('offset', options.offset.toString());
         if (options?.search) params.append('search', options.search);
+        if (options?.kind) params.append('kind', options.kind);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<WorksResponse>(`/works${query}`);

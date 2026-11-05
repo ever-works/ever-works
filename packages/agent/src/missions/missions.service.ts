@@ -173,6 +173,51 @@ interface ResolvedTemplateInputs {
 
 const MISSION_TEMPLATE_DEFAULTS = new MissionTemplateManifestService();
 
+/**
+ * APW-08 T38 (review of #3077) — the guardrails a template may set, with the bounds the API's
+ * `WorkAgentGuardrailsDto` enforces on a person's own write. A manifest is repository content, so
+ * its guardrails are narrowed to these keys and ranges before they are stored (the parser keeps
+ * unknown keys for forward compatibility; the Mission row must not), as the clone path does.
+ */
+const TEMPLATE_GUARDRAIL_INT_BOUNDS: Record<string, readonly [number, number]> = {
+    maxWorksPerRun: [1, 25],
+    maxItemsPerWork: [1, 500],
+    maxBudgetCentsPerRun: [0, 1_000_000],
+    requireApprovalAboveBudgetCents: [0, 1_000_000],
+};
+const TEMPLATE_GUARDRAIL_FLAGS = [
+    'requireApprovalBeforeCreate',
+    'requireApprovalBeforeDelete',
+    'dryRunByDefault',
+] as const;
+
+function sanitizeTemplateGuardrails(raw: unknown): MissionGuardrailsOverride | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const source = raw as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const [key, [min, max]] of Object.entries(TEMPLATE_GUARDRAIL_INT_BOUNDS)) {
+        const value = source[key];
+        if (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max) {
+            result[key] = value;
+        }
+    }
+    for (const key of TEMPLATE_GUARDRAIL_FLAGS) {
+        if (typeof source[key] === 'boolean') result[key] = source[key];
+    }
+    return Object.keys(result).length > 0 ? (result as MissionGuardrailsOverride) : null;
+}
+
+/** The Task output a template may set: the two bounds only (never an Agent). */
+function sanitizeTemplateTaskOutput(raw: unknown): Record<string, unknown> | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const source = raw as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const key of ['tasksPerTick', 'openTasksCap']) {
+        if (source[key] !== undefined) result[key] = source[key];
+    }
+    return Object.keys(result).length > 0 ? result : null;
+}
+
 /** `{product}`, `{business}` and `{appWork}` filled in ONE pass, so an input holding braces stays text. */
 function fillTemplateText(text: string, inputs: ResolvedTemplateInputs): string {
     const values: Record<string, string> = {
@@ -698,7 +743,15 @@ export class MissionsService {
             input.type === MissionType.ONE_SHOT && input.schedule === undefined
                 ? { ...input, schedule: null }
                 : input;
-        return MISSION_TEMPLATE_DEFAULTS.applyDefaults(seed, manifest);
+        const merged = MISSION_TEMPLATE_DEFAULTS.applyDefaults(seed, manifest);
+        // What the template supplied (and only that) is narrowed to what a person may write.
+        if (input.guardrailsOverride === undefined && merged.guardrailsOverride !== undefined) {
+            merged.guardrailsOverride = sanitizeTemplateGuardrails(merged.guardrailsOverride);
+        }
+        if (input.taskOutput === undefined && merged.taskOutput !== undefined) {
+            merged.taskOutput = sanitizeTemplateTaskOutput(merged.taskOutput);
+        }
+        return merged;
     }
 
     /**
@@ -721,7 +774,7 @@ export class MissionsService {
                 message: 'templateInputs needs missionTemplateRepo to name a Mission template.',
             });
         }
-        if (template.manifest && !template.manifest.appWork) {
+        if (!template.config.takesAppWork || (template.manifest && !template.manifest.appWork)) {
             throw new BadRequestException({
                 code: 'templateInputsNotAccepted',
                 message: 'This Mission template does not take an App Work.',

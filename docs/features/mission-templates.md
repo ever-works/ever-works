@@ -54,7 +54,7 @@ You can also open the plain Mission form on a template: `/missions/new?template=
 
 ### Templates about an App Work
 
-A template whose manifest has an `appWork` section is about one [App Work](./app-works.md) you already run. Its **Use this Template** opens the Mission form with three more fields — **Product**, **Business** and **App Work** (one of your App Works) — and a summary of what the template sets. On create:
+A template whose manifest has an `appWork` section is about one [App Work](./app-works.md) you already run. Its **Use this Template** opens the Mission form with three more fields — **Product**, **Business** and **App Work** (one of your App Works) — and a summary of what the template sets. The form needs the template's manifest: when it cannot be read, **Use this Template** falls back to the plain prompt, and the Mission it creates says the template could not be read. On create:
 
 - the Mission's title is _Build my own {product} for {business} on top of {appWork}_ unless you type one;
 - the App Work is attached to the Mission with the template's relation (_Improves_ by default);
@@ -125,11 +125,11 @@ suggestedGoals:
 | `appWork.recommendedAppSpec`   | App spec rules the template recommends; offered as **Propose these rules**, never applied.        |
 | `suggestedGoals`               | Up to 10 draft delivery Goals (`title`, `goalKind: delivery`, 1–10 `dodCriteria`).                |
 
-The manifest is **optional** — a template with no `.works/mission.yml` is valid; the spawned Mission just gets all-defaults. Empty / null / comment-only manifests count as the all-defaults case, not a schema error.
+The manifest is **optional**: empty / null / comment-only manifests count as the all-defaults case, not a schema error. A manifest the platform cannot find is treated like one it cannot read — the Mission keeps the values you gave and the answer carries `templateManifestUnreadable` (a missing file and a repository your git connection cannot see look the same from outside).
+
+`{product}`, `{business}` and `{appWork}` in a suggested Goal's title or criteria are filled from the form. A template's guardrails and Task output are narrowed to what you could set yourself (the same keys and ranges as the Mission form; never an Agent).
 
 ### Forward compatibility
-
-`{product}`, `{business}` and `{appWork}` in a suggested Goal's title or criteria are filled from the form.
 
 Unknown top-level keys + unknown nested keys are **tolerated**, not rejected. A future template version can add fields without breaking older agent versions. The trade-off is that typos in field names pass silently — if a manifest field doesn't seem to do anything, double-check the spelling against the schema above.
 

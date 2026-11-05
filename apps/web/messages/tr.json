@@ -912,7 +912,9 @@
                 "proposeNeedsAppWork": "Önce bir App Work seçin.",
                 "rulesProposed": "App Work’te uygulama kurallarını değiştirmek için bir iş açıldı.",
                 "rulesFailed": "İş açılamadı. Tekrar deneyin.",
-                "create": "Görev oluştur"
+                "create": "Görev oluştur",
+                "templateUnreadable": "Şablon okunamadı; yalnızca girdiğiniz değerler kullanıldı.",
+                "templatePartial": "Görev oluşturuldu ancak şablonunun bir kısmı uygulanamadı."
             },
             "quickAdd": {
                 "label": "Start a new Mission",

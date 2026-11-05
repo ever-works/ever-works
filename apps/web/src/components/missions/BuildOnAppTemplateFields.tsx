@@ -93,6 +93,8 @@ export interface BuildOnAppTemplateFieldsProps {
     value: BuildOnAppTemplateValue;
     onChange: (next: BuildOnAppTemplateValue) => void;
     proposeRules: ProposeRulesFn;
+    /** The schedule the form will send; the summary line describes the template's own cadence only. */
+    schedule?: string | null;
     disabled?: boolean;
 }
 
@@ -109,13 +111,16 @@ export function BuildOnAppTemplateFields({
     value,
     onChange,
     proposeRules,
+    schedule = MONDAY_0800_UTC,
     disabled = false,
 }: BuildOnAppTemplateFieldsProps) {
     const t = useTranslations('dashboard.missionsPage.buildOnApp');
     const locale = useLocale();
     const [appWorkCount, setAppWorkCount] = useState<number | null>(null);
     const [proposing, setProposing] = useState(false);
-    const [proposed, setProposed] = useState(false);
+    // The App Works a change request was already filed for in this form (one per Work).
+    const [proposedFor, setProposedFor] = useState<readonly string[]>([]);
+    const proposed = value.appWorkId !== '' && proposedFor.includes(value.appWorkId);
 
     const defaults = manifest.defaults;
     const appWork = manifest.appWork;
@@ -126,7 +131,10 @@ export function BuildOnAppTemplateFields({
               )
             : null;
     const showSummary =
-        defaults?.cadence === MONDAY_0800_UTC && defaults.tasksPerTick !== null && amount !== null;
+        defaults?.cadence === MONDAY_0800_UTC &&
+        (schedule ?? '').trim() === MONDAY_0800_UTC &&
+        defaults.tasksPerTick !== null &&
+        amount !== null;
 
     const set = (patch: Partial<BuildOnAppTemplateValue>) => onChange({ ...value, ...patch });
 
@@ -137,14 +145,12 @@ export function BuildOnAppTemplateFields({
             return;
         }
         setProposing(true);
+        const workId = value.appWorkId;
         void (async () => {
             try {
-                const result = await proposeRules(
-                    value.appWorkId,
-                    buildProposeRulesRequest(appWork),
-                );
+                const result = await proposeRules(workId, buildProposeRulesRequest(appWork));
                 if (result.success) {
-                    setProposed(true);
+                    setProposedFor((previous) => [...previous, workId]);
                     toast.success(t('rulesProposed'));
                 } else {
                     toast.error(t('rulesFailed'));
@@ -242,8 +248,8 @@ export function BuildOnAppTemplateFields({
                             {t('suggestedGoals')}
                         </p>
                         <ul className="mt-1 list-disc ps-5" data-testid="build-on-app-goals">
-                            {manifest.suggestedGoals.map((goal) => (
-                                <li key={goal.title}>{fill(goal.title, value, null)}</li>
+                            {manifest.suggestedGoals.map((goal, index) => (
+                                <li key={index}>{fill(goal.title, value, null)}</li>
                             ))}
                         </ul>
                     </div>

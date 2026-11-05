@@ -273,6 +273,51 @@ defaults:
         },
     );
 
+    it('narrows a template’s guardrails and Task output to what a person may write (review of #3077)', async () => {
+        const manifest = `
+defaults:
+  outputMode: tasks
+  guardrails:
+    maxBudgetCentsPerRun: 1500
+    requireApprovalBeforeCreate: true
+    maxWorksPerRun: 9999
+    smuggled: { nested: true }
+  taskOutput:
+    tasksPerTick: 2
+    agentId: 11111111-1111-4111-8111-111111111111
+`;
+        const git = makeGitFacade({
+            'ever-works/starter-business-mission-template': utf8(manifest),
+        });
+        const { service } = serviceWith(git);
+        const dto = await service.create('u1', {
+            title: 'Narrowed',
+            description: 'The template asks for more than a person may set.',
+            type: MissionType.ONE_SHOT,
+            missionTemplateRepo: 'starter-business',
+        });
+        // Unknown keys and out-of-bounds values are dropped; the Agent never comes from a template.
+        expect(dto.guardrailsOverride).toEqual({
+            maxBudgetCentsPerRun: 1500,
+            requireApprovalBeforeCreate: true,
+        });
+        expect(dto.taskOutput).toEqual({ tasksPerTick: 2, openTasksCap: 3 });
+        expect(dto.warnings ?? []).toEqual([]);
+    });
+
+    it('a provider that does not answer in time counts as unreadable', async () => {
+        const getFileContent = jest.fn(() => new Promise<never>(() => undefined));
+        const reader = new MissionTemplateManifestReader(new MissionTemplateManifestService(), {
+            getFileContent,
+        } as unknown as GitFacadeService);
+        reader.timeoutMs = 20;
+        const read = await reader.read(
+            findMissionTemplateConfig('starter-business') as MissionTemplateConfig,
+            'u1',
+        );
+        expect(read).toMatchObject({ ok: false, reason: 'unreadable' });
+    });
+
     it('reads nothing for a value that is not a catalog template id', async () => {
         const git = makeGitFacade({});
         const { service } = serviceWith(git);

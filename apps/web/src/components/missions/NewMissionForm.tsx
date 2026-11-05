@@ -19,6 +19,21 @@ import {
 
 type CreateMissionFn = (input: CreateMissionInput) => Promise<Mission>;
 
+/** The `buildOnApp` copy for a create's template warnings, or `null` when there is none. */
+export function templateWarningKey(
+    warnings: readonly string[] | undefined,
+): 'templateUnreadable' | 'templatePartial' | null {
+    if (!warnings || warnings.length === 0) return null;
+    if (warnings.includes('templateManifestUnreadable')) return 'templateUnreadable';
+    if (
+        warnings.includes('templateWorkNotAttached') ||
+        warnings.includes('templateGoalsNotCreated')
+    ) {
+        return 'templatePartial';
+    }
+    return null;
+}
+
 /**
  * APW-08 T40 — the catalog Mission template the form was opened with (`?template=<id>`), and its
  * manifest as `GET /me/missions/templates/:id/manifest` answered it (`null` when unreadable).
@@ -139,6 +154,10 @@ export function NewMissionForm({
                         : {}),
                 });
                 toast.success(t('created'));
+                // APW-08 T40 (review of #3077) — a template that could not be read, or a part of it
+                // (the App Work link, a draft Goal) that could not be applied, is said, not hidden.
+                const warning = templateWarningKey(mission.warnings);
+                if (warning) toast.warning(tb(warning));
                 // Deliberately NOT cleared before navigation — the form stays
                 // locked until the route change unmounts it.
                 router.push(`${ROUTES.DASHBOARD_MISSIONS}/${mission.id}`);
@@ -263,6 +282,7 @@ export function NewMissionForm({
                         value={templateValue}
                         onChange={setTemplateValue}
                         proposeRules={proposeRules}
+                        schedule={type === 'scheduled' ? schedule : null}
                         disabled={isSubmitting}
                     />
                 )}

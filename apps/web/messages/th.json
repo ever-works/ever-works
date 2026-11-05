@@ -912,7 +912,9 @@
                 "proposeNeedsAppWork": "เลือก App Work ก่อน",
                 "rulesProposed": "เปิดงานบน App Work เพื่อเปลี่ยนกฎของแอปแล้ว",
                 "rulesFailed": "ไม่สามารถเปิดงานได้ ลองอีกครั้ง",
-                "create": "สร้างภารกิจ"
+                "create": "สร้างภารกิจ",
+                "templateUnreadable": "อ่านเทมเพลตไม่ได้ จึงใช้เฉพาะค่าที่คุณกรอก",
+                "templatePartial": "สร้างภารกิจแล้ว แต่ไม่สามารถใช้บางส่วนของเทมเพลตได้"
             },
             "quickAdd": {
                 "label": "Start a new Mission",

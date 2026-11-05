@@ -30,6 +30,12 @@ export const MISSION_TEMPLATE_MANIFEST_MAX_BYTES = 64 * 1024;
 /** The warning a Mission write answers when the template's manifest could not be used. */
 export const MISSION_TEMPLATE_MANIFEST_UNREADABLE = 'templateManifestUnreadable';
 
+/**
+ * How long a create or a form render waits for the provider (review of #3077): past it the
+ * manifest counts as unreadable, so a slow provider never holds a Mission create.
+ */
+export const MISSION_TEMPLATE_MANIFEST_READ_TIMEOUT_MS = 5_000;
+
 export type MissionTemplateManifestReadResult =
     | { ok: true; manifest: MissionTemplateManifest }
     | { ok: false; reason: 'unreadable' | 'invalid'; message: string };
@@ -45,6 +51,9 @@ export class MissionTemplateManifestReader {
         @Optional() private readonly gitFacade?: GitFacadeService,
     ) {}
 
+    /** Overridable by a test; production reads with {@link MISSION_TEMPLATE_MANIFEST_READ_TIMEOUT_MS}. */
+    timeoutMs = MISSION_TEMPLATE_MANIFEST_READ_TIMEOUT_MS;
+
     async read(
         template: MissionTemplateConfig,
         userId: string,
@@ -53,8 +62,9 @@ export class MissionTemplateManifestReader {
             return { ok: false, reason: 'unreadable', message: 'No git facade in this context.' };
         }
         let file: { content: string; encoding: string } | null;
+        let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-            file = await this.gitFacade.getFileContent(
+            const read = this.gitFacade.getFileContent(
                 template.owner,
                 template.repo,
                 MISSION_TEMPLATE_MANIFEST_PATH,
@@ -64,12 +74,23 @@ export class MissionTemplateManifestReader {
                 },
                 template.branch,
             );
+            const deadline = new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(
+                    () => reject(new Error(`No answer within ${this.timeoutMs} ms.`)),
+                    this.timeoutMs,
+                );
+            });
+            // A late answer after the deadline is dropped; its rejection must not go unhandled.
+            read.catch(() => undefined);
+            file = await Promise.race([read, deadline]);
         } catch (error) {
             return {
                 ok: false,
                 reason: 'unreadable',
                 message: error instanceof Error ? error.message : String(error),
             };
+        } finally {
+            if (timer) clearTimeout(timer);
         }
         if (!file || typeof file.content !== 'string') {
             return {

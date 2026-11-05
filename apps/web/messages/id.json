@@ -912,7 +912,9 @@
                 "proposeNeedsAppWork": "Pilih App Work terlebih dahulu.",
                 "rulesProposed": "Tugas untuk mengubah aturan aplikasi telah dibuka di App Work.",
                 "rulesFailed": "Tugas tidak dapat dibuka. Coba lagi.",
-                "create": "Buat Misi"
+                "create": "Buat Misi",
+                "templateUnreadable": "Template tidak dapat dibaca, jadi hanya nilai yang Anda masukkan yang digunakan.",
+                "templatePartial": "Misi telah dibuat, tetapi sebagian templatenya tidak dapat diterapkan."
             },
             "quickAdd": {
                 "label": "Start a new Mission",

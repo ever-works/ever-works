@@ -1444,7 +1444,9 @@
                 "proposeNeedsAppWork": "Choose an App Work first.",
                 "rulesProposed": "A Task to change the app rules was opened on the App Work.",
                 "rulesFailed": "Couldn’t open the Task. Try again.",
-                "create": "Create Mission"
+                "create": "Create Mission",
+                "templateUnreadable": "The template could not be read, so only the values you entered were used.",
+                "templatePartial": "The Mission was created, but part of its template could not be applied."
             },
             "menu": {
                 "chat": "Chat about it"

@@ -912,7 +912,9 @@
                 "proposeNeedsAppWork": "Escolha um App Work primeiro.",
                 "rulesProposed": "Uma tarefa para alterar as regras do app foi aberta no App Work.",
                 "rulesFailed": "Não foi possível abrir a tarefa. Tente novamente.",
-                "create": "Criar missão"
+                "create": "Criar missão",
+                "templateUnreadable": "Não foi possível ler o modelo, então só os valores que você informou foram usados.",
+                "templatePartial": "A missão foi criada, mas parte do modelo dela não pôde ser aplicada."
             },
             "quickAdd": {
                 "label": "Start a new Mission",

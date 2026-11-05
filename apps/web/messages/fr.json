@@ -958,7 +958,9 @@
                 "proposeNeedsAppWork": "Choisissez d’abord un App Work.",
                 "rulesProposed": "Une tâche pour modifier les règles de l’app a été ouverte sur l’App Work.",
                 "rulesFailed": "Impossible d’ouvrir la tâche. Réessayez.",
-                "create": "Créer la mission"
+                "create": "Créer la mission",
+                "templateUnreadable": "Le modèle n’a pas pu être lu : seules les valeurs que vous avez saisies ont été utilisées.",
+                "templatePartial": "La mission a été créée, mais une partie de son modèle n’a pas pu être appliquée."
             }
         },
         "memoryPage": {

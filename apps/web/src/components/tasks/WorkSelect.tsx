@@ -72,7 +72,12 @@ export function WorkSelect({
         let cancelled = false;
         void (async () => {
             try {
-                const res = await getWorks({ limit: WORK_PICKER_LIMIT });
+                // One kind asked for: the API filters, so the first page holds only that kind
+                // (an account with many Works of other kinds still sees its App Works).
+                const res = await getWorks({
+                    limit: WORK_PICKER_LIMIT,
+                    ...(kinds && kinds.length === 1 ? { kind: kinds[0] } : {}),
+                });
                 if (cancelled) return;
                 if (res.success) {
                     const loaded = res.works

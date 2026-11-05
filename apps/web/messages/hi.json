@@ -912,7 +912,9 @@
                 "proposeNeedsAppWork": "पहले कोई App Work चुनें।",
                 "rulesProposed": "ऐप नियम बदलने के लिए App Work पर एक Task खोला गया।",
                 "rulesFailed": "Task नहीं खुल सका। फिर से कोशिश करें।",
-                "create": "मिशन बनाएँ"
+                "create": "मिशन बनाएँ",
+                "templateUnreadable": "टेम्पलेट पढ़ा नहीं जा सका, इसलिए केवल आपके दर्ज किए गए मान इस्तेमाल हुए।",
+                "templatePartial": "मिशन बन गया, लेकिन उसके टेम्पलेट का कुछ हिस्सा लागू नहीं हो सका।"
             },
             "quickAdd": {
                 "label": "Start a new Mission",

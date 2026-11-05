@@ -912,7 +912,9 @@
                 "proposeNeedsAppWork": "Hãy chọn một App Work trước.",
                 "rulesProposed": "Đã mở một tác vụ trên App Work để thay đổi quy tắc ứng dụng.",
                 "rulesFailed": "Không thể mở tác vụ. Hãy thử lại.",
-                "create": "Tạo nhiệm vụ"
+                "create": "Tạo nhiệm vụ",
+                "templateUnreadable": "Không thể đọc mẫu, nên chỉ những giá trị bạn đã nhập được sử dụng.",
+                "templatePartial": "Đã tạo nhiệm vụ, nhưng không thể áp dụng một phần của mẫu."
             },
             "quickAdd": {
                 "label": "Start a new Mission",

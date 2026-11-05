@@ -38,6 +38,12 @@ export interface MissionTemplateConfig {
      * the git facade. Omitted = {@link MISSION_TEMPLATE_DEFAULT_GIT_PROVIDER}.
      */
     gitProvider?: string;
+    /**
+     * APW-08 T39 (review of #3077) — the template is about one App Work, so a create may carry
+     * `templateInputs`. Fixed here, not read from the manifest, so whether a template accepts them
+     * never depends on whether its manifest could be read. Omitted = `false`.
+     */
+    takesAppWork?: boolean;
 }
 
 /**
@@ -93,6 +99,7 @@ const BUILD_ON_OPEN_SOURCE_APP_MISSION_TEMPLATE: MissionTemplateConfig = {
     branch: 'main',
     syncBranches: ['main'],
     betaBranch: null,
+    takesAppWork: true,
 };
 
 export const MISSION_TEMPLATES: MissionTemplateConfig[] = [
