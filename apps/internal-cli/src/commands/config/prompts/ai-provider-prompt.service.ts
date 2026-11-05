@@ -478,18 +478,19 @@ export class AiProviderPromptService extends BasePromptService {
     }
 
     private getCustomModelExamples(providerName: string): string {
+        // Current ids checked 2026-11-05 (see AiProviderRegistryService).
         const examples: Record<string, string> = {
-            openai: 'Examples: gpt-5.2, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4o, gpt-4o-mini, o3-mini',
-            google: 'Examples: gemini-3-pro, gemini-3-flash, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash',
+            openai: 'Examples: gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra, gpt-6-luna, gpt-5.5, gpt-5.4',
+            google: 'Examples: gemini-4-argon, gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash-lite',
             anthropic:
-                'Examples: claude-opus-4-5-20251101, claude-sonnet-4.5, claude-haiku-4.5, claude-3-5-sonnet-latest',
+                'Examples: claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5, claude-fable-5-1',
             openrouter:
-                'Examples: openai/gpt-5.2, openai/gpt-5-mini, anthropic/claude-opus-4.5, google/gemini-3-flash, meta-llama/llama-3.3-70b-instruct:free',
-            ollama: 'Examples: llama3.3, llama3.2, qwen2.5, qwen2.5-coder, deepseek-r1, gemma2, phi4',
+                'Examples: openai/gpt-6.1-sol, anthropic/claude-opus-5.5, google/gemini-3.8-flash, x-ai/grok-4.7, deepseek/deepseek-v4-pro',
+            ollama: 'Examples: qwen3.5, gemma4, qwen3, gpt-oss, llama3.2',
             'lm-studio':
                 'Use the model id currently loaded in LM Studio (e.g. qwen2.5-7b-instruct, llama-3.2-3b-instruct)',
             vllm: 'Use the model id vLLM was launched with via --model (e.g. meta-llama/Llama-3.1-8B-Instruct)',
-            groq: 'Examples: openai/gpt-oss-120b, llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen-qwq-32b',
+            groq: 'Examples: openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.8-27b (preview)',
             custom: 'Enter any model name supported by your OpenAI-compatible endpoint',
         };
 

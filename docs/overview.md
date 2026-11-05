@@ -95,11 +95,11 @@ The template registry lives in `packages/agent/src/generators/website-generator/
 
 The platform supports 11 LLM providers, all accessed through an OpenAI-compatible interface:
 
-- **OpenAI** — GPT-5.1, GPT-5-nano, GPT-4o-mini
-- **Google** — Gemini 2.5 Flash, Gemini 2.5 Pro
-- **Anthropic** — Claude Opus 5.5, Claude Sonnet 4.5, Claude Haiku 4.5
-- **Groq** — Fast inference with open-weight models (`qwen/qwen3-32b` by default)
-- **Grok (xAI)** — `grok-4.7` and the rest of the xAI catalog
+- **OpenAI** — GPT-6 Astra, GPT-6.1 Sol, GPT-6 Luna
+- **Google** — Gemini 4 Argon, Gemini 3.8 Flash, Gemini 3.5 Flash-Lite
+- **Anthropic** — Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5
+- **Groq** — Fast inference with open-weight models (`openai/gpt-oss-120b` by default)
+- **Grok (xAI)** — `grok-4.7` (simple tier `grok-4.3`) and the rest of the xAI catalog
 - **Mistral** — Mistral Small, Medium, Large
 - **OpenRouter** — Multi-provider gateway (400+ models)
 - **Ollama** — Local model inference
@@ -107,7 +107,7 @@ The platform supports 11 LLM providers, all accessed through an OpenAI-compatibl
 - **vLLM** — Your own self-hosted vLLM OpenAI-compatible server (`http://localhost:8000/v1` by default)
 - **Vercel AI Gateway** — Multi-provider routing via Vercel
 
-See [AI & Generation](/ai-agents) for details, and [Bring Your Own AI Provider](./guides/bring-your-own-ai-provider.md) for the setup walkthrough.
+These are the plugins' default model families as of 2026-11-05 (sources: each plugin's README and the vendor model list it cites); availability depends on your account/plan/region, the picker accepts a custom model id and keeps existing saved selections. See [AI & Generation](/ai-agents) for details, and [Bring Your Own AI Provider](./guides/bring-your-own-ai-provider.md) for the setup walkthrough.
 
 ## Plugin System
 

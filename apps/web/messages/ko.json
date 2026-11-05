@@ -5532,7 +5532,7 @@
                 "workName": "워크 이름",
                 "generationPrompt": "Worker 프롬프트",
                 "modelOverride": "AI 모델 재정의",
-                "modelOverridePlaceholder": "예: openai/gpt-4.1 또는 openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "예: openai/gpt-6.1-sol 또는 openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "선택 사항입니다. 여기에 재정의하지 않으면 기본적으로 가져온 모델 또는 이전 모델을 사용합니다.",
                 "modelOverrideUnavailable": "사용 가능한 목록에서 모델을 선택하려면 먼저 구성된 AI 제공자를 선택하세요.",
                 "websiteTemplateHelperText": "워크 저장소가 처음 생성될 때 사용될 워크 템플릿을 선택하세요.",

@@ -292,7 +292,7 @@ name: Awesome Something
 initial_prompt: |
     A curated list of tools for X, grouped by use case,
     each with an original one-line description.
-model: gpt-5.1
+model: gpt-6.1-sol
 website_repo: my-org/awesome-something-website
 providers:
     ai: openai

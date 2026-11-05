@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
 import * as tar from 'tar';
 
 import { DEFAULT_CLI_VERSION } from '../types.js';
-import { detectPlatform, getBinaryPath } from './platform.js';
+import { detectPlatform, getBinaryPath, type PlatformInfo } from './platform.js';
 
 interface Logger {
 	log(message: string, ...args: unknown[]): void;
@@ -231,12 +231,112 @@ async function findBinary(rootDir: string, binaryName: string): Promise<string |
 	return null;
 }
 
+/**
+ * Since rust-v0.129.0 the Linux build no longer compiles bubblewrap in (rust-v0.128.0 still
+ * shipped `vendored_bwrap.rs`). `codex-rs/linux-sandbox` now execs a system `bwrap` from PATH or
+ * the bundled `codex-resources/bwrap` next to the executable, checked against a sha256 compiled
+ * into codex (`CODEX_BWRAP_SHA256`); with neither it panics "bubblewrap is unavailable". Each
+ * release publishes it as `bwrap-<target>.tar.gz`. Verified at tags rust-v0.128.0, rust-v0.129.0
+ * and rust-v0.166.0 on 2026-11-06.
+ */
+const FIRST_VERSION_WITH_SEPARATE_BWRAP: readonly [number, number, number] = [0, 129, 0];
+
+/** Whether this version, on this platform, needs the bundled bwrap installed next to it. */
+function needsBundledBwrap(version: string, platform: PlatformInfo): boolean {
+	if (!platform.bwrapAssetName) {
+		return false;
+	}
+	const match = /^(\d+)\.(\d+)\.(\d+)/u.exec(version);
+	if (!match) {
+		// Unknown version shape: require bwrap, so a release without it fails closed.
+		return true;
+	}
+	const parts = match.slice(1, 4).map(Number);
+	for (let index = 0; index < FIRST_VERSION_WITH_SEPARATE_BWRAP.length; index++) {
+		if (parts[index] !== FIRST_VERSION_WITH_SEPARATE_BWRAP[index]) {
+			return parts[index] > FIRST_VERSION_WITH_SEPARATE_BWRAP[index];
+		}
+	}
+	return true;
+}
+
+/** `<install dir>/codex-resources/bwrap`, the first place codex looks for its bundled bwrap. */
+function bundledBwrapPath(binaryPath: string): string {
+	return path.join(path.dirname(binaryPath), 'codex-resources', 'bwrap');
+}
+
+async function isExecutable(target: string): Promise<boolean> {
+	try {
+		await fs.access(target, fs.constants.X_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * A complete install has the codex binary and, where needed, the bundled bwrap. The binary is
+ * copied into place last, so its presence also marks a finished install.
+ */
+async function isCompleteInstall(binaryPath: string, withBwrap: boolean): Promise<boolean> {
+	return (await isExecutable(binaryPath)) && (!withBwrap || (await isExecutable(bundledBwrapPath(binaryPath))));
+}
+
+/**
+ * Before 2026-11-06 the plugin cached the binary as a bare file at the path that is now the
+ * install directory. Answers that file's path when one is there.
+ */
+async function findLegacyFlatBinary(installDir: string): Promise<string | null> {
+	const stat = await fs.lstat(installDir).catch(() => null);
+	return stat?.isFile() ? installDir : null;
+}
+
+/**
+ * Download one release asset into `tempDir` and verify it against the release's published
+ * SHA-256 before anything extracts, chmods or runs it.
+ *
+ * Security: fail closed when no checksum is available, and reject any mismatch. A MITM /
+ * compromised release that omits the digest and .sha256 asset, or swaps the archive, cannot get
+ * a trojaned binary installed and executed. Mirrors the opencode binary-manager.
+ */
+async function downloadVerifiedAsset(
+	release: ReleaseResponse,
+	asset: ReleaseAsset,
+	tempDir: string,
+	label: string,
+	logger?: Logger
+): Promise<string> {
+	logger?.log(`Downloading ${label} from ${asset.browser_download_url}...`);
+	const buffer = await fetchBuffer(asset.browser_download_url);
+	const archivePath = path.join(tempDir, asset.name);
+	await fs.writeFile(archivePath, buffer);
+
+	const checksum = await resolveChecksum(release.assets, asset.name);
+	if (!checksum) {
+		throw new Error(
+			`No checksum (digest or .sha256 asset) found for ${label} ${release.tag_name} (${asset.name}); ` +
+				`refusing to install an unverified binary.`
+		);
+	}
+	if (!(await verifySha256(archivePath, checksum))) {
+		throw new Error(`Checksum mismatch for ${label} ${release.tag_name} (${asset.name})`);
+	}
+	return archivePath;
+}
+
+async function extractSingleBinary(archivePath: string, outputDir: string, binaryName: string): Promise<string | null> {
+	await fs.mkdir(outputDir, { recursive: true });
+	await extractTarGz(archivePath, outputDir);
+	return findBinary(outputDir, binaryName);
+}
+
 export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger?: Logger): Promise<string> {
 	const platform = await detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
+	const installDir = path.dirname(binaryPath);
+	const withBwrap = needsBundledBwrap(version, platform);
 
-	try {
-		await fs.access(binaryPath, fs.constants.X_OK);
+	if (await isCompleteInstall(binaryPath, withBwrap)) {
 		const cachedBinary = await canExecute(binaryPath);
 		if (cachedBinary.ok) {
 			logger?.debug(`Codex binary already cached at ${binaryPath}`);
@@ -244,14 +344,12 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 		}
 
 		logger?.warn?.(`Cached Codex binary at ${binaryPath} is not runnable: ${cachedBinary.error}`);
-	} catch {
-		// continue with download
 	}
 
-	await fs.mkdir(path.dirname(binaryPath), { recursive: true });
+	await fs.mkdir(path.dirname(installDir), { recursive: true });
 
 	// Security: resolve the release via the GitHub API so we can obtain the published SHA-256
-	// for the asset and verify integrity before installing. The archive was previously fetched
+	// for each asset and verify integrity before installing. The archive was previously fetched
 	// from a constructed download URL and executed with ZERO integrity check, so a MITM /
 	// compromised release could ship a trojaned binary that we chmod'd and ran as a subprocess.
 	logger?.log(`Resolving Codex CLI ${version} release from GitHub...`);
@@ -263,38 +361,54 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 				`Check the upstream release assets for supported platforms.`
 		);
 	}
+	const bwrapAsset = withBwrap ? release.assets.find((asset) => asset.name === platform.bwrapAssetName) : undefined;
+	if (withBwrap && !bwrapAsset) {
+		throw new Error(
+			`No bubblewrap asset named ${platform.bwrapAssetName} found for Codex ${release.tag_name}. ` +
+				`Codex ${version} on Linux needs it (or a system bwrap) for its sandbox; refusing a partial install.`
+		);
+	}
 
-	logger?.log(`Downloading Codex CLI ${version} from ${archiveAsset.browser_download_url}...`);
-	const archiveBuffer = await fetchBuffer(archiveAsset.browser_download_url);
-	const tempDir = await fs.mkdtemp(path.join(path.dirname(binaryPath), 'codex-download-'));
+	const tempDir = await fs.mkdtemp(path.join(path.dirname(installDir), 'codex-download-'));
 	try {
-		const archivePath = path.join(tempDir, platform.assetName);
-		await fs.writeFile(archivePath, archiveBuffer);
+		// Verify every archive before extracting any of them.
+		const archivePath = await downloadVerifiedAsset(release, archiveAsset, tempDir, 'Codex', logger);
+		const bwrapArchivePath = bwrapAsset
+			? await downloadVerifiedAsset(release, bwrapAsset, tempDir, 'bubblewrap', logger)
+			: null;
 
-		// Security: fail closed when no checksum is available, and reject any mismatch BEFORE
-		// extracting/chmod/copy/exec. Mirrors the opencode binary-manager: a MITM / compromised
-		// release that omits the digest and .sha256 asset, or swaps the archive, cannot get a
-		// trojaned binary installed and executed. Hosts where the GitHub API is unreachable
-		// degrade to the system `codex` on PATH below, exactly as a network failure does today.
-		const checksum = await resolveChecksum(release.assets, platform.assetName);
-		if (!checksum) {
-			throw new Error(
-				`No checksum (digest or .sha256 asset) found for Codex ${release.tag_name} (${platform.assetName}); ` +
-					`refusing to install an unverified binary.`
-			);
-		}
-		const valid = await verifySha256(archivePath, checksum);
-		if (!valid) {
-			throw new Error(`Checksum mismatch for Codex ${release.tag_name} (${platform.assetName})`);
-		}
-
-		await extractTarGz(archivePath, tempDir);
-
-		const extractedBinary = await findBinary(tempDir, 'codex');
+		// Each archive gets its own extraction directory, so a lookup never matches the archive
+		// file itself (`codex-<target>.tar.gz` also starts with `codex-`).
+		const extractedBinary = await extractSingleBinary(archivePath, path.join(tempDir, 'extract-codex'), 'codex');
 		if (!extractedBinary) {
 			throw new Error(`Downloaded Codex archive did not contain a codex binary for ${platform.platformString}.`);
 		}
+		const extractedBwrap = bwrapArchivePath
+			? await extractSingleBinary(bwrapArchivePath, path.join(tempDir, 'extract-bwrap'), 'bwrap')
+			: null;
+		if (bwrapArchivePath && !extractedBwrap) {
+			throw new Error(
+				`Downloaded bubblewrap archive did not contain a bwrap binary for ${platform.platformString}.`
+			);
+		}
 
+		// A bare binary cached by an older plugin release sits where the install directory goes.
+		// Replace it only now that the new install is verified and extracted.
+		const legacyFlatBinary = await findLegacyFlatBinary(installDir);
+		if (legacyFlatBinary) {
+			await fs.rm(legacyFlatBinary, { force: true });
+		}
+
+		// Install bwrap first and the codex binary last: the binary's presence marks a complete
+		// install. Each version keeps its own bwrap, because codex checks it against the sha256
+		// it was built with.
+		await fs.mkdir(installDir, { recursive: true });
+		if (extractedBwrap) {
+			const bwrapPath = bundledBwrapPath(binaryPath);
+			await fs.mkdir(path.dirname(bwrapPath), { recursive: true });
+			await fs.copyFile(extractedBwrap, bwrapPath);
+			await fs.chmod(bwrapPath, 0o755);
+		}
 		await fs.chmod(extractedBinary, 0o755);
 		await fs.copyFile(extractedBinary, binaryPath);
 		await fs.chmod(binaryPath, 0o755);
@@ -327,14 +441,18 @@ export async function resolveExistingBinary(version: string = DEFAULT_CLI_VERSIO
 	const platform = await detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
 
-	try {
-		await fs.access(binaryPath, fs.constants.X_OK);
+	if (await isCompleteInstall(binaryPath, needsBundledBwrap(version, platform))) {
 		const cachedBinary = await canExecute(binaryPath);
 		if (cachedBinary.ok) {
 			return binaryPath;
 		}
-	} catch {
-		// No cached binary available.
+	}
+
+	// A bare binary cached by an older plugin release still serves `codex login` / `login status`,
+	// which run no sandbox; ensureBinary replaces it before the next generation run.
+	const legacyFlatBinary = await findLegacyFlatBinary(path.dirname(binaryPath));
+	if (legacyFlatBinary && (await isExecutable(legacyFlatBinary)) && (await canExecute(legacyFlatBinary)).ok) {
+		return legacyFlatBinary;
 	}
 
 	const systemBinary = await canExecute('codex');

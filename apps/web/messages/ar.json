@@ -5601,7 +5601,7 @@
                 "workName": "اسم المجلد",
                 "generationPrompt": "موجه الـWorker",
                 "modelOverride": "تجاوز نموذج الذكاء الاصطناعي",
-                "modelOverridePlaceholder": "مثل openai/gpt-4.1 أو openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "مثل openai/gpt-6.1-sol أو openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "اختياري. يستخدم النموذج المستورد أو السابق افتراضيًا إلا إذا قمت بتجاوزه هنا.",
                 "modelOverrideUnavailable": "اختر موفر AI مُكوّن أولاً لاختيار نموذج من القائمة المتاحة.",
                 "websiteTemplateHelperText": "اختر قالب العمل الذي سيُستَخدم عند إنشاء مستودع العمل لأول مرة.",

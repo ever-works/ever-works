@@ -71,7 +71,10 @@ async function main() {
 			'codex',
 			[
 				'exec',
-				...(process.env.CODEX_SMOKE_BYPASS_SANDBOX ? ['--dangerously-bypass-approvals-and-sandbox'] : ['--full-auto']),
+				// `--full-auto` was removed from `codex exec` in CLI 0.147.0; `--sandbox workspace-write` replaces it.
+				...(process.env.CODEX_SMOKE_BYPASS_SANDBOX
+					? ['--dangerously-bypass-approvals-and-sandbox']
+					: ['--sandbox', 'workspace-write']),
 				'--skip-git-repo-check',
 				prompt
 			],

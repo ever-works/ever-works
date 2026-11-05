@@ -5532,7 +5532,7 @@
                 "workName": "Mapnaam",
                 "generationPrompt": "Worker-prompt",
                 "modelOverride": "AI-model overschrijven",
-                "modelOverridePlaceholder": "bijv. openai/gpt-4.1 of openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "bijv. openai/gpt-6.1-sol of openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Optioneel. Gebruikt standaard het geïmporteerde of vorige model, tenzij je het hier overschrijft.",
                 "modelOverrideUnavailable": "Selecteer eerst een geconfigureerde AI‑provider om een model te kiezen uit de beschikbare lijst.",
                 "websiteTemplateHelperText": "Kies de Work-template die wordt gebruikt wanneer de Work-repository voor het eerst wordt aangemaakt.",

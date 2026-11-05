@@ -5532,7 +5532,7 @@
                 "workName": "Nazwa pracy",
                 "generationPrompt": "Prompt Worker",
                 "modelOverride": "Nadpisanie modelu AI",
-                "modelOverridePlaceholder": "np. openai/gpt-4.1 lub openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "np. openai/gpt-6.1-sol lub openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Opcjonalne. Domyślnie używa importowanego lub poprzedniego modelu, chyba że nadpiszesz go tutaj.",
                 "modelOverrideUnavailable": "Najpierw wybierz skonfigurowanego dostawcę AI, aby wybrać model z dostępnej listy.",
                 "websiteTemplateHelperText": "Wybierz szablon Pracy, który zostanie użyty przy pierwszym utworzeniu repozytorium Pracy.",

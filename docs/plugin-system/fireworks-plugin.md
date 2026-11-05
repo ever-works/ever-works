@@ -7,22 +7,23 @@ sidebar_position: 37
 
 # Fireworks AI Models via OpenRouter
 
-Ever Works does not ship a standalone Fireworks AI plugin. Fireworks AI is one of the inference providers that OpenRouter routes requests to when you select open-source models. This page explains how Fireworks AI fits into the Ever Works AI pipeline and how to take advantage of its fast inference.
+Ever Works does not ship a Fireworks AI plugin: there is no `fireworks` package under `packages/plugins/`. Fireworks AI is an inference host that OpenRouter can route requests to when you select open-weight models, and it also publishes one model of its own, `fireworks/ember-1`, which both the **OpenRouter** and the **Vercel AI Gateway** plugins can call. This page explains how Fireworks AI fits into the Ever Works AI pipeline.
 
 **Related source files:**
 
-| File                                                   | Purpose                           |
-| ------------------------------------------------------ | --------------------------------- |
-| `packages/plugins/openrouter/src/openrouter.plugin.ts` | OpenRouter AI provider plugin     |
-| `packages/plugin/src/ai/reasoning.utils.ts`            | Reasoning configuration utilities |
+| File                                                                 | Purpose                              |
+| -------------------------------------------------------------------- | ------------------------------------ |
+| `packages/plugins/openrouter/src/openrouter.plugin.ts`               | OpenRouter AI provider plugin        |
+| `packages/plugins/vercel-ai-gateway/src/vercel-ai-gateway.plugin.ts` | Vercel AI Gateway AI provider plugin |
+| `packages/plugin/src/ai/reasoning.utils.ts`                          | Reasoning configuration utilities    |
 
 ## What is Fireworks AI?
 
-Fireworks AI is a fast-inference platform for open-source AI models. It specializes in optimized serving of models like Llama, Mistral, and Qwen, often achieving faster response times than other providers. When you use open-source models through OpenRouter in Ever Works, Fireworks AI may be one of the backend providers handling your requests.
+Fireworks AI is a fast-inference platform for open-weight AI models. It specializes in optimized serving of open-weight models, and its research team also publishes its own model, Ember-1. When you use open-weight models through OpenRouter in Ever Works, Fireworks AI may be one of the backend providers handling your requests.
 
 ## How OpenRouter Uses Fireworks AI
 
-OpenRouter acts as a routing layer. When you select a model such as `meta-llama/llama-3.3-70b-instruct`, OpenRouter can route the request to whichever provider offers the best combination of price, speed, and availability -- including Fireworks AI.
+OpenRouter acts as a routing layer. When you select a model such as `openai/gpt-oss-120b`, OpenRouter can route the request to whichever provider offers the best combination of price, speed, and availability -- possibly Fireworks AI.
 
 ```mermaid
 graph TD
@@ -35,7 +36,7 @@ graph TD
     E --> H["Optimized Inference"]
 ```
 
-You do not choose Fireworks AI directly. Instead, you choose a model, and OpenRouter handles provider selection automatically.
+You do not choose Fireworks AI directly. Instead, you choose a model, and OpenRouter handles provider selection automatically. Ever Works' OpenRouter plugin has no setting to pin a host. The one exception is `fireworks/ember-1`, Fireworks' own model, which you select by its id.
 
 ### Provider Preferences
 
@@ -49,14 +50,28 @@ These preferences are applied at the OpenRouter level, outside of Ever Works con
 
 ## Models Commonly Served by Fireworks AI
 
-Fireworks AI typically serves open-source models. Common models that may be routed to Fireworks AI include:
+Models as of 2026-11-06 — source: the live lists [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) and [ai-gateway.vercel.sh/v1/models](https://ai-gateway.vercel.sh/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
-| Model ID (OpenRouter)               | Description        |
-| ----------------------------------- | ------------------ |
-| `meta-llama/llama-3.3-70b-instruct` | Meta Llama 3.3 70B |
-| `meta-llama/llama-4-scout`          | Meta Llama 4 Scout |
-| `mistralai/mistral-large`           | Mistral Large      |
-| `qwen/qwen-2.5-72b-instruct`        | Qwen 2.5 72B       |
+**Fireworks' own model.** Both lists carry exactly one Fireworks id:
+
+| Model ID            | Description                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fireworks/ember-1` | Ember-1, a reasoning model from Fireworks Research built on Kimi K3. 1,048,576 context, text and image input, tool calling; $3 / $15 per million input / output tokens on OpenRouter |
+
+Its reasoning is on by default (OpenRouter lists a default effort of `max`), and Ever Works' reasoning registry has no entry for it, so requests run at that default.
+
+**Open-weight models Fireworks AI may serve.** OpenRouter's model list does not say which hosts serve a model; each model's page on [openrouter.ai/models](https://openrouter.ai/models) does. Open-weight models present on the list on 2026-11-06 include:
+
+| Model ID (OpenRouter)         | Description           |
+| ----------------------------- | --------------------- |
+| `openai/gpt-oss-120b`         | OpenAI gpt-oss 120B   |
+| `openai/gpt-oss-20b`          | OpenAI gpt-oss 20B    |
+| `meta-llama/llama-4-maverick` | Meta Llama 4 Maverick |
+| `meta-llama/llama-4-scout`    | Meta Llama 4 Scout    |
+| `deepseek/deepseek-v4-pro`    | DeepSeek V4 Pro       |
+| `moonshotai/kimi-k3`          | Moonshot Kimi K3      |
+
+`meta-llama/llama-3.3-70b-instruct` is still listed but is an older model. `mistralai/mistral-large` and `qwen/qwen-2.5-72b-instruct`, which this page used to list, are older generations.
 
 ## Configuration in Ever Works
 
@@ -70,7 +85,7 @@ Since Fireworks AI is accessed transparently through OpenRouter, no special conf
 
 ```bash
 PLUGIN_OPENROUTER_API_KEY=sk-or-...
-PLUGIN_OPENROUTER_DEFAULT_MODEL=meta-llama/llama-3.3-70b-instruct
+PLUGIN_OPENROUTER_DEFAULT_MODEL=openai/gpt-oss-120b
 ```
 
 ## Performance Characteristics
@@ -92,28 +107,30 @@ Fireworks AI is known for fast inference times. This benefits Ever Works in seve
 | Ollama (local)                | Depends on hardware         | Free              |
 | OpenAI (direct)               | Standard                    | Per-token         |
 
-If raw inference speed is your top priority and you want open-source models, consider the **Groq** plugin as a direct alternative. Groq uses custom LPU hardware and offers the fastest inference for supported models.
+If raw inference speed is your top priority and you want open-weight models, consider the **Groq** plugin as a direct alternative. Groq uses custom LPU hardware; its plugin defaults to `openai/gpt-oss-120b` (simple tier `openai/gpt-oss-20b`) as of 2026-11-06.
 
 ## Tiered Strategy with Fireworks-Served Models
 
 ```mermaid
 graph LR
     subgraph "Cost-Optimized Pipeline"
-        S["Simple Tasks"] --> SM["llama-3.3-70b:free<br/>No cost"]
-        M["Standard Tasks"] --> MM["llama-3.3-70b<br/>Low cost, fast"]
-        C["Complex Tasks"] --> CM["llama-4-maverick<br/>Highest quality"]
+        S["Simple Tasks"] --> SM["gpt-oss-20b<br/>Lowest cost of the three"]
+        M["Standard Tasks"] --> MM["gpt-oss-120b<br/>Low cost, fast"]
+        C["Complex Tasks"] --> CM["deepseek-v4-pro<br/>Highest quality"]
     end
 ```
 
-| Tier     | Model                                    | Why                                     |
-| -------- | ---------------------------------------- | --------------------------------------- |
-| Simple   | `meta-llama/llama-3.3-70b-instruct:free` | Zero cost for tags and classifications  |
-| Standard | `meta-llama/llama-3.3-70b-instruct`      | Good quality, fast via Fireworks AI     |
-| Complex  | `meta-llama/llama-4-maverick`            | Best open-source quality for full pages |
+| Tier     | Model                      | Why                                                           |
+| -------- | -------------------------- | ------------------------------------------------------------- |
+| Simple   | `openai/gpt-oss-20b`       | $0.03 / $0.13 per million tokens for tags and classifications |
+| Standard | `openai/gpt-oss-120b`      | Good quality at $0.15 / $0.60                                 |
+| Complex  | `deepseek/deepseek-v4-pro` | Strong open-weight quality for full pages ($1.60 / $3.20)     |
+
+Prices are the `pricing` field of OpenRouter's model list on 2026-11-06, per million input / output tokens; what a request costs depends on the host OpenRouter routes it to. `meta-llama/llama-3.3-70b-instruct:free`, which this table used to recommend, is no longer listed. To use Fireworks' own model, set a tier to `fireworks/ember-1`.
 
 ## Capabilities
 
-Models served by Fireworks AI through OpenRouter support standard capabilities:
+Models served by Fireworks AI through OpenRouter support standard capabilities (per model, see OpenRouter's list):
 
 | Capability               | Supported       |
 | ------------------------ | --------------- |

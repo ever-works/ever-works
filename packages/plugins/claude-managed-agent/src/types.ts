@@ -28,7 +28,14 @@ export const FILES_API_BETA = 'files-api-2025-04-14';
 export const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 export const DEFAULT_POLL_INTERVAL_MS = 2000;
 export const DEFAULT_MAX_POLL_ATTEMPTS = 3600;
-export const DEFAULT_MODEL = 'claude-sonnet-4-6';
+/**
+ * Default Managed Agents model: Claude Sonnet 5.5 (models refresh 2026-11-05; supported per
+ * https://platform.claude.com/docs/en/managed-agents/agent-setup). Changing it moves every
+ * config that never saved a model onto the new default (decision B: no backfill, because Ever
+ * Works has no real users yet). Saved models are untouched, and the model is excluded from the
+ * agent config hash, so the switch does not recreate the persistent agent.
+ */
+export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 export const DEFAULT_WORKSPACE_PATH = '/workspace/ever-works';
 export const WORKSPACE_SEED_MANIFEST_MOUNT_PATH = '/mnt/session/uploads/ever-works-workspace-seed.json';
 
@@ -185,46 +192,88 @@ function buildClaudeModel(
 	};
 }
 
+/**
+ * Managed Agents model catalog, as of 2026-11-05. Sources:
+ * - https://platform.claude.com/docs/en/managed-agents/agent-setup (supported model ids)
+ * - https://platform.claude.com/docs/en/about-claude/models/overview (limits: 4.6 and later
+ *   have a 1M context and 128K output; 4.5 models 200K / 64K)
+ * - https://platform.claude.com/docs/en/about-claude/model-deprecations (retirements)
+ *
+ * The picker also accepts a custom id; a saved id is still accepted and passed through unchanged
+ * (Anthropic rejects retired ids at run time). Every id this
+ * plugin listed before stays, labelled "(legacy)" (decision 2). Limited-availability
+ * `claude-mythos-*` ids are not listed (decision 4). Other supported ids not listed here
+ * (`claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`, `claude-opus-4-8`,
+ * `claude-opus-4-5-20251101`) can still be entered as custom ids.
+ */
 export const CLAUDE_MANAGED_AGENT_SUPPORTED_MODELS: readonly AiModel[] = [
 	buildClaudeModel(
+		'claude-opus-5-5',
+		'Claude Opus 5.5',
+		'Most capable Claude model for complex reasoning and agentic coding.',
+		1000000,
+		128000
+	),
+	buildClaudeModel(
+		'claude-sonnet-5-5',
+		'Claude Sonnet 5.5',
+		'Best balance of speed, cost and intelligence for managed agent work. Default.',
+		1000000,
+		128000
+	),
+	buildClaudeModel(
+		'claude-haiku-5-5',
+		'Claude Haiku 5.5',
+		'Fastest, lowest-cost Claude model for lightweight managed agent runs.',
+		1000000,
+		128000
+	),
+	buildClaudeModel(
+		'claude-fable-5-1',
+		'Claude Fable 5.1',
+		'Frontier model with premium pricing ($10 / $50 per million input / output tokens); thinking is always on.',
+		1000000,
+		128000
+	),
+	buildClaudeModel(
 		'claude-opus-4-7',
-		'Claude Opus 4.7',
-		'Most capable generally available Claude model for complex reasoning and agentic coding.',
+		'Claude Opus 4.7 (legacy)',
+		'Earlier Opus generation, still served. Successor: claude-opus-5-5.',
 		1000000,
 		128000
 	),
 	buildClaudeModel(
 		'claude-opus-4-6',
-		'Claude Opus 4.6',
-		'Previous Opus generation with strong long-context reasoning and coding performance.',
+		'Claude Opus 4.6 (legacy)',
+		'Earlier Opus generation, still served. Successor: claude-opus-5-5.',
 		1000000,
 		128000
 	),
 	buildClaudeModel(
 		'claude-sonnet-4-6',
-		'Claude Sonnet 4.6',
-		'Best balance of speed and intelligence for managed agent work workflows.',
+		'Claude Sonnet 4.6 (legacy)',
+		'Previous default Sonnet, still served. Successor: claude-sonnet-5-5.',
 		1000000,
-		64000
+		128000
 	),
 	buildClaudeModel(
 		'claude-sonnet-4-5-20250929',
-		'Claude Sonnet 4.5',
-		'Stable earlier Sonnet 4.5 snapshot for teams that want that exact model version.',
-		1000000,
+		'Claude Sonnet 4.5 (legacy, retires 2026-11-30)',
+		'Deprecated; Anthropic retires it on 2026-11-30. Successor: claude-sonnet-5-5.',
+		200000,
 		64000
 	),
 	buildClaudeModel(
 		'claude-haiku-4-5',
-		'Claude Haiku 4.5',
-		'Convenient alias for the current Claude Haiku 4.5 release.',
+		'Claude Haiku 4.5 alias (legacy)',
+		'Anthropic API alias for claude-haiku-4-5-20251001. The Managed Agents docs list only the dated id; prefer it.',
 		200000,
 		64000
 	),
 	buildClaudeModel(
 		'claude-haiku-4-5-20251001',
-		'Claude Haiku 4.5 (2025-10-01)',
-		'Pinned Haiku 4.5 snapshot for lightweight managed agent runs.',
+		'Claude Haiku 4.5 (legacy)',
+		'Pinned Haiku 4.5 snapshot, still served. Successor: claude-haiku-5-5.',
 		200000,
 		64000
 	)

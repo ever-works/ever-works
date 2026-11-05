@@ -75,6 +75,18 @@ graph LR
 | Standard | `mistral-medium-latest` | Listings, summaries, content reformatting       |
 | Complex  | `mistral-large-latest`  | Full page generation, multi-step analysis       |
 
+Model defaults as of 2026-11-05 — source: [docs.mistral.ai/models](https://docs.mistral.ai/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+| Alias                   | Points to on 2026-11-05                                                           |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `mistral-small-latest`  | `mistral-small-2603` (Mistral Small 4, GA)                                        |
+| `mistral-medium-latest` | `mistral-medium-3-5` (deprecated 2026-10-31, retires 2027-04-30)                  |
+| `mistral-large-latest`  | `mistral-large-2512` (Mistral Large 3; deprecated 2026-10-31, retires 2027-04-30) |
+
+The default model, the `onLoad` bootstrap and `getDefaultModelId()` equal the simple tier, `mistral-small-latest`.
+
+**Default shift (2026-11-05): no default changed.** Configs that never saved a model keep using the `-latest` aliases above, and saved selections are kept. Mistral moves those aliases forward on its own, so the model behind an unsaved config can change without an Ever Works release. Today the medium and large aliases point at models deprecated on 2026-10-31; their suggested successor, `mistral-large-4`, is in Public Preview, and the defaults will be revisited when it is GA. To pin a model, save its dated id (for example `mistral-small-2603`).
+
 ### Environment Variables
 
 | Variable                       | Description                            |
@@ -156,7 +168,15 @@ protected override resolveConfig(settings?: PluginSettings): Partial<AiOperation
     if (s.apiKey && typeof s.apiKey === 'string') {
         config.apiKey = s.apiKey;
     }
+    // A saved default model reaches AiOperations, as it does for every other provider.
+    if (s.defaultModel && typeof s.defaultModel === 'string') {
+        config.model = s.defaultModel;
+    }
     if (s.baseUrl && typeof s.baseUrl === 'string') {
+        // SSRF guard: an unsafe host or scheme throws before the request is made.
+        if (!isSafeWebhookUrl(s.baseUrl)) {
+            throw new Error('Mistral base URL is not safe to call (SSRF guard blocked the destination host).');
+        }
         config.baseURL = s.baseUrl;
     }
     if (typeof s.temperature === 'number') {
@@ -169,7 +189,7 @@ protected override resolveConfig(settings?: PluginSettings): Partial<AiOperation
 }
 ```
 
-The resolved config is passed to `AiOperations` as overrides, taking precedence over the defaults set during `onLoad`.
+The resolved config is passed to `AiOperations` as overrides, taking precedence over the defaults set during `onLoad` (bootstrap model `mistral-small-latest`). A call without `options.model` therefore runs on the saved default model, not on the bootstrap model.
 
 ## Lifecycle
 

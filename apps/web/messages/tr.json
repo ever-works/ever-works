@@ -5532,7 +5532,7 @@
                 "workName": "İş Adı",
                 "generationPrompt": "Worker İstemi",
                 "modelOverride": "AI Modeli Geçersiz Kılma",
-                "modelOverridePlaceholder": "ör. openai/gpt-4.1 veya openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "ör. openai/gpt-6.1-sol veya openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "İsteğe bağlı. Burada geçersiz kılmadığınız sürece varsayılan olarak içe aktarılan veya önceki modeli kullanır.",
                 "modelOverrideUnavailable": "Kullanılabilir listeden bir model seçmek için önce yapılandırılmış bir AI sağlayıcısı seçin.",
                 "websiteTemplateHelperText": "İş deposu ilk oluşturulduğunda kullanılacak iş şablonunu seçin.",

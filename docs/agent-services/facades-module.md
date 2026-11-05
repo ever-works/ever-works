@@ -143,11 +143,13 @@ The primary interface for all AI operations. Implements `IAiFacade`.
 
 **Model routing**: The facade supports complexity-based model selection:
 
-| Complexity | Typical Models               | Use Case                                       |
-| ---------- | ---------------------------- | ---------------------------------------------- |
-| `simple`   | GPT-4o-mini, Claude Haiku    | Fast, cheap tasks (classification, extraction) |
-| `medium`   | GPT-4o, Claude Sonnet        | Standard generation tasks                      |
-| `complex`  | GPT-4o (latest), Claude Opus | Complex reasoning, long context                |
+| Complexity | Typical Models                 | Use Case                                       |
+| ---------- | ------------------------------ | ---------------------------------------------- |
+| `simple`   | GPT-6 Luna, Claude Haiku 5.5   | Fast, cheap tasks (classification, extraction) |
+| `medium`   | GPT-6.1 Sol, Claude Sonnet 5.5 | Standard generation tasks                      |
+| `complex`  | GPT-6 Astra, Claude Opus 5.5   | Complex reasoning, long context                |
+
+The typical models are the OpenAI and Anthropic plugins' tier defaults as of 2026-11-05 (sources: [developers.openai.com/api/docs/models](https://developers.openai.com/api/docs/models), [platform.claude.com models overview](https://platform.claude.com/docs/en/about-claude/models/overview)); each plugin's tier fields can be set to any model the account can use.
 
 **Auto-escalation**: If `askJson` fails validation with the initial model, it automatically retries with the next complexity tier. This handles cases where simpler models produce malformed JSON.
 

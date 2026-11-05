@@ -41,9 +41,18 @@ export const CLAUDE_CODE_DIST_URL =
 	'https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases';
 
 /**
- * Default CLI version to download
+ * Default CLI version to download: 2.1.311, the npm `stable` dist-tag on 2026-10-26
+ * (`npm view @anthropic-ai/claude-code dist-tags`; `<dist>/2.1.311/manifest.json` serves the
+ * same platform keys as 2.1.76). Opus 5.5 needs 2.1.280+, Sonnet 5.5 2.1.284+, Haiku 5.5
+ * 2.1.293+ and the `fable` alias 2.1.257+ (https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md).
  */
-export const DEFAULT_CLI_VERSION = '2.1.76';
+export const DEFAULT_CLI_VERSION = '2.1.311';
+
+/**
+ * Default model: the CLI's `sonnet` alias. With CLI 2.1.311 on the Anthropic API it resolves
+ * to Claude Sonnet 5.5 (https://code.claude.com/docs/en/model-config, checked 2026-11-05).
+ */
+export const DEFAULT_MODEL = 'sonnet';
 
 /**
  * Default maximum number of agentic turns for Claude Code

@@ -38,7 +38,7 @@ version: 2 # optional, advisory
 kind: directory # optional, defaults to "default"
 name: Awesome Chairs
 initial_prompt: A curated directory of ergonomic office chairs
-model: anthropic/claude-sonnet-4
+model: anthropic/claude-sonnet-5.5
 website_repo: ever-works/awesome-chairs-website
 schedule_cadence: weekly # hourly | daily | weekly | monthly
 deploy_provider: vercel

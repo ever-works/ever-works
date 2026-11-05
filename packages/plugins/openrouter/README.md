@@ -47,6 +47,22 @@ OpenRouter is the default AI provider. During work generation, it handles conten
 - **Temperature** (`temperature`, hidden) — sampling temperature, 0–2. Defaults to 0.7.
 - **Max Tokens** (`maxTokens`, hidden) — limits the length of each AI-generated response. Defaults to 4096.
 
+## Model defaults
+
+Model defaults as of 2026-11-05. Source: https://openrouter.ai/api/v1/models (each id was listed that day) and OpenAI's model guide https://developers.openai.com/api/docs/models.
+
+| Setting              | Default              | Env var                           |
+| -------------------- | -------------------- | --------------------------------- |
+| Default Model        | `openai/gpt-6.1-sol` | `PLUGIN_OPENROUTER_DEFAULT_MODEL` |
+| Simple Tasks Model   | `openai/gpt-6-luna`  | `PLUGIN_OPENROUTER_SIMPLE_MODEL`  |
+| Standard Tasks Model | `openai/gpt-6.1-sol` | `PLUGIN_OPENROUTER_MEDIUM_MODEL`  |
+| Complex Tasks Model  | `openai/gpt-6-astra` | `PLUGIN_OPENROUTER_COMPLEX_MODEL` |
+
+- **Model picker:** the picker lists OpenRouter's live models, including every vendor's current family (for example `anthropic/claude-opus-5.5`, `google/gemini-4-argon`, `x-ai/grok-4.7`). It also accepts a custom model id, and existing saved selections stay as they are.
+- **Availability:** depends on your OpenRouter account and region.
+- **Default shift:** these defaults replaced `openai/gpt-5-mini` (default, simple, medium) and `openai/gpt-5` (complex) on 2026-11-05. OpenAI shuts those ids down on 2026-12-11. A configuration that never saved a model now uses the new defaults. One that saved a model keeps it.
+- **Deployment overrides:** each tier can be overridden per deployment with the env vars above, for example to trade quality for cost.
+
 ## Troubleshooting
 
 | Symptom                                     | Likely cause                                                                                   | Fix                                                                                                                                                    |

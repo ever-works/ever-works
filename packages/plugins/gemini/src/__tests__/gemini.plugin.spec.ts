@@ -255,6 +255,20 @@ describe('GeminiPlugin', () => {
 			);
 		});
 
+		// Models refresh 2026-11-05: the default fixture saves the now-legacy gemini-2.5-flash;
+		// it must reach the CLI run unchanged (no rewrite to the new default).
+		it('should pass a previously saved model (gemini-2.5-flash) to the CLI run unchanged', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			await plugin.execute(work, request, existing);
+
+			const { executeGemini } = await import('../utils/process-runner');
+			expect(vi.mocked(executeGemini)).toHaveBeenCalledWith(
+				expect.objectContaining({ model: 'gemini-2.5-flash' })
+			);
+		});
+
 		it('should report progress ending at 100%', async () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);

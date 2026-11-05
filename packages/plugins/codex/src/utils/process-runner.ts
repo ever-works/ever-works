@@ -58,7 +58,10 @@ export function executeCodex(options: ExecuteOptions): {
 		if (options.bypassApprovalsAndSandbox) {
 			args.push('--dangerously-bypass-approvals-and-sandbox');
 		} else {
-			args.push('--full-auto');
+			// `--full-auto` was removed from `codex exec` in CLI 0.147.0 (openai/codex#36054); its
+			// documented successor is `--sandbox workspace-write`. Do not add `-a never`: exec
+			// rejects it and already defaults approvals to never.
+			args.push('--sandbox', 'workspace-write');
 		}
 		args.push('--skip-git-repo-check');
 		if (options.model) {

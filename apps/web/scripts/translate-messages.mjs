@@ -9,7 +9,10 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
-const DEFAULT_MODEL = 'x-ai/grok-4.1-fast';
+// x-ai/grok-4.1-fast is gone from https://openrouter.ai/api/v1/models; xAI retired the
+// grok-4-1-fast models on 2026-05-15 and redirects them to grok-4.3
+// (https://docs.x.ai/developers/migration/may-15-retirement, checked 2026-11-05).
+const DEFAULT_MODEL = 'x-ai/grok-4.3';
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
 const DEFAULT_CHUNK_BYTES = 12000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 12000;

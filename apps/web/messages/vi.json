@@ -5532,7 +5532,7 @@
                 "workName": "Tên Công việc",
                 "generationPrompt": "Prompt Worker",
                 "modelOverride": "Ghi đè mô hình AI",
-                "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "ví dụ: openai/gpt-6.1-sol hoặc openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Tùy chọn. Mặc định sử dụng mô hình đã nhập hoặc mô hình trước đó trừ khi bạn ghi đè ở đây.",
                 "modelOverrideUnavailable": "Hãy chọn một nhà cung cấp AI đã được cấu hình trước để chọn một model từ danh sách có sẵn.",
                 "websiteTemplateHelperText": "Chọn mẫu Công việc sẽ được dùng khi kho Công việc được tạo lần đầu.",

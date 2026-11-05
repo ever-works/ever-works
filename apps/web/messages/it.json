@@ -5532,7 +5532,7 @@
                 "workName": "Nome Lavori",
                 "generationPrompt": "Prompt del Worker",
                 "modelOverride": "Sovrascrittura modello AI",
-                "modelOverridePlaceholder": "es. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "es. openai/gpt-6.1-sol o openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Opzionale. Usa il modello importato o precedente per impostazione predefinita a meno che non lo sovrascriva qui.",
                 "modelOverrideUnavailable": "Seleziona prima un provider AI configurato per scegliere un modello dall'elenco disponibile.",
                 "websiteTemplateHelperText": "Scegli il modello Lavori che verrà utilizzato quando il repository Lavori viene creato per la prima volta.",

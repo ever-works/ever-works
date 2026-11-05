@@ -5601,7 +5601,7 @@
                 "workName": "Име на работата",
                 "generationPrompt": "Подсказка за Worker",
                 "modelOverride": "Презаписване на AI модел",
-                "modelOverridePlaceholder": "нпр. openai/gpt-4.1 или openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "нпр. openai/gpt-6.1-sol или openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Не задължително. По подразбиране използва импортирания или предишния модел, освен ако не го презапишете тук.",
                 "modelOverrideUnavailable": "Изберете първо конфигуриран доставчик на ИИ, за да изберете модел от наличния списък.",
                 "websiteTemplateHelperText": "Изберете шаблона на работата, който ще се използва при първоначалното създаване на репозитория на работата.",

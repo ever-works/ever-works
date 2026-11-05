@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnthropicPlugin } from '../anthropic.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
 
 vi.mock('@ever-works/plugin/ai', () => {
 	const MockAiOperations = vi.fn().mockImplementation(function () {
@@ -138,9 +139,13 @@ describe('AnthropicPlugin', () => {
 		const schemaDefault = (key: string): string =>
 			(plugin.settingsSchema.properties![key] as { default: string }).default;
 
+		// Models refresh 2026-11-05: widened from the default and complex tiers to
+		// all four, so a tier cannot default to a deprecated id (the medium tier's
+		// `claude-sonnet-4-5-20250929` retires 2026-11-30).
 		it('is a model id the Claude API accepts, in the settings schema', () => {
-			expect(VERIFIED_ACTIVE_CLAUDE_API_MODEL_IDS).toContain(schemaDefault('defaultModel'));
-			expect(VERIFIED_ACTIVE_CLAUDE_API_MODEL_IDS).toContain(schemaDefault('complexModel'));
+			for (const key of ['defaultModel', 'simpleModel', 'mediumModel', 'complexModel']) {
+				expect(VERIFIED_ACTIVE_CLAUDE_API_MODEL_IDS, key).toContain(schemaDefault(key));
+			}
 		});
 
 		it('is the same id in the settings schema, the onLoad bootstrap and getDefaultModelId()', async () => {
@@ -165,6 +170,103 @@ describe('AnthropicPlugin', () => {
 			for (const [key, prop] of Object.entries(props)) {
 				expect((prop as { default?: unknown }).default, key).not.toBe('claude-sonnet-4-5-20250514');
 			}
+		});
+	});
+
+	/**
+	 * Model defaults as of 2026-11-05 (models refresh). Every id was read on the
+	 * vendor's pages that day:
+	 *   https://platform.claude.com/docs/en/about-claude/models/overview
+	 *   https://platform.claude.com/docs/en/about-claude/model-deprecations
+	 * Each tier gets the vendor's current model for its role: simple = Haiku 5.5
+	 * (fastest), medium = Sonnet 5.5, complex = Opus 5.5 (the vendor's
+	 * recommended start). The default keeps its shape (it equals the complex
+	 * tier). Q176: the medium tier's previous id, `claude-sonnet-4-5-20250929`, is
+	 * deprecated and retires 2026-11-30. Update from those pages, never from memory.
+	 */
+	describe('model defaults (as of 2026-11-05)', () => {
+		const EXPECTED_TIER_DEFAULTS: Record<string, string> = {
+			defaultModel: 'claude-opus-5-5',
+			simpleModel: 'claude-haiku-5-5',
+			mediumModel: 'claude-sonnet-5-5',
+			complexModel: 'claude-opus-5-5'
+		};
+		const EXPECTED_BOOTSTRAP_MODEL = 'claude-opus-5-5';
+
+		/** Ids an earlier release shipped as tier defaults (still served; Sonnet 4.5 until 2026-11-30). */
+		const LEGACY_SAVED_MODELS: Record<string, string> = {
+			defaultModel: 'claude-sonnet-4-5-20250929',
+			simpleModel: 'claude-haiku-4-5-20251001',
+			mediumModel: 'claude-sonnet-4-5-20250929',
+			complexModel: 'claude-sonnet-4-5-20250929'
+		};
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'anthropic',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		const loadedAiOps = async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			return {
+				bootstrapModel: (MockAiOperations.mock.calls[0][0] as { model: string }).model,
+				aiOpsInstance: MockAiOperations.mock.results[0].value
+			};
+		};
+
+		it("defaults each tier to the vendor's current model for that role", () => {
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				expect(schemaDefault(key), key).toBe(id);
+			}
+		});
+
+		it('uses the default model for the onLoad bootstrap and getDefaultModelId()', async () => {
+			const { bootstrapModel, aiOpsInstance } = await loadedAiOps();
+
+			await plugin.validateConnection({ apiKey: 'sk-ant-test' });
+			const fallbackModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(fallbackModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(schemaDefault('defaultModel')).toBe(EXPECTED_BOOTSTRAP_MODEL);
+		});
+
+		it('lets a saved legacy id pass settings validation (no enum or pattern on the model fields)', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const key of Object.keys(LEGACY_SAVED_MODELS)) {
+				const prop = props[key] as Record<string, unknown>;
+				expect(prop.type, key).toBe('string');
+				expect(prop, key).not.toHaveProperty('enum');
+				expect(prop, key).not.toHaveProperty('const');
+				expect(prop, key).not.toHaveProperty('pattern');
+			}
+			expect(
+				validateSettingsConstraints({ apiKey: 'sk-ant-test', ...LEGACY_SAVED_MODELS }, props as never)
+			).toEqual([]);
+		});
+
+		it('sends a saved legacy id to AiOperations unchanged', async () => {
+			const { aiOpsInstance } = await loadedAiOps();
+			const settings = { apiKey: 'sk-ant-test', ...LEGACY_SAVED_MODELS };
+
+			await plugin.createChatCompletion({
+				model: 'claude-haiku-4-5-20251001',
+				messages: [{ role: 'user', content: 'hi' }],
+				settings
+			});
+			const [options, config] = aiOpsInstance.createChatCompletion.mock.calls[0];
+			expect(options.model).toBe('claude-haiku-4-5-20251001');
+			expect(config.model).toBe('claude-sonnet-4-5-20250929');
+
+			await plugin.validateConnection(settings);
+			const tested = aiOpsInstance.testConnection.mock.calls.map((call: unknown[]) => call[1]);
+			expect([...tested].sort()).toEqual(['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929']);
 		});
 	});
 

@@ -235,10 +235,13 @@ describe('ClaudeManagedAgentPlugin — persistent control plane (default)', () =
 		);
 
 		// Session pins the model via agent_with_overrides — no version churn.
+		// Intentional spec change (models refresh 2026-11-05): no model is saved here, so the
+		// session runs on DEFAULT_MODEL, which moved from claude-sonnet-4-6 to claude-sonnet-5-5
+		// (decision B: unsaved configs follow the new default, no backfill).
 		expect(sdkMocks.sessionsCreate.mock.calls[0][0].agent).toEqual({
 			type: 'agent_with_overrides',
 			id: 'agent_1',
-			model: 'claude-sonnet-4-6'
+			model: 'claude-sonnet-5-5'
 		});
 
 		// Cleanup: session archived, seed file removed, control plane kept.
@@ -252,6 +255,24 @@ describe('ClaudeManagedAgentPlugin — persistent control plane (default)', () =
 		expect(extractUsageLikePlatform(result.metrics as ManagedAgentPipelineMetrics)).toEqual({
 			total_tokens_used: 200,
 			total_cost: 2.5
+		});
+	});
+
+	// Models refresh 2026-11-05: a saved previous-generation id still reaches the session
+	// override unchanged, and the persistent agent is reused rather than recreated.
+	it('passes a previously saved model (claude-sonnet-4-6) to agentOverrides unchanged', async () => {
+		primeSingleSessionRun();
+		const plugin = new ClaudeManagedAgentPlugin();
+		const { context } = createContextStub({ apiKey: 'sk-test', model: 'claude-sonnet-4-6' });
+		await plugin.onLoad(context);
+
+		const result = await plugin.execute(WORK, { prompt: 'generate', config: {} } as never, EXISTING, execOptions());
+
+		expect(result.success).toBe(true);
+		expect(sdkMocks.sessionsCreate.mock.calls[0][0].agent).toEqual({
+			type: 'agent_with_overrides',
+			id: 'agent_1',
+			model: 'claude-sonnet-4-6'
 		});
 	});
 

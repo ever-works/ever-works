@@ -8,7 +8,7 @@ let capturedWatcherOptions: TaxonomyWatcherOptions | null = null;
 
 // Mock all utility modules
 vi.mock('../utils/binary-manager', () => ({
-	ensureBinary: vi.fn().mockResolvedValue('/tmp/opencode-generator/bin/opencode-v1.0.223-linux-x64')
+	ensureBinary: vi.fn().mockResolvedValue('/tmp/opencode-generator/bin/opencode-v1.19.5-linux-x64')
 }));
 
 vi.mock('../utils/workspace-manager', () => ({
@@ -116,7 +116,7 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 		services: {},
 		getSettings: vi.fn().mockResolvedValue(
 			settingsOverride ?? {
-				version: 'v1.0.223'
+				version: 'v1.19.5'
 			}
 		),
 		getResolvedSettings: vi.fn(),
@@ -180,7 +180,9 @@ describe('OpenCodePlugin', () => {
 	it('should define only hidden CLI version settings and use selectable ai-provider category', () => {
 		const props = plugin.settingsSchema.properties!;
 		expect(Object.keys(props)).toEqual(['version']);
-		expect(props.version.default).toBe('v1.0.223');
+		// Intentional spec change (models refresh 2026-11-05): the pin moved from v1.0.223 to
+		// v1.19.5, the GitHub "Latest" v1 release of anomalyco/opencode (2026-10-28).
+		expect(props.version.default).toBe('v1.19.5');
 		const manifest = plugin.getManifest();
 		expect(manifest.selectableProviderCategories).toContain('ai-provider');
 		expect(manifest.selectableProviderCategories).toContain('screenshot');

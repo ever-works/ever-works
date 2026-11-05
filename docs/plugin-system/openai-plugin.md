@@ -7,7 +7,7 @@ sidebar_position: 21
 
 # OpenAI AI Provider Plugin
 
-The OpenAI plugin connects Ever Works to OpenAI's API, providing access to models such as GPT-4o, GPT-4o mini, and text-embedding models. It extends `BaseAiProvider` and uses the shared `AiOperations` layer that wraps LangChain under the hood.
+The OpenAI plugin connects Ever Works to OpenAI's API, providing access to models such as GPT-6 Astra, GPT-6.1 Sol and GPT-6 Luna, plus OpenAI's embedding and transcription models. It extends `BaseAiProvider` and uses the shared `AiOperations` layer that wraps LangChain under the hood.
 
 **Source:** `packages/plugins/openai/src/openai.plugin.ts`
 
@@ -41,16 +41,22 @@ graph TD
 
 ### Settings Schema
 
-| Setting        | Type     | Required | Default                     | Scope    | Widget         | Description                                          |
-| -------------- | -------- | -------- | --------------------------- | -------- | -------------- | ---------------------------------------------------- |
-| `apiKey`       | `string` | Yes      | --                          | `user`   | --             | OpenAI API key. Secret.                              |
-| `defaultModel` | `string` | Yes      | `gpt-5.1`                   | `global` | `model-select` | Default model for all AI tasks.                      |
-| `simpleModel`  | `string` | No       | `gpt-5-nano`                | `global` | `model-select` | Model for tags, descriptions, classifications.       |
-| `mediumModel`  | `string` | No       | `gpt-4o-mini`               | `global` | `model-select` | Model for listings, summaries, reformatting.         |
-| `complexModel` | `string` | No       | `gpt-5.1`                   | `global` | `model-select` | Model for full page generation, multi-step analysis. |
-| `temperature`  | `number` | No       | `0.7`                       | --       | --             | Sampling temperature (0--2). Hidden.                 |
-| `maxTokens`    | `number` | No       | `4096`                      | --       | --             | Max tokens per response. Hidden.                     |
-| `baseUrl`      | `string` | No       | `https://api.openai.com/v1` | --       | --             | API endpoint. Hidden.                                |
+| Setting              | Type     | Required | Default                     | Scope    | Widget         | Description                                                                              |
+| -------------------- | -------- | -------- | --------------------------- | -------- | -------------- | ---------------------------------------------------------------------------------------- |
+| `apiKey`             | `string` | Yes      | --                          | `user`   | --             | OpenAI API key. Secret.                                                                  |
+| `defaultModel`       | `string` | Yes      | `gpt-6-astra`               | `global` | `model-select` | Default model for all AI tasks.                                                          |
+| `simpleModel`        | `string` | No       | `gpt-6-luna`                | `global` | `model-select` | Model for tags, descriptions, classifications.                                           |
+| `mediumModel`        | `string` | No       | `gpt-6.1-sol`               | `global` | `model-select` | Model for listings, summaries, reformatting.                                             |
+| `complexModel`       | `string` | No       | `gpt-6-astra`               | `global` | `model-select` | Model for full page generation, multi-step analysis.                                     |
+| `embeddingModel`     | `string` | No       | `text-embedding-3-small`    | `global` | `model-select` | Model for Knowledge Base semantic search.                                                |
+| `transcriptionModel` | `string` | No       | `whisper-1`                 | `global` | `model-select` | Speech-to-text model for Knowledge Base media ingest (env `OPENAI_TRANSCRIPTION_MODEL`). |
+| `temperature`        | `number` | No       | `0.7`                       | --       | --             | Sampling temperature (0--2). Hidden.                                                     |
+| `maxTokens`          | `number` | No       | `4096`                      | --       | --             | Max tokens per response. Hidden.                                                         |
+| `baseUrl`            | `string` | No       | `https://api.openai.com/v1` | --       | --             | API endpoint. Hidden.                                                                    |
+
+Model defaults as of 2026-11-05 — source: [developers.openai.com/api/docs/models](https://developers.openai.com/api/docs/models) (shutdown dates: [developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. The defaults moved from `gpt-5.1` (default and complex, shuts down 2027-04-01), `gpt-5-nano` (simple, shuts down 2026-12-11) and `gpt-4o-mini` (standard, shuts down 2027-01-14) to `gpt-6-astra`, `gpt-6-luna` and `gpt-6.1-sol`. A saved deprecated id is still sent to OpenAI unchanged, so switch away from it before its shutdown date. The embedding (`text-embedding-3-small`) and transcription (`whisper-1`) defaults are unchanged.
 
 ### Model Tiers
 
@@ -58,12 +64,12 @@ The plugin supports a tiered model system that maps task complexity to appropria
 
 ```mermaid
 graph LR
-    A[Simple Tasks] -->|gpt-5-nano| B[Tags, short descriptions]
-    C[Standard Tasks] -->|gpt-4o-mini| D[Listings, summaries]
-    E[Complex Tasks] -->|gpt-5.1| F[Full pages, analysis]
+    A[Simple Tasks] -->|gpt-6-luna| B[Tags, short descriptions]
+    C[Standard Tasks] -->|gpt-6.1-sol| D[Listings, summaries]
+    E[Complex Tasks] -->|gpt-6-astra| F[Full pages, analysis]
 ```
 
-This allows cost optimization: fast, inexpensive models handle simple classification tasks while more capable models are reserved for complex generation.
+This allows cost optimization: fast, inexpensive models handle simple classification tasks while more capable models are reserved for complex generation. GPT-6 Luna is OpenAI's model for cost-sensitive, high-volume work, GPT-6.1 Sol balances intelligence and cost, and GPT-6 Astra is the flagship and the most expensive of the three ($10 / $50 per million input / output tokens on 2026-11-05); pick a cheaper id for the default and complex tiers if cost matters more than quality.
 
 ## Capabilities
 
@@ -74,18 +80,20 @@ getCapabilities(): AiModelCapabilities {
     supportsStreaming: true,
     supportsToolCalling: true,
     supportsVision: true,
-    maxContextLength: 128000
+    maxContextLength: FALLBACK_CONTEXT_WINDOW // 128000
   };
 }
 ```
 
-| Capability        | Supported | Description                                        |
-| ----------------- | --------- | -------------------------------------------------- |
-| Structured Output | Yes       | JSON mode and function calling for typed responses |
-| Streaming         | Yes       | Server-sent events for real-time token delivery    |
-| Tool Calling      | Yes       | Function calling for agent-based workflows         |
-| Vision            | Yes       | Image understanding (GPT-4o and later models)      |
-| Max Context       | 128,000   | Maximum tokens in a single context window          |
+| Capability        | Supported | Description                                                                                                    |
+| ----------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| Structured Output | Yes       | JSON mode and function calling for typed responses                                                             |
+| Streaming         | Yes       | Server-sent events for real-time token delivery                                                                |
+| Tool Calling      | Yes       | Function calling for agent-based workflows                                                                     |
+| Vision            | Yes       | Image understanding (GPT-4o and later models)                                                                  |
+| Max Context       | 128,000   | Plugin-wide fallback hint, used only when neither the live model list nor the catalogue knows a model's window |
+
+`FALLBACK_CONTEXT_WINDOW` stays at 128,000, the smallest window of the models a config may still name (`gpt-4o` / `gpt-4o-mini`), because the AI facade also uses it as the output ceiling in its pre-flight cost check. The GPT-6 family's own 1,050,000-token window comes from the live model list.
 
 ## Core Methods
 
@@ -137,7 +145,7 @@ The `resolveConfig()` method (from `BaseAiProvider`) merges settings into a fina
 // Conceptual flow
 const resolvedConfig = {
 	apiKey: settings.apiKey,
-	model: options.model || settings.defaultModel || 'gpt-5-nano',
+	model: options.model || settings.defaultModel || 'gpt-6-luna', // bootstrap model from onLoad
 	temperature: settings.temperature || 0.7,
 	maxTokens: settings.maxTokens || 4096,
 	baseURL: settings.baseUrl || 'https://api.openai.com/v1',
@@ -162,7 +170,7 @@ On load, the plugin creates an `AiOperations` instance with placeholder values:
 ```typescript
 this.aiOps = new AiOperations({
 	apiKey: '', // Provided per-request from user settings
-	model: 'gpt-5-nano',
+	model: BOOTSTRAP_MODEL, // 'gpt-6-luna', also returned by getDefaultModelId()
 	temperature: 0.7,
 	baseURL: 'https://api.openai.com/v1',
 	maxTokens: 4096,
@@ -208,11 +216,11 @@ sequenceDiagram
 
 ## Comparison with Other AI Providers
 
-| Feature       | OpenAI      | Anthropic         |
-| ------------- | ----------- | ----------------- |
-| Max Context   | 128K tokens | 200K tokens       |
-| Embeddings    | Yes         | No                |
-| Streaming     | Yes         | Yes               |
-| Tool Calling  | Yes         | Yes               |
-| Vision        | Yes         | Yes               |
-| Default Model | gpt-5.1     | claude-sonnet-4-5 |
+| Feature       | OpenAI                                                                 | Anthropic       |
+| ------------- | ---------------------------------------------------------------------- | --------------- |
+| Max Context   | 128K tokens (fallback hint; GPT-6 family 1,050,000 from the live list) | 200K tokens     |
+| Embeddings    | Yes                                                                    | No              |
+| Streaming     | Yes                                                                    | Yes             |
+| Tool Calling  | Yes                                                                    | Yes             |
+| Vision        | Yes                                                                    | Yes             |
+| Default Model | gpt-6-astra                                                            | claude-opus-5-5 |

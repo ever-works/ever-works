@@ -5532,7 +5532,7 @@
                 "workName": "Nome do Trabalho",
                 "generationPrompt": "Prompt do Worker",
                 "modelOverride": "Substituição de Modelo de IA",
-                "modelOverridePlaceholder": "ex.: openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "ex.: openai/gpt-6.1-sol ou openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Opcional. Usa o modelo importado ou anterior por padrão, a menos que você o substitua aqui.",
                 "modelOverrideUnavailable": "Selecione primeiro um provedor de IA configurado para escolher um modelo da lista disponível.",
                 "websiteTemplateHelperText": "Escolha o modelo de Trabalho que será usado quando o repositório do Trabalho for criado pela primeira vez.",

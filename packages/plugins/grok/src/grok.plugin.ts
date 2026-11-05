@@ -16,12 +16,22 @@ import type {
 } from '@ever-works/plugin';
 
 /**
- * The model every tier defaults to. `onLoad` and `getDefaultModelId()` read it
- * too, so the three cannot drift apart. xAI's models page
- * (https://docs.x.ai/developers/models, checked 2026-10-28) recommends Grok 4.7
- * for general use and no longer lists `grok-2-latest`, the old default.
+ * The default model, also the medium and complex tiers'. `onLoad` and
+ * `getDefaultModelId()` read it too, so the three cannot drift apart. xAI's
+ * models page (https://docs.x.ai/developers/models, checked 2026-10-28 and
+ * 2026-11-05) recommends Grok 4.7 for general use and no longer lists
+ * `grok-2-latest`, the old default.
  */
 const DEFAULT_MODEL = 'grok-4.7';
+
+/**
+ * The simple tier, as of 2026-11-05: Grok 4.3, which the same page describes as
+ * "Fast, reliable" ($1.25 / $2.50 per million tokens, 1M context), for the
+ * vendor's small/cheap role. The other tiers stay on Grok 4.7. A config that
+ * saved another id keeps it; only configs that never saved a simple-tier model
+ * move to this default (owner decision, 2026-11-05).
+ */
+const SIMPLE_MODEL = 'grok-4.3';
 
 /**
  * Grok (xAI) AI provider plugin
@@ -61,7 +71,7 @@ export class GrokPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: DEFAULT_MODEL,
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},

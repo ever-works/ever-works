@@ -22,6 +22,21 @@ import type { AiOperationsConfig } from '@ever-works/plugin/ai';
 import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /**
+ * Tier defaults: Mistral's `-latest` aliases, which the vendor moves forward on
+ * its own. As of 2026-11-05 (https://docs.mistral.ai/models):
+ *   mistral-small-latest  → mistral-small-2603 (Small 4, GA)
+ *   mistral-medium-latest → mistral-medium-3-5, deprecated 2026-10-31, retires 2027-04-30
+ *   mistral-large-latest  → mistral-large-2512 (Large 3), deprecated 2026-10-31, retires 2027-04-30
+ * The suggested successor, mistral-large-4, is in Public Preview, so the
+ * defaults stay on the aliases until it is GA. The default model, the onLoad
+ * bootstrap and getDefaultModelId() equal the simple tier.
+ */
+const SIMPLE_MODEL = 'mistral-small-latest';
+const MEDIUM_MODEL = 'mistral-medium-latest';
+const COMPLEX_MODEL = 'mistral-large-latest';
+const DEFAULT_MODEL = SIMPLE_MODEL;
+
+/**
  * Mistral AI provider plugin
  *
  * Provides AI capabilities through the Mistral API, which offers
@@ -55,7 +70,7 @@ export class MistralPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'mistral-small-latest',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_MISTRAL_DEFAULT_MODEL'
@@ -64,7 +79,7 @@ export class MistralPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'mistral-small-latest',
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_MISTRAL_SIMPLE_MODEL'
@@ -73,7 +88,7 @@ export class MistralPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'mistral-medium-latest',
+				default: MEDIUM_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_MISTRAL_MEDIUM_MODEL'
@@ -82,7 +97,7 @@ export class MistralPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'mistral-large-latest',
+				default: COMPLEX_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_MISTRAL_COMPLEX_MODEL'
@@ -129,7 +144,7 @@ export class MistralPlugin extends BaseAiProvider {
 
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'mistral-small-latest',
+			model: DEFAULT_MODEL,
 			baseURL: 'https://api.mistral.ai/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -147,7 +162,7 @@ export class MistralPlugin extends BaseAiProvider {
 	// BaseAiProvider abstract implementations
 
 	protected getDefaultModelId(): string {
-		return 'mistral-small-latest';
+		return DEFAULT_MODEL;
 	}
 
 	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
@@ -274,6 +289,14 @@ export class MistralPlugin extends BaseAiProvider {
 
 		if (s.apiKey && typeof s.apiKey === 'string') {
 			config.apiKey = s.apiKey;
+		}
+
+		// A saved default model must reach AiOperations, as it does for every
+		// other provider through BaseAiProvider.resolveConfig. This override used
+		// to drop it, so a call without `options.model` ran on the bootstrap model
+		// instead of the one the user saved.
+		if (s.defaultModel && typeof s.defaultModel === 'string') {
+			config.model = s.defaultModel;
 		}
 
 		if (s.baseUrl && typeof s.baseUrl === 'string') {

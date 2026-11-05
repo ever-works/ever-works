@@ -58,6 +58,10 @@ The plugin talks to vLLM through its OpenAI-compatible `/v1` API endpoint. vLLM 
 
 The `apiKey` field is marked `x-secret`, so a real token is stored encrypted. It defaults to vLLM's documented `EMPTY` placeholder, which an unsecured server accepts. Model fields use `x-widget: model-select` and have **no hardcoded default** — set them to the model id vLLM was launched with.
 
+Models as of 2026-11-05: there is no built-in default model. Use the model your server was started with (`vllm serve <model>`); the picker lists it once the connection works, accepts a custom model id, and keeps existing saved selections. See [docs.vllm.ai supported models](https://docs.vllm.ai/en/latest/models/supported_models.html) for the architectures vLLM supports.
+
+**Default shift (2026-11-05): no default changed.** The 2026-11-05 models refresh leaves this plugin as it was: there is no default to move, and saved selections are kept. Before a model is saved, the `onLoad` bootstrap and `getDefaultModelId()` use the placeholder `local-model`.
+
 ### Required Fields
 
 - `baseUrl` — the vLLM server address

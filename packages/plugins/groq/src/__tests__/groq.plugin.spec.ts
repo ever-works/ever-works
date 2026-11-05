@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GroqPlugin } from '../groq.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
 
 vi.mock('@ever-works/plugin/ai', () => {
 	const MockAiOperations = vi.fn().mockImplementation(function () {
@@ -95,6 +96,122 @@ describe('GroqPlugin', () => {
 			for (const [key, prop] of Object.entries(props)) {
 				expect((prop as any).title, `${key} should have a title`).toBeDefined();
 			}
+		});
+	});
+
+	/**
+	 * Model defaults as of 2026-11-05 (models refresh). Every id was read on the
+	 * vendor's pages that day:
+	 *   https://console.groq.com/docs/models
+	 *   https://console.groq.com/docs/deprecations
+	 * Fix: every tier defaulted to `qwen/qwen3-32b`, which Groq retired on
+	 * 2026-07-17 (successor gpt-oss-120b), so every unsaved config was broken.
+	 * Each tier now gets a production model for its role: simple =
+	 * openai/gpt-oss-20b, medium and complex = openai/gpt-oss-120b (featured).
+	 * The default keeps its shape (it equals the medium and complex tiers).
+	 * Update from those pages, never from memory.
+	 */
+	describe('model defaults (as of 2026-11-05)', () => {
+		const EXPECTED_TIER_DEFAULTS: Record<string, string> = {
+			defaultModel: 'openai/gpt-oss-120b',
+			simpleModel: 'openai/gpt-oss-20b',
+			mediumModel: 'openai/gpt-oss-120b',
+			complexModel: 'openai/gpt-oss-120b'
+		};
+		const EXPECTED_BOOTSTRAP_MODEL = 'openai/gpt-oss-120b';
+
+		/** The id every tier shipped with until this refresh (retired by Groq on 2026-07-17). */
+		const LEGACY_SAVED_MODELS: Record<string, string> = {
+			defaultModel: 'qwen/qwen3-32b',
+			simpleModel: 'qwen/qwen3-32b',
+			mediumModel: 'qwen/qwen3-32b',
+			complexModel: 'qwen/qwen3-32b'
+		};
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'groq',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		const loadedAiOps = async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			return {
+				bootstrapModel: (MockAiOperations.mock.calls[0][0] as { model: string }).model,
+				aiOpsInstance: MockAiOperations.mock.results[0].value
+			};
+		};
+
+		it("defaults each tier to the vendor's current model for that role", () => {
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				expect(schemaDefault(key), key).toBe(id);
+			}
+		});
+
+		it('uses the default model for the onLoad bootstrap and getDefaultModelId()', async () => {
+			const { bootstrapModel, aiOpsInstance } = await loadedAiOps();
+
+			// No `defaultModel` in the settings: validateConnection falls back to
+			// getDefaultModelId(), the path every unsaved config takes.
+			await plugin.validateConnection({ apiKey: 'gsk-test' });
+			const fallbackModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(fallbackModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(schemaDefault('defaultModel')).toBe(EXPECTED_BOOTSTRAP_MODEL);
+		});
+
+		it('never defaults any field to the retired qwen/qwen3-32b', () => {
+			for (const [key, prop] of Object.entries(plugin.settingsSchema.properties!)) {
+				expect((prop as { default?: unknown }).default, key).not.toBe('qwen/qwen3-32b');
+			}
+		});
+
+		it('lets a saved legacy id pass settings validation (no enum or pattern on the model fields)', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const key of Object.keys(LEGACY_SAVED_MODELS)) {
+				const prop = props[key] as Record<string, unknown>;
+				expect(prop.type, key).toBe('string');
+				expect(prop, key).not.toHaveProperty('enum');
+				expect(prop, key).not.toHaveProperty('const');
+				expect(prop, key).not.toHaveProperty('pattern');
+			}
+			expect(validateSettingsConstraints({ apiKey: 'gsk-test', ...LEGACY_SAVED_MODELS }, props as never)).toEqual(
+				[]
+			);
+		});
+
+		// A retired id is still sent as saved: the vendor's error then tells the
+		// user to pick another model. The plugin never rewrites a saved selection.
+		it('sends a saved legacy id to AiOperations unchanged', async () => {
+			const { aiOpsInstance } = await loadedAiOps();
+			const settings = { apiKey: 'gsk-test', ...LEGACY_SAVED_MODELS };
+
+			await plugin.createChatCompletion({
+				model: 'qwen/qwen3-32b',
+				messages: [{ role: 'user', content: 'hi' }],
+				settings
+			});
+			const [options, config] = aiOpsInstance.createChatCompletion.mock.calls[0];
+			expect(options.model).toBe('qwen/qwen3-32b');
+			expect(config.model).toBe('qwen/qwen3-32b');
+
+			await plugin.validateConnection(settings);
+			const tested = aiOpsInstance.testConnection.mock.calls.map((call: unknown[]) => call[1]);
+			expect(tested).toEqual(['qwen/qwen3-32b']);
+		});
+	});
+
+	describe('manifest text', () => {
+		it('names the models Groq serves today, not Mixtral', () => {
+			const readme = plugin.getManifest().readme;
+			expect(readme).not.toMatch(/Mixtral/);
+			expect(readme).toMatch(/gpt-oss/);
 		});
 	});
 

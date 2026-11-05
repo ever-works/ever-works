@@ -58,6 +58,10 @@ The plugin talks to LM Studio through its OpenAI-compatible `/v1` API endpoint, 
 
 Model fields use the `x-widget: model-select` extension, which renders a model dropdown in the dashboard UI populated by calling `listModels()` against the configured server. Unlike cloud providers, **the model fields ship without a hardcoded default** — LM Studio serves whatever model you have loaded, so you select it after the connection succeeds.
 
+Models as of 2026-11-05: there is no built-in default model. The picker lists whatever your LM Studio server has loaded (`GET /v1/models`), accepts a custom model id, and keeps existing saved selections; see [lmstudio.ai/models](https://lmstudio.ai/models) for the models LM Studio can download. Availability depends on the models you load.
+
+**Default shift (2026-11-05): no default changed.** The 2026-11-05 models refresh leaves this plugin as it was: there is no default to move, and saved selections are kept. Before a model is saved, the `onLoad` bootstrap and `getDefaultModelId()` use the placeholder `local-model`.
+
 ### Required Fields
 
 - `baseUrl` — the LM Studio server address

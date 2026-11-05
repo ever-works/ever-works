@@ -5532,7 +5532,7 @@
                 "workName": "Имя работы",
                 "generationPrompt": "Промпт Worker",
                 "modelOverride": "Переопределение модели ИИ",
-                "modelOverridePlaceholder": "например, openai/gpt-4.1 или openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "например, openai/gpt-6.1-sol или openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Необязательно. По умолчанию используется импортированная или предыдущая модель, если вы не переопределите её здесь.",
                 "modelOverrideUnavailable": "Сначала выберите настроенного провайдера ИИ, чтобы выбрать модель из доступного списка。",
                 "websiteTemplateHelperText": "Выберите шаблон работы, который будет использоваться при первом создании репозитория работы.",

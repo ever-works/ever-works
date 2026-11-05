@@ -105,7 +105,7 @@ The masked format shows the first 3 and last 4 characters of the original value 
 					{
 						"pluginId": "openai",
 						"enabled": true,
-						"settings": { "model": "gpt-4o" },
+						"settings": { "model": "gpt-6.1-sol" },
 						"secretSettings": {
 							"apiKey": "MASKED:sk-***abcd"
 						}
