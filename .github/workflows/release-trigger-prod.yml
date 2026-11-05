@@ -60,7 +60,7 @@ jobs:
         working-directory: packages/tasks
         run: pnpm prepare:plugins
 
-      - name: ðŸš€ Deploy Trigger.dev
+      - name: 🚀 Deploy Trigger.dev
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}

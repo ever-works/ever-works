@@ -253,7 +253,14 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
+      # shellcheck gates at `warning` and up. The 74 info/style findings it also
+      # reports today (70 of them SC2086, unquoted variables, mostly in the
+      # legacy DigitalOcean deploy workflows) are opinions about scripts that
+      # work; warnings are the likely bugs, and there were none left when this
+      # job was added. Run `SHELLCHECK_OPTS= actionlint` locally to see all.
       - name: actionlint
+        env:
+          SHELLCHECK_OPTS: --severity=warning
         run: |
           shellcheck --version | head -2 || echo "shellcheck not installed: run: scripts are not checked"
           actionlint -color
@@ -535,6 +542,8 @@ jobs:
             local log="/tmp/guard-$label.log"
             rm -f "$log"
             if [ -n "$extra" ]; then
+              # `$extra` is a whole `NAME=value` assignment, which `export` applies as given.
+              # shellcheck disable=SC2163
               ( export "$extra"; pnpm exec next start -p "$port" ) >"$log" 2>&1 &
             else
               ( pnpm exec next start -p "$port" ) >"$log" 2>&1 &
@@ -695,7 +704,7 @@ jobs:
         working-directory: apps/internal-cli
         # NODE_ENV=test signals this is a test-context bootstrap (the CLI uses
         # in-memory sqlite here, not a real database). C-07 PR-B made
-        # `autoMigrate()` default-off everywhere except NODE_ENV=test â€” without
+        # `autoMigrate()` default-off everywhere except NODE_ENV=test — without
         # this env, `synchronize` doesn't run and the eager NestJS bootstrap
         # hits "no such table: subscription_plans". Equivalent to setting
         # DATABASE_AUTOMIGRATE=true explicitly; NODE_ENV=test is the standard
@@ -707,12 +716,12 @@ jobs:
       - name: Test External CLI
         if: steps.scope.outputs.code == 'true'
         working-directory: apps/cli
-        # See note above on the Internal CLI step â€” same C-07 PR-B implication.
+        # See note above on the Internal CLI step — same C-07 PR-B implication.
         env:
           NODE_ENV: test
         run: pnpm test:cli
 
-  # EW-742 P6 T37 â€” per-provider job-runtime plugin matrix.
+  # EW-742 P6 T37 — per-provider job-runtime plugin matrix.
   #
   # Why a separate job: the aggregate `pnpm test` step in `lint-and-test`
   # passes/fails as a single signal. When a contract change in
@@ -722,10 +731,10 @@ jobs:
   #
   # Scope: contract + bindToTenant + dispatcher/worker-host factories +
   # T31 enqueue-options translators + T36-T40 tenant conformance suite
-  # â€” all mocks-only. The real-infra portion of T37 (a `TENANT_OVERLAY=
-  # {off|on}` Ã— `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}`
+  # — all mocks-only. The real-infra portion of T37 (a `TENANT_OVERLAY=
+  # {off|on}` × `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}`
   # matrix against live Redis/Postgres/Temporal/Inngest service
-  # containers) remains gated on CI infra availability â€” tracked in
+  # containers) remains gated on CI infra availability — tracked in
   # tasks.md and ADR-017.
   #
   # Independent of `lint-and-test`: this job re-installs and re-builds
@@ -804,7 +813,7 @@ jobs:
       - name: Test @ever-works/job-runtime-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/job-runtime-${{ matrix.provider }}-plugin test
 
-  # EW-742 P6 T32/T37 real-infra axis â€” all 4 push-model providers
+  # EW-742 P6 T32/T37 real-infra axis — all 4 push-model providers
   # against live infra: BullMQ on Redis, pg-boss on Postgres, Temporal
   # via temporalio/auto-setup (shares the Postgres service, Temporal
   # namespaces its own tables), Inngest via the inngest/inngest dev
@@ -817,7 +826,7 @@ jobs:
   job-runtime-real-infra:
     # Cost gate: real-infra cells spin up 4 service containers (Redis,
     # Postgres, Temporal auto-setup, Inngest dev-server) which burn
-    # Ubicloud minutes. Run on direct pushes to main only â€” PR signal
+    # Ubicloud minutes. Run on direct pushes to main only — PR signal
     # stays covered by the mocks-only job-runtime-plugin-matrix above.
     # Re-enable per-PR by removing this `if:` line.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -967,7 +976,7 @@ jobs:
           docker run -d --name inngest -p 8288:8288 \
             inngest/inngest:v1.38.1 inngest dev --no-discovery --host 0.0.0.0
           echo "Waiting for Inngest on http://localhost:8288 ..."
-          for i in $(seq 1 45); do
+          for _ in $(seq 1 45); do
             if curl -sf -o /dev/null http://localhost:8288/; then
               echo "Inngest is ready."; exit 0
             fi
@@ -983,7 +992,7 @@ jobs:
         run: pnpm --filter @ever-works/job-runtime-inngest-plugin test
 
   # Companion matrix for the secret-store-resolver provider family
-  # (EW-742 P3.2 / P6 â€” runSecretStoreContractSuite is wired into all 7
+  # (EW-742 P3.2 / P6 — runSecretStoreContractSuite is wired into all 7
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:
