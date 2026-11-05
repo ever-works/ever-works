@@ -59,7 +59,10 @@ runs:
       run: |
         if (Get-Command pwsh.exe -ErrorAction SilentlyContinue) { Write-Host 'PowerShell 7 already on PATH'; exit 0 }
         $dir = Join-Path $env:RUNNER_TOOL_CACHE "pwsh\$env:PWSH_VERSION\x64"
-        if (-not (Test-Path (Join-Path $dir 'pwsh.exe'))) {
+        # A cache counts only once a whole extraction finished (marker written
+        # last): an interrupted unpack never passes for an install.
+        $complete = Join-Path $dir '.complete'
+        if (-not (Test-Path -LiteralPath $complete)) {
           Write-Host "Fetching PowerShell $env:PWSH_VERSION for $env:RUNNER_NAME"
           $zip = Join-Path $env:RUNNER_TEMP "pwsh-$env:PWSH_VERSION.zip"
           $url = "https://github.com/PowerShell/PowerShell/releases/download/v$env:PWSH_VERSION/PowerShell-$env:PWSH_VERSION-win-x64.zip"
@@ -67,9 +70,13 @@ runs:
           if ($LASTEXITCODE -ne 0) { throw "PowerShell download failed ($LASTEXITCODE)" }
           $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
           if ($actual -cne $env:PWSH_SHA256) { throw 'PowerShell zip checksum mismatch' }
-          if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
-          Expand-Archive -LiteralPath $zip -DestinationPath $dir
-          Remove-Item -Force $zip
+          $staging = "$dir.partial"
+          if (Test-Path -LiteralPath $staging) { Remove-Item -Recurse -Force -LiteralPath $staging }
+          Expand-Archive -LiteralPath $zip -DestinationPath $staging
+          if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
+          Move-Item -LiteralPath $staging -Destination $dir
+          Set-Content -LiteralPath $complete -Value $env:PWSH_SHA256 -Encoding ascii
+          Remove-Item -Force -LiteralPath $zip
         }
         if (-not (Test-Path (Join-Path $dir 'pwsh.exe'))) { throw "pwsh.exe missing under $dir" }
         & (Join-Path $dir 'pwsh.exe') -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
