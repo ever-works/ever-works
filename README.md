@@ -100,7 +100,7 @@ See the [plugin documentation][uri_docs] for how to build and publish your own.
 
 ## 📊 Activity
 
-![Alt](https://repobeats.axiom.co/api/embed/b021c349a314f0f5d801c42b22e4dc9489c7af15.svg "Repobeats analytics image")
+![Alt](https://repobeats.axiom.co/api/embed/b021c349a314f0f5d801c42b22e4dc9489c7af15.svg 'Repobeats analytics image')
 
 ## 💻 Demo, Testing and Production
 
