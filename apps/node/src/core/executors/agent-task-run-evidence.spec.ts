@@ -221,11 +221,18 @@ describe('runAgentTaskJob — run evidence (self-build slice AP)', () => {
 	it('observes the stream LIVE through readChunk, and reads only the END of a stream past the output ceiling', async () => {
 		const stream = Buffer.from(streamEchoing('x'), 'utf8');
 		// Padding lines in front push the file past the ceiling; the verdict
-		// sits on the last line, inside the window that is read.
+		// sits on the last line, inside the window that is read. The cost of
+		// this test is per LINE (each is parsed live and again in the END
+		// window), not per byte: ~8 900 lines of 900 B took 1.2 s here and 33 s
+		// on a saturated CI runner (round 13, past the 30 s budget), while
+		// ~2 100 lines of 3.9 KB fill the same 8 MiB in about a sixth of the time.
+		// Each line stays under the transcript's 4 096-char line cap, so the
+		// pad still takes the ordinary path a real stream line takes.
 		const padLine = Buffer.from(
-			`${JSON.stringify({ type: 'system', subtype: 'noise', pad: 'p'.repeat(900) })}\n`,
+			`${JSON.stringify({ type: 'system', subtype: 'noise', pad: 'p'.repeat(3_900) })}\n`,
 			'utf8'
 		);
+		expect(padLine.length).toBeLessThan(4_096);
 		const padCount = Math.ceil((MODEL_CLI_MAX_OUTPUT_BYTES + 1024) / padLine.length);
 		const file = Buffer.concat([...Array.from({ length: padCount }, () => padLine), stream]);
 		const readFile = vi.fn(async () => {

@@ -87,10 +87,12 @@ const ready = (v: TaskDeliveryView, retryEscalationId: string | null = null) => 
     retryEscalationId,
 });
 
-function renderSection() {
+function renderSection(
+    initial: React.ComponentProps<typeof TaskDeliverySection>['initial'] = null,
+) {
     return render(
         <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
-            <TaskDeliverySection taskId="task-1" workId="work-1" />
+            <TaskDeliverySection taskId="task-1" workId="work-1" initial={initial} />
         </NextIntlClientProvider>,
     );
 }
@@ -211,6 +213,60 @@ describe('TaskDeliverySection — the timeline (APW-08 T27)', () => {
         renderSection();
         await waitFor(() => expect(screen.getByTestId('task-delivery-unavailable')).toBeTruthy());
         expect(screen.getByTestId('task-delivery-unavailable').textContent).toBe(copy.unavailable);
+    });
+
+    // The e2e "Close anyway asks first…" saw the section on screen but no chip for 5 s: the
+    // chip waited for a client Server Action, which the App Router runs one at a time behind
+    // the rest of the dashboard's. The page reads the first answer on the server.
+    it("paints the server's first answer with the page, without a client read", async () => {
+        vi.useFakeTimers();
+        getDelivery.mockResolvedValue(ready(view('build_failed')));
+        renderSection({ view: view('build_failed'), retryEscalationId: null });
+
+        expect(screen.getByTestId('task-delivery-section').getAttribute('data-state')).toBe(
+            'build_failed',
+        );
+        expect(screen.getByTestId('task-delivery-chip').textContent).toMatch(/^Build failed ✗/);
+        await flush();
+        expect(getDelivery).not.toHaveBeenCalled();
+    });
+
+    it("polls on from the server's answer while the chain is open", async () => {
+        vi.useFakeTimers();
+        getDelivery.mockResolvedValue(ready(view('deploying')));
+        renderSection({ view: view('building'), retryEscalationId: null });
+        await flush();
+        expect(getDelivery).not.toHaveBeenCalled();
+
+        await flush(DELIVERY_POLL_INTERVAL_MS);
+        expect(getDelivery).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId('task-delivery-section').getAttribute('data-state')).toBe(
+            'deploying',
+        );
+    });
+
+    it('retries a first read that failed on the poll cadence until one answers', async () => {
+        vi.useFakeTimers();
+        getDelivery
+            .mockResolvedValueOnce({ ok: false, code: 'DELIVERY_READ_FAILED' })
+            .mockRejectedValueOnce(new Error('network'))
+            .mockResolvedValue(ready(view('closed_without_deploy')));
+        renderSection();
+        await flush();
+        expect(screen.getByTestId('task-delivery-unavailable')).toBeTruthy();
+
+        await flush(DELIVERY_POLL_INTERVAL_MS);
+        expect(getDelivery).toHaveBeenCalledTimes(2);
+        expect(screen.getByTestId('task-delivery-unavailable')).toBeTruthy();
+
+        await flush(DELIVERY_POLL_INTERVAL_MS);
+        expect(getDelivery).toHaveBeenCalledTimes(3);
+        expect(screen.getByTestId('task-delivery-chip').textContent).toBe(
+            'Closed without deploying',
+        );
+        // Answered with a terminal state: the retries are over, as the poll would be.
+        await flush(DELIVERY_POLL_INTERVAL_MS * 3);
+        expect(getDelivery).toHaveBeenCalledTimes(3);
     });
 });
 

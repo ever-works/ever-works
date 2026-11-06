@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { RunLedgerRow } from '@ever-works/contracts';
 import {
     buildRunsSearch,
+    calendarDateIn,
     countActiveFilters,
     formatCents,
     formatRunDuration,
@@ -11,7 +12,9 @@ import {
     isTypingTarget,
     mergeRefreshedRows,
     parseRunsViewState,
+    requestedRunWindow,
     runElapsedMs,
+    runsWindowKey,
     stepAnchorDate,
     windowIncludesNow,
 } from './runs.shared';
@@ -122,6 +125,48 @@ describe('runs.shared', () => {
         it('never skips a month when stepping from the 31st', () => {
             expect(stepAnchorDate('2026-01-31', 'month', 1)).toBe('2026-02-01');
             expect(stepAnchorDate('2026-03-31', 'month', -1)).toBe('2026-02-01');
+        });
+    });
+
+    // The calendar names the window the viewer asked for until the server has
+    // answered that view, so "today" must be the viewer's day, not UTC's.
+    describe('the requested window', () => {
+        it("reads today in the viewer's timezone, and UTC's for an unknown zone", () => {
+            const now = new Date('2026-09-08T20:00:00.000Z');
+            expect(calendarDateIn('UTC', now)).toBe('2026-09-08');
+            expect(calendarDateIn('Pacific/Auckland', now)).toBe('2026-09-09');
+            expect(
+                calendarDateIn('America/Los_Angeles', new Date('2026-09-08T03:00:00.000Z')),
+            ).toBe('2026-09-07');
+            expect(calendarDateIn('Not/A_Zone', now)).toBe('2026-09-08');
+        });
+
+        it('anchors on the named date, or on today when the view names none', () => {
+            const now = new Date('2026-09-08T20:00:00.000Z');
+            expect(
+                requestedRunWindow({ granularity: 'week', date: '2026-08-31' }, 'UTC', now),
+            ).toEqual({
+                granularity: 'week',
+                anchorDate: '2026-08-31',
+                from: '',
+                to: '',
+                timezone: 'UTC',
+                clamped: false,
+            });
+            expect(
+                requestedRunWindow({ granularity: 'day', date: null }, 'Pacific/Auckland', now)
+                    .anchorDate,
+            ).toBe('2026-09-09');
+        });
+
+        it('keys a view by its window only — filters never move it', () => {
+            expect(runsWindowKey({ granularity: 'week', date: null })).toBe('week|');
+            expect(runsWindowKey({ granularity: 'day', date: '2026-09-08' })).toBe(
+                'day|2026-09-08',
+            );
+            expect(runsWindowKey({ granularity: 'day', date: '2026-09-08' })).not.toBe(
+                runsWindowKey({ granularity: 'week', date: '2026-09-08' }),
+            );
         });
     });
 
