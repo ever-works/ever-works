@@ -59,10 +59,41 @@ The `settingsSchema` exposes:
 
 - `oauthToken` (user, secret) — Claude Code OAuth token from `claude setup-token`. Read from env `PLUGIN_CLAUDE_CODE_OAUTH_TOKEN`.
 - `apiKey` (user, secret) — Anthropic API key from console.anthropic.com.
-- `model` (global) — Model alias (`sonnet`, `opus`, `haiku`) or explicit version (e.g. `claude-sonnet-4-5-20250929`). Defaults to `sonnet`.
-- `version` (hidden) — Claude Code CLI version pinned by the plugin; the binary is downloaded and cached on first use.
+- `model` (global) — Model alias (`sonnet`, `opus`, `haiku`) or explicit id (e.g. `claude-sonnet-5-5`). Defaults to `sonnet`.
+- `version` (hidden) — Claude Code CLI version pinned by the plugin (default `2.1.311`); the binary is downloaded and cached on first use.
 - `maxTurns` (hidden) — maximum agentic turns per session (default 50, range 1–100).
 - `maxBudgetUsd` (hidden) — optional USD budget per generation.
+
+### Models
+
+Model list as of 2026-11-05 — source: [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
+and the [Claude models overview](https://platform.claude.com/docs/en/about-claude/models/overview). Availability
+depends on your account, plan and region; the picker also accepts a custom model id and keeps existing saved
+selections.
+
+| Model id                     | Notes                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `sonnet`                     | **Default.** CLI alias; on the Anthropic API it resolves to Sonnet 5.5   |
+| `opus`                       | CLI alias; resolves to Opus 5.5                                          |
+| `haiku`                      | CLI alias; resolves to Haiku 5.5                                         |
+| `claude-opus-5-5`            | Most capable                                                             |
+| `claude-sonnet-5-5`          | Balance of speed, cost and intelligence                                  |
+| `claude-haiku-5-5`           | Fastest, lowest cost                                                     |
+| `claude-fable-5-1`           | Frontier model, premium pricing ($10 / $50 per MTok); needs CLI 2.1.257+ |
+| `claude-sonnet-4-5-20250929` | Legacy, retires 2026-11-30 (200K context)                                |
+| `claude-haiku-4-5-20251001`  | Legacy (200K context)                                                    |
+
+`claude-opus-4-1-20250805` retired on 2026-08-05 and is no longer listed. A config that saved it is still accepted and
+the id is passed through unchanged; Anthropic rejects retired ids at run time. Limited-availability `claude-mythos-*` models are not listed.
+
+**Default and CLI pin (2026-11-05):** the default stays the `sonnet` alias. The CLI pin moved from `2.1.76` to
+`2.1.311` (npm `stable`), and with it `sonnet` now resolves to Sonnet 5.5, so a config that never saved a model runs on
+Sonnet 5.5. There is no backfill, because Ever Works has no real users yet. Saved models are not changed.
+
+When you connect with an API key, the plugin checks the key with one small `POST /v1/messages` call. That API takes
+API model ids, not CLI aliases, so the check sends `claude-sonnet-5-5` for `sonnet`, `claude-opus-5-5` for
+`default`/`opus`/`best`/`opusplan`, `claude-haiku-5-5` for `haiku` and `claude-fable-5-1` for `fable` (a `[1m]` suffix is
+dropped). The generation run itself passes your saved value to the CLI unchanged.
 
 The plugin's **CLI binary** is managed automatically and stored under the platform's temp directory; users do not configure a binary path. **Auth mode** is implicit: if `oauthToken` is set the plugin uses OAuth, otherwise it falls back to the Anthropic API key.
 

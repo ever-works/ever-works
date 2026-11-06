@@ -55,6 +55,10 @@ vLLM exposes the same OpenAI-compatible `/v1` API as the other AI providers, so 
 
 vLLM is typically deployed on a GPU server rather than a laptop. For the managed Ever Works cloud to reach it, the **Base URL must be resolvable from where work generation runs** — either a self-hosted Ever Works deployment on the same network, or a vLLM server exposed at a reachable (public or VPN) URL secured with `--api-key`. A `localhost` URL only works when Ever Works itself runs on the same machine/LAN as the vLLM server.
 
+## Models
+
+There is no built-in default model. Use the model your server was started with (`vllm serve <model>`); the picker lists it once the connection works, and also accepts a custom model id. As of 2026-11-05, see https://docs.vllm.ai/en/latest/models/supported_models.html for the architectures vLLM supports.
+
 ## Troubleshooting
 
 | Symptom                                 | Likely cause                                                       | Fix                                                                                                       |

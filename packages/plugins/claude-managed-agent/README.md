@@ -19,6 +19,32 @@ Notes:
 - This plugin currently assumes the built-in `agent_toolset_20260401`.
 - It intentionally fails fast if the session pauses for a custom tool result or tool confirmation, because those flows need first-class app orchestration outside a simple pipeline plugin.
 
+## Models
+
+Model list as of 2026-11-05 — source: [Managed Agents agent setup](https://platform.claude.com/docs/en/managed-agents/agent-setup)
+and the [Claude models overview](https://platform.claude.com/docs/en/about-claude/models/overview). Availability depends
+on your account, plan and region; the picker also accepts a custom model id and keeps existing saved selections.
+
+| Model id                     | Context / output | Notes                                                    |
+| ---------------------------- | ---------------- | -------------------------------------------------------- |
+| `claude-opus-5-5`            | 1M / 128K        | Most capable                                             |
+| `claude-sonnet-5-5`          | 1M / 128K        | **Default**                                              |
+| `claude-haiku-5-5`           | 1M / 128K        | Fastest, lowest cost                                     |
+| `claude-fable-5-1`           | 1M / 128K        | Frontier model, premium pricing ($10 / $50 per MTok)     |
+| `claude-opus-4-7`            | 1M / 128K        | Legacy                                                   |
+| `claude-opus-4-6`            | 1M / 128K        | Legacy                                                   |
+| `claude-sonnet-4-6`          | 1M / 128K        | Legacy (previous default)                                |
+| `claude-sonnet-4-5-20250929` | 200K / 64K       | Legacy, retires 2026-11-30                               |
+| `claude-haiku-4-5`           | 200K / 64K       | Legacy API alias; Managed Agents lists only the dated id |
+| `claude-haiku-4-5-20251001`  | 200K / 64K       | Legacy                                                   |
+
+Limited-availability `claude-mythos-*` models are not listed.
+
+**Default change (2026-11-05):** the default moved from `claude-sonnet-4-6` to `claude-sonnet-5-5`. A config that never
+saved a model now runs on `claude-sonnet-5-5`; there is no backfill, because Ever Works has no real users yet. Saved
+models are not changed. The model is sent per session (`agent_with_overrides`) and is not part of the agent config
+hash, so the switch does not recreate the persistent agent.
+
 ## Troubleshooting
 
 | Symptom                                                              | Likely cause                                                                                                    | Fix                                                                                                                                                                           |

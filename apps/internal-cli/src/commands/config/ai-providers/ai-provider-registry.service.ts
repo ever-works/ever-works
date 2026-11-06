@@ -26,27 +26,48 @@ export class AiProviderRegistryService {
         this.registerDefaultProviders();
     }
 
+    /**
+     * Model ids and defaults checked 2026-11-05 on each vendor's own model list or
+     * live model-list API (models refresh; sheet in the homelab repo,
+     * projects/ever-works/knowledge/notes/2026-09-17-app-works/handover-2026-09-26/
+     * models-refresh-source-sheet-2026-11-05.md). Retired ids are dropped; ids the
+     * vendor still serves stay after the current ones. Any other id can still be
+     * entered as a custom model.
+     */
     private registerDefaultProviders(): void {
         this.providers.set('openai', {
             name: 'openai',
             displayName: 'OpenAI',
-            description: 'OpenAI GPT models (GPT-5, GPT-4o, o1/o3)',
+            description: 'OpenAI GPT models (GPT-6, GPT-6.1, GPT-5.x)',
             defaults: {
-                model: 'gpt-4o',
+                // https://developers.openai.com/api/docs/models: "GPT-6.1 Sol to
+                // balance intelligence and cost".
+                model: 'gpt-6.1-sol',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
             requiresApiKey: true,
             models: [
+                'gpt-6-astra',
+                'gpt-6.1-sol',
+                'gpt-6.1-terra',
+                'gpt-6-luna',
+                'gpt-6-sol',
+                'gpt-5.6-sol',
+                'gpt-5.6-terra',
+                'gpt-5.6-luna',
+                'gpt-5.5',
+                'gpt-5.4',
+                'gpt-5.4-mini',
                 'gpt-5.2',
+                // Deprecated, still served until their shutdown dates
+                // (https://developers.openai.com/api/docs/deprecations).
                 'gpt-5.1',
                 'gpt-5',
                 'gpt-5-mini',
                 'gpt-5-nano',
                 'gpt-4o',
                 'gpt-4o-mini',
-                'o3-mini',
-                'o1-mini',
             ],
             websiteUrl: 'https://openai.com',
             docsUrl: 'https://platform.openai.com/docs',
@@ -55,19 +76,25 @@ export class AiProviderRegistryService {
         this.providers.set('google', {
             name: 'google',
             displayName: 'Google AI (Gemini)',
-            description: 'Google Gemini models (Gemini 3, 2.5, 2.0)',
+            description: 'Google Gemini models (Gemini 4, 3.x, 2.5)',
             defaults: {
-                model: 'gemini-2.0-flash',
+                // https://aistudio.google.com/docs/changelog (2026-09-18): new
+                // projects should use "3.5 Flash-Lite or 3.8 Flash".
+                model: 'gemini-3.8-flash',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
             requiresApiKey: true,
             models: [
-                'gemini-3-pro',
-                'gemini-3-flash',
+                'gemini-4-argon',
+                'gemini-3.8-flash',
+                'gemini-3.6-flash',
+                'gemini-3.5-flash-lite',
+                'gemini-3.1-pro-preview',
+                'gemini-3-flash-preview',
+                // Deprecated 2026-11-02: existing users only.
                 'gemini-2.5-pro',
                 'gemini-2.5-flash',
-                'gemini-2.0-flash',
             ],
             websiteUrl: 'https://ai.google.dev',
             docsUrl: 'https://ai.google.dev/docs',
@@ -76,7 +103,7 @@ export class AiProviderRegistryService {
         this.providers.set('anthropic', {
             name: 'anthropic',
             displayName: 'Anthropic (Claude)',
-            description: 'Anthropic Claude models (Claude 4.5, 3.5)',
+            description: 'Anthropic Claude models (Claude 5.5, Fable)',
             defaults: {
                 // Active Claude API id (the vendor's recommended starting model, checked
                 // 2026-10-28). The old default, claude-3-5-sonnet-latest, is retired.
@@ -87,12 +114,14 @@ export class AiProviderRegistryService {
             requiresApiKey: true,
             models: [
                 'claude-opus-5-5',
+                'claude-sonnet-5-5',
+                'claude-haiku-5-5',
+                'claude-fable-5-1',
+                // Legacy, still served.
                 'claude-opus-4-5-20251101',
-                'claude-sonnet-4.5',
-                'claude-haiku-4.5',
-                'claude-3-5-sonnet-latest',
-                'claude-3-5-haiku-latest',
-                'claude-3-haiku-20240307',
+                'claude-haiku-4-5-20251001',
+                // Deprecated; retires 2026-11-30 (successor claude-sonnet-5-5).
+                'claude-sonnet-4-5-20250929',
             ],
             websiteUrl: 'https://anthropic.com',
             docsUrl: 'https://docs.anthropic.com',
@@ -103,12 +132,35 @@ export class AiProviderRegistryService {
             displayName: 'OpenRouter',
             description: 'Access to 400+ AI models through OpenRouter',
             defaults: {
-                model: 'openai/gpt-4o',
+                // Same default as the openrouter plugin.
+                model: 'openai/gpt-6.1-sol',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
             requiresApiKey: true,
+            // Ids present on https://openrouter.ai/api/v1/models on 2026-11-05.
             models: [
+                'openai/gpt-6-astra',
+                'openai/gpt-6.1-sol',
+                'openai/gpt-6.1-terra',
+                'openai/gpt-6-luna',
+                'anthropic/claude-opus-5.5',
+                'anthropic/claude-sonnet-5.5',
+                'anthropic/claude-haiku-5.5',
+                'anthropic/claude-fable-5.1',
+                'google/gemini-4-argon',
+                'google/gemini-3.8-flash',
+                'google/gemini-3.5-flash-lite',
+                'x-ai/grok-4.7',
+                'x-ai/grok-4.3',
+                'mistralai/mistral-large-4-0',
+                'deepseek/deepseek-v4-pro',
+                'deepseek/deepseek-v4.1-flash',
+                'moonshotai/kimi-k3',
+                'qwen/qwen3.8-flash',
+                'z-ai/glm-5.3',
+                'meta-llama/llama-4-maverick',
+                // Older ids still listed.
                 'openai/gpt-5.2',
                 'openai/gpt-5.1',
                 'openai/gpt-5-mini',
@@ -116,12 +168,7 @@ export class AiProviderRegistryService {
                 'openai/gpt-4o',
                 'anthropic/claude-opus-4.5',
                 'moonshotai/kimi-k2.5',
-                'google/gemini-3-flash',
-                'google/gemini-2.0-flash-001',
                 'meta-llama/llama-3.3-70b-instruct',
-                'meta-llama/llama-3.3-70b-instruct:free',
-                'deepseek/deepseek-r1',
-                'x-ai/grok-3-mini-beta',
             ],
             websiteUrl: 'https://openrouter.ai',
             docsUrl: 'https://openrouter.ai/docs',
@@ -132,13 +179,21 @@ export class AiProviderRegistryService {
             displayName: 'Ollama',
             description: 'Local AI models through Ollama (free)',
             defaults: {
-                model: 'llama3.3',
+                // https://ollama.com/library/qwen3.5 (tools capable; the bare name
+                // pulls the latest tag). The ollama plugin defaults to the smaller
+                // qwen3.5:4b tag.
+                model: 'qwen3.5',
                 temperature: 0.7,
                 maxTokens: 8192,
                 baseUrl: 'http://localhost:11434/v1',
             },
             requiresApiKey: false,
             models: [
+                'qwen3.5',
+                'gemma4',
+                'qwen3',
+                'gpt-oss',
+                'qwen3-coder',
                 'llama3.3',
                 'llama3.2',
                 'qwen2.5',
@@ -200,20 +255,22 @@ export class AiProviderRegistryService {
             displayName: 'Groq',
             description: 'Ultra-fast inference with Groq LPU',
             defaults: {
-                model: 'qwen/qwen3-32b',
+                // qwen/qwen3-32b was retired 2026-07-17; Groq names gpt-oss-120b
+                // as its replacement (https://console.groq.com/docs/deprecations).
+                model: 'openai/gpt-oss-120b',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
             requiresApiKey: true,
+            // https://console.groq.com/docs/models (2026-11-05).
             models: [
                 'openai/gpt-oss-120b',
+                'openai/gpt-oss-20b',
+                // Preview ("not for production use" on Groq's models page).
+                'qwen/qwen3.8-27b',
+                // Enterprise plans only since 2026-08-16.
                 'llama-3.3-70b-versatile',
-                'llama-3.3-70b-specdec',
                 'llama-3.1-8b-instant',
-                'llama-3.2-90b-vision-preview',
-                'qwen-qwq-32b',
-                'qwen-2.5-coder-32b',
-                'deepseek-r1-distill-qwen-32b',
             ],
             websiteUrl: 'https://groq.com',
             docsUrl: 'https://console.groq.com/docs',

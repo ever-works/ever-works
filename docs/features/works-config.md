@@ -39,7 +39,7 @@ initial_prompt: |
     agent, search, and developer-experience categories.
 
 # Default model alias the platform should request from the AI provider
-model: gpt-5.1
+model: gpt-6.1-sol
 
 # Where the generated website should be published. Accepts:
 #   "owner/repo"          — bare slug

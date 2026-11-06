@@ -11,18 +11,23 @@ The Ever Works Platform uses AI services to power work content generation, enric
 
 ## Providers
 
-AI providers are managed through the [plugin system](/plugin-system). Each provider is a plugin that implements the `ai-provider` capability. The platform ships with 8 AI provider plugins:
+AI providers are managed through the [plugin system](/plugin-system). Each provider is a plugin that implements the `ai-provider` capability. The platform ships with 11 AI provider plugins:
 
-| Provider          | Plugin ID           | Default Model                               | Configuration              |
-| ----------------- | ------------------- | ------------------------------------------- | -------------------------- |
-| OpenAI            | `openai`            | `gpt-5.1`                                   | User API key               |
-| Anthropic         | `anthropic`         | `claude-opus-5-5`                           | User API key               |
-| Google Gemini     | `google`            | `models/gemini-2.5-flash`                   | User API key               |
-| Groq              | `groq`              | `meta-llama/llama-4-scout-17b-16e-instruct` | User API key               |
-| Mistral           | `mistral`           | `mistral-small-latest`                      | User API key               |
-| Ollama            | `ollama`            | `llama2`                                    | Local (no key)             |
-| OpenRouter        | `openrouter`        | `openai/gpt-5.1`                            | Hybrid (admin or user key) |
-| Vercel AI Gateway | `vercel-ai-gateway` | configurable                                | Hybrid                     |
+| Provider          | Plugin ID           | Default Model                           | Configuration              |
+| ----------------- | ------------------- | --------------------------------------- | -------------------------- |
+| OpenAI            | `openai`            | `gpt-6-astra`                           | User API key               |
+| Anthropic         | `anthropic`         | `claude-opus-5-5`                       | User API key               |
+| Google Gemini     | `google`            | `models/gemini-3.8-flash`               | User API key               |
+| Grok (xAI)        | `grok`              | `grok-4.7`                              | User API key               |
+| Groq              | `groq`              | `openai/gpt-oss-120b`                   | User API key               |
+| Mistral           | `mistral`           | `mistral-small-latest`                  | User API key               |
+| Ollama            | `ollama`            | `qwen3.5:4b`                            | Local (no key)             |
+| LM Studio         | `lm-studio`         | none (the model your server has loaded) | Local (no key)             |
+| vLLM              | `vllm`              | none (the model your server serves)     | Local (no key)             |
+| OpenRouter        | `openrouter`        | `openai/gpt-6.1-sol`                    | Hybrid (admin or user key) |
+| Vercel AI Gateway | `vercel-ai-gateway` | `openai/gpt-6-astra`                    | Hybrid                     |
+
+Model defaults as of 2026-11-05 — source: each plugin's README and the vendor model list it cites (see [Built-in Plugins — AI Providers](/plugin-system/built-in-plugins#ai-providers)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections. Configs that never saved a model use these defaults since the 2026-11-05 models refresh; saved selections are kept. Each plugin also has simple, standard and complex tier fields with their own defaults.
 
 ### Provider Capabilities
 

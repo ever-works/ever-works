@@ -38,16 +38,20 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 
 ### Provider Configuration
 
-| Property            | Value                                       |
-| ------------------- | ------------------------------------------- |
-| Base URL            | `https://api.groq.com/openai/v1`            |
-| Default Model       | `qwen/qwen3-32b`                            |
-| Simple Tier         | _(not explicitly overridden, uses default)_ |
-| Medium Tier         | _(not explicitly overridden, uses default)_ |
-| Complex Tier        | _(not explicitly overridden, uses default)_ |
-| Max Context Tokens  | `128000`                                    |
-| Supports Embeddings | `false`                                     |
-| Supports Vision     | `true` (inherited default)                  |
+| Property            | Value                            |
+| ------------------- | -------------------------------- |
+| Base URL            | `https://api.groq.com/openai/v1` |
+| Default Model       | `openai/gpt-oss-120b`            |
+| Simple Tier         | `openai/gpt-oss-20b`             |
+| Medium Tier         | `openai/gpt-oss-120b`            |
+| Complex Tier        | `openai/gpt-oss-120b`            |
+| Max Context Tokens  | `128000`                         |
+| Supports Embeddings | `false`                          |
+| Supports Vision     | `true` (inherited default)       |
+
+Model defaults as of 2026-11-05 — source: [console.groq.com/docs/models](https://console.groq.com/docs/models) (retirements: [deprecations](https://console.groq.com/docs/deprecations)). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Every tier used to default to `qwen/qwen3-32b`, which Groq retired on 2026-07-17; unsaved configs now use `openai/gpt-oss-120b` (default, medium, complex, `onLoad` bootstrap and `getDefaultModelId()`) and `openai/gpt-oss-20b` (simple).
 
 ## Configuration
 
@@ -56,10 +60,10 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 | Field              | Type     | Required | Description                                                                 |
 | ------------------ | -------- | -------- | --------------------------------------------------------------------------- |
 | `apiKey`           | `string` | Yes      | Groq API key (`x-secret`, `x-envVar: PLUGIN_GROQ_API_KEY`, `x-scope: user`) |
-| `model`            | `string` | No       | Override default model (`default: qwen/qwen3-32b`)                          |
-| `simpleModel`      | `string` | No       | Model for simple tasks                                                      |
-| `mediumModel`      | `string` | No       | Model for medium complexity tasks                                           |
-| `complexModel`     | `string` | No       | Model for complex tasks                                                     |
+| `defaultModel`     | `string` | Yes      | Default model (`default: openai/gpt-oss-120b`)                              |
+| `simpleModel`      | `string` | No       | Model for simple tasks (`default: openai/gpt-oss-20b`)                      |
+| `mediumModel`      | `string` | No       | Model for medium complexity tasks (`default: openai/gpt-oss-120b`)          |
+| `complexModel`     | `string` | No       | Model for complex tasks (`default: openai/gpt-oss-120b`)                    |
 | `maxContextTokens` | `number` | No       | Override max context window                                                 |
 
 ### Environment Variables
@@ -87,7 +91,7 @@ Through `BaseAiProvider` and `AiOperations`, the plugin provides:
 ### Limitations
 
 - **No Embeddings** - Groq does not support embedding generation. The plugin explicitly sets `supportsEmbeddings: false`.
-- **Model Availability** - Available models depend on Groq's current offerings. The default `qwen/qwen3-32b` is a community model hosted on Groq.
+- **Model Availability** - Available models depend on Groq's current offerings. The defaults `openai/gpt-oss-120b` and `openai/gpt-oss-20b` are Groq production models (2026-11-05); `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` are enterprise-only since 2026-08-16.
 
 ## API Reference
 
@@ -115,7 +119,8 @@ resolveConfig(settings: PluginSettings): ProviderConfig {
     return {
         apiKey: settings.apiKey,
         baseUrl: 'https://api.groq.com/openai/v1',
-        defaultModel: settings.model || 'qwen/qwen3-32b',
+        defaultModel: settings.defaultModel || 'openai/gpt-oss-120b',
+        simpleModel: settings.simpleModel || 'openai/gpt-oss-20b',
         maxContextTokens: settings.maxContextTokens || 128000,
         supportsEmbeddings: false
     };
@@ -156,7 +161,7 @@ The `BaseAiProvider` resolves the model based on complexity:
 - `medium` -> `mediumModel` or `defaultModel`
 - `complex` -> `complexModel` or `defaultModel`
 
-For Groq, since no tier-specific models are configured by default, all tiers use `qwen/qwen3-32b` unless the user overrides them in settings.
+For Groq, the simple tier defaults to `openai/gpt-oss-20b` and the medium and complex tiers to `openai/gpt-oss-120b`, unless the user overrides them in settings.
 
 ### OpenAI Compatibility
 

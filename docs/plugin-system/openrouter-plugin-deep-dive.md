@@ -33,24 +33,29 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 
 ### Provider Configuration
 
-| Property            | Value                            |
-| ------------------- | -------------------------------- |
-| Base URL            | `https://openrouter.ai/api/v1`   |
-| Default Model       | `openai/gpt-5.1`                 |
-| Simple Tier         | `openai/gpt-5-nano`              |
-| Medium Tier         | `openai/gpt-4o`                  |
-| Complex Tier        | _(uses default: openai/gpt-5.1)_ |
-| Max Context Tokens  | `128000`                         |
-| Supports Embeddings | `true` (inherited default)       |
-| Supports Vision     | `false`                          |
+| Property             | Value                          |
+| -------------------- | ------------------------------ |
+| Base URL             | `https://openrouter.ai/api/v1` |
+| Default Model        | `openai/gpt-6.1-sol`           |
+| Simple Tier          | `openai/gpt-6-luna`            |
+| Medium Tier          | `openai/gpt-6.1-sol`           |
+| Complex Tier         | `openai/gpt-6-astra`           |
+| Bootstrap / fallback | `openai/gpt-6-luna`            |
+| Max Context Tokens   | `128000`                       |
+| Supports Embeddings  | `true` (inherited default)     |
+| Supports Vision      | `false`                        |
+
+Model defaults as of 2026-11-05 — source: [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models) (each id was listed that day) and OpenAI's [model guide](https://developers.openai.com/api/docs/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05):** configs that never saved a model use the new defaults; saved selections are kept. Before the refresh every tier except complex defaulted to `openai/gpt-5-mini` and the complex tier to `openai/gpt-5`; OpenAI shuts both down on 2026-12-11.
 
 ### Model Tiers
 
-| Tier                | Model               | Use Case                                                |
-| ------------------- | ------------------- | ------------------------------------------------------- |
-| **Simple**          | `openai/gpt-5-nano` | Lightweight tasks (prompt processing, domain detection) |
-| **Medium**          | `openai/gpt-4o`     | Balanced tasks (content extraction, search queries)     |
-| **Complex/Default** | `openai/gpt-5.1`    | Complex reasoning (AI generation, data aggregation)     |
+| Tier               | Model                | Use Case                                                |
+| ------------------ | -------------------- | ------------------------------------------------------- |
+| **Simple**         | `openai/gpt-6-luna`  | Lightweight tasks (prompt processing, domain detection) |
+| **Medium/Default** | `openai/gpt-6.1-sol` | Balanced tasks (content extraction, search queries)     |
+| **Complex**        | `openai/gpt-6-astra` | Complex reasoning (AI generation, data aggregation)     |
 
 ### System Plugin Role
 
@@ -71,10 +76,10 @@ This ensures that the platform always has an AI provider available, even before 
 | Field              | Type     | Required | Description                                                                             |
 | ------------------ | -------- | -------- | --------------------------------------------------------------------------------------- |
 | `apiKey`           | `string` | Yes      | OpenRouter API key (`x-secret`, `x-envVar: PLUGIN_OPENROUTER_API_KEY`, `x-scope: user`) |
-| `model`            | `string` | No       | Override default model (`default: openai/gpt-5.1`)                                      |
-| `simpleModel`      | `string` | No       | Model for simple tasks (`default: openai/gpt-5-nano`)                                   |
-| `mediumModel`      | `string` | No       | Model for medium tasks (`default: openai/gpt-4o`)                                       |
-| `complexModel`     | `string` | No       | Model for complex tasks                                                                 |
+| `defaultModel`     | `string` | Yes      | Default model (`default: openai/gpt-6.1-sol`)                                           |
+| `simpleModel`      | `string` | No       | Model for simple tasks (`default: openai/gpt-6-luna`)                                   |
+| `mediumModel`      | `string` | No       | Model for medium tasks (`default: openai/gpt-6.1-sol`)                                  |
+| `complexModel`     | `string` | No       | Model for complex tasks (`default: openai/gpt-6-astra`)                                 |
 | `maxContextTokens` | `number` | No       | Override max context window (`default: 128000`)                                         |
 
 ### Environment Variables
@@ -140,9 +145,10 @@ resolveConfig(settings: PluginSettings): ProviderConfig {
     return {
         apiKey: settings.apiKey,
         baseUrl: 'https://openrouter.ai/api/v1',
-        defaultModel: settings.model || 'openai/gpt-5.1',
-        simpleModel: settings.simpleModel || 'openai/gpt-5-nano',
-        mediumModel: settings.mediumModel || 'openai/gpt-4o',
+        defaultModel: settings.defaultModel || 'openai/gpt-6.1-sol',
+        simpleModel: settings.simpleModel || 'openai/gpt-6-luna',
+        mediumModel: settings.mediumModel || 'openai/gpt-6.1-sol',
+        complexModel: settings.complexModel || 'openai/gpt-6-astra',
         maxContextTokens: settings.maxContextTokens || 128000,
         supportsVision: false
     };
@@ -171,11 +177,13 @@ getManifest(): PluginManifest {
 
 OpenRouter uses a `provider/model` naming convention:
 
-- `openai/gpt-5.1` - OpenAI's GPT-5.1 via OpenRouter
-- `openai/gpt-5-nano` - OpenAI's GPT-5 Nano via OpenRouter
-- `openai/gpt-4o` - OpenAI's GPT-4o via OpenRouter
-- `anthropic/claude-sonnet-4-20250514` - Anthropic's Claude via OpenRouter
-- `google/gemini-2.5-pro` - Google's Gemini via OpenRouter
+- `openai/gpt-6-astra` - OpenAI's GPT-6 Astra via OpenRouter
+- `openai/gpt-6.1-sol` - OpenAI's GPT-6.1 Sol via OpenRouter
+- `openai/gpt-6-luna` - OpenAI's GPT-6 Luna via OpenRouter
+- `anthropic/claude-sonnet-5.5` - Anthropic's Claude Sonnet 5.5 via OpenRouter
+- `google/gemini-4-argon` - Google's Gemini 4 Argon via OpenRouter
+
+Example ids as of 2026-11-05 — source: [openrouter.ai/api/v1/models](https://openrouter.ai/api/v1/models). Availability depends on your account/plan/region; the picker accepts a custom model id and keeps existing saved selections.
 
 Users can override the default models with any valid OpenRouter model ID.
 
@@ -207,10 +215,10 @@ This ensures the platform is functional out of the box with just an admin-level 
 // Admin sets a global API key for all users
 const adminSettings = {
 	apiKey: 'sk-or-v1-...' // OpenRouter API key
-	// Default tiers apply:
-	// simple: openai/gpt-5-nano
-	// medium: openai/gpt-4o
-	// complex: openai/gpt-5.1
+	// Default tiers apply (as of 2026-11-05):
+	// simple: openai/gpt-6-luna
+	// medium: openai/gpt-6.1-sol
+	// complex: openai/gpt-6-astra
 };
 ```
 
@@ -220,9 +228,9 @@ const adminSettings = {
 // User overrides with their own key and preferred models
 const userSettings = {
 	apiKey: 'sk-or-v1-user-key',
-	model: 'anthropic/claude-sonnet-4-20250514',
-	simpleModel: 'google/gemini-2.0-flash',
-	complexModel: 'anthropic/claude-opus-4-20250514'
+	defaultModel: 'anthropic/claude-sonnet-5.5',
+	simpleModel: 'google/gemini-3.5-flash-lite',
+	complexModel: 'anthropic/claude-opus-5.5'
 };
 ```
 
@@ -232,9 +240,9 @@ const userSettings = {
 // Users can specify any model available on OpenRouter
 const settings = {
 	apiKey: 'sk-or-v1-...',
-	model: 'meta-llama/llama-4-maverick',
+	defaultModel: 'meta-llama/llama-4-maverick',
 	simpleModel: 'meta-llama/llama-4-scout',
-	complexModel: 'deepseek/deepseek-r1'
+	complexModel: 'deepseek/deepseek-v4-pro'
 };
 ```
 

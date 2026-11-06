@@ -227,7 +227,7 @@ import { CollapsibleCard } from '@/components/ui/collapsible-card';
 >
 	<div className="space-y-4">
 		<Input label="API Key" type="password" />
-		<Input label="Model" value="gpt-4o" />
+		<Input label="Model" value="gpt-6.1-sol" />
 	</div>
 </CollapsibleCard>;
 ```

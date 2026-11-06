@@ -577,12 +577,12 @@ The platform uses a tiered model system to balance cost and quality. Each tier m
 
 | Setting        | Purpose                                                   | Examples                           |
 | -------------- | --------------------------------------------------------- | ---------------------------------- |
-| `defaultModel` | Fallback for all tasks when no tier-specific model is set | `gpt-5.1`, `claude-sonnet-4.5`     |
-| `simpleModel`  | Tags, short descriptions, quick classifications           | `gpt-5-nano`, `gpt-5-mini`         |
-| `mediumModel`  | Listings, summaries, content reformatting                 | `gpt-4o-mini`, `claude-sonnet-4.5` |
-| `complexModel` | Full page generation, multi-step analysis                 | `gpt-5.1`, `gpt-5`                 |
+| `defaultModel` | Fallback for all tasks when no tier-specific model is set | `gpt-6-astra`, `claude-opus-5-5`   |
+| `simpleModel`  | Tags, short descriptions, quick classifications           | `gpt-6-luna`, `claude-haiku-5-5`   |
+| `mediumModel`  | Listings, summaries, content reformatting                 | `gpt-6.1-sol`, `claude-sonnet-5-5` |
+| `complexModel` | Full page generation, multi-step analysis                 | `gpt-6-astra`, `claude-opus-5-5`   |
 
-The pipeline selects the appropriate model tier based on the step being executed. Users can override any tier in the plugin settings.
+The examples are the OpenAI and Anthropic plugins' defaults as of 2026-11-05 (sources: [developers.openai.com/api/docs/models](https://developers.openai.com/api/docs/models), [platform.claude.com models overview](https://platform.claude.com/docs/en/about-claude/models/overview)). The pipeline selects the appropriate model tier based on the step being executed. Users can override any tier in the plugin settings.
 
 ### x-\* Extension Reference
 

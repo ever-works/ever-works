@@ -53,15 +53,27 @@ export const GEMINI_NPM_PACKAGE = '@google/gemini-cli';
  * exact-version defaults of the sibling CLI plugins (codex/opencode/claude-code).
  *
  * The value is the version `@google/gemini-cli@latest` resolved to at pin time
- * (2026-06-08). The `'latest'` sentinel remains an explicit opt-in via plugin
- * settings and is still treated specially by the binary-manager.
+ * (0.67.0, 2026-11-04; `npm view @google/gemini-cli`). The `'latest'` sentinel
+ * remains an explicit opt-in via plugin settings and is still treated specially
+ * by the binary-manager.
+ *
+ * Models refresh 2026-11-05: the previous pin, 0.45.2, silently rewrote any model
+ * id ending in "flash" to its own default (google-gemini/gemini-cli#28859, fixed
+ * in 0.61.0), and native Gemini 3.8 Flash support arrived in 0.62.0. The flags the
+ * runner passes (`-p`, `--output-format`, `--sandbox`, `--approval-mode`, `--model`)
+ * are unchanged in 0.67.0.
  */
-export const DEFAULT_CLI_VERSION = '0.45.2';
+export const DEFAULT_CLI_VERSION = '0.67.0';
 
 /**
- * Default Gemini model
+ * Default Gemini model: Gemini 3.8 Flash, the Gemini API's "most intelligent Flash"
+ * (GA 2026-09-02; https://aistudio.google.com/docs/models, checked 2026-11-05).
+ *
+ * Changing this moves every config that never saved a model onto the new default
+ * (models refresh decision B, 2026-11-05: no backfill, because Ever Works has no
+ * real users yet). Saved models are untouched.
  */
-export const DEFAULT_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_MODEL = 'gemini-3.8-flash';
 
 /**
  * Maximum stdout/stderr buffer size (10MB) to prevent OOM

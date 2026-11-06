@@ -13,6 +13,12 @@ name: Windows Job Launcher
 # trigger is CONVERTED rather than dropped, for the same reason as
 # node-packaging-windows.yml.
 # Runner: windows-2022, GitHub-hosted (not the self-hosted ARC pool).
+# It stays hosted on purpose, unlike the other Windows jobs that use our own
+# machines (vars.RUNNER_WINDOWS_X64, 2026-11-05): prepare-test-signed-manifest.ps1
+# adds a throwaway certificate to LocalMachine\Root. That is harmless on an
+# ephemeral runner, but our Windows runners are persistent and EVERDESK1/EVERDESK4
+# run a real fleet node, so a missed cleanup would leave a trusted test root
+# next to that node's helper-trust check.
 on:
   push:
     branches: [main, stage]

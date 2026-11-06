@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAiPlugin } from '../openai.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
 
 vi.mock('@ever-works/plugin/ai', () => {
 	const MockAiOperations = vi.fn().mockImplementation(function () {
@@ -100,6 +101,123 @@ describe('OpenAiPlugin', () => {
 			for (const [key, prop] of Object.entries(props)) {
 				expect((prop as any).title, `${key} should have a title`).toBeDefined();
 			}
+		});
+	});
+
+	/**
+	 * Model defaults as of 2026-11-05 (models refresh). Every id was read on the
+	 * vendor's pages that day:
+	 *   https://developers.openai.com/api/docs/models
+	 *   https://developers.openai.com/api/docs/deprecations
+	 * Each tier gets the vendor's current model for its role: simple = GPT-6 Luna
+	 * (cost-sensitive), medium = GPT-6.1 Sol (balance), complex = GPT-6 Astra
+	 * (flagship). The default keeps its shape (it equals the complex tier), and the
+	 * onLoad bootstrap and getDefaultModelId() keep theirs (the simple tier's id).
+	 * The previous ids are deprecated: gpt-5-nano shuts down 2026-12-11,
+	 * gpt-4o-mini 2027-01-14 and gpt-5.1 2027-04-01. Update from those pages, never
+	 * from memory.
+	 */
+	describe('model defaults (as of 2026-11-05)', () => {
+		const EXPECTED_TIER_DEFAULTS: Record<string, string> = {
+			defaultModel: 'gpt-6-astra',
+			simpleModel: 'gpt-6-luna',
+			mediumModel: 'gpt-6.1-sol',
+			complexModel: 'gpt-6-astra'
+		};
+		const EXPECTED_BOOTSTRAP_MODEL = 'gpt-6-luna';
+
+		/** The ids an earlier release shipped as defaults (still served, deprecated). */
+		const LEGACY_SAVED_MODELS: Record<string, string> = {
+			defaultModel: 'gpt-5.1',
+			simpleModel: 'gpt-5-nano',
+			mediumModel: 'gpt-4o-mini',
+			complexModel: 'gpt-5.1'
+		};
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'openai',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		const loadedAiOps = async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			return {
+				bootstrapModel: (MockAiOperations.mock.calls[0][0] as { model: string }).model,
+				aiOpsInstance: MockAiOperations.mock.results[0].value
+			};
+		};
+
+		it("defaults each tier to the vendor's current model for that role", () => {
+			for (const [key, id] of Object.entries(EXPECTED_TIER_DEFAULTS)) {
+				expect(schemaDefault(key), key).toBe(id);
+			}
+		});
+
+		it('uses the same id for the onLoad bootstrap, getDefaultModelId() and the simple tier', async () => {
+			const { bootstrapModel, aiOpsInstance } = await loadedAiOps();
+
+			// No `defaultModel` in the settings: validateConnection falls back to
+			// getDefaultModelId(), the path every unsaved config takes.
+			await plugin.validateConnection({ apiKey: 'sk-test' });
+			const fallbackModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(fallbackModel).toBe(EXPECTED_BOOTSTRAP_MODEL);
+			expect(schemaDefault('simpleModel')).toBe(EXPECTED_BOOTSTRAP_MODEL);
+		});
+
+		it('lets a saved legacy id pass settings validation (no enum or pattern on the model fields)', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const key of Object.keys(LEGACY_SAVED_MODELS)) {
+				const prop = props[key] as Record<string, unknown>;
+				expect(prop.type, key).toBe('string');
+				expect(prop, key).not.toHaveProperty('enum');
+				expect(prop, key).not.toHaveProperty('const');
+				expect(prop, key).not.toHaveProperty('pattern');
+			}
+			expect(validateSettingsConstraints({ apiKey: 'sk-test', ...LEGACY_SAVED_MODELS }, props as never)).toEqual(
+				[]
+			);
+		});
+
+		it('sends a saved legacy id to AiOperations unchanged', async () => {
+			const { aiOpsInstance } = await loadedAiOps();
+			const settings = { apiKey: 'sk-test', ...LEGACY_SAVED_MODELS };
+
+			await plugin.createChatCompletion({
+				model: 'gpt-4o-mini',
+				messages: [{ role: 'user', content: 'hi' }],
+				settings
+			});
+			const [options, config] = aiOpsInstance.createChatCompletion.mock.calls[0];
+			expect(options.model).toBe('gpt-4o-mini');
+			expect(config.model).toBe('gpt-5.1');
+
+			await plugin.validateConnection(settings);
+			const tested = aiOpsInstance.testConnection.mock.calls.map((call: unknown[]) => call[1]);
+			expect([...tested].sort()).toEqual(['gpt-4o-mini', 'gpt-5-nano', 'gpt-5.1']);
+		});
+	});
+
+	describe('capabilities and manifest text', () => {
+		// The plugin-wide hint is only a fallback (the live model list carries each
+		// model's own window) and doubles as the facade's pre-flight output ceiling,
+		// so it stays at the smallest window a saved model may still have.
+		it('keeps the conservative fallback context hint (128,000 tokens)', () => {
+			expect(plugin.getCapabilities().maxContextLength).toBe(128000);
+		});
+
+		it('names current models, not GPT-4o, in its marketing text', () => {
+			const manifest = plugin.getManifest();
+			expect(manifest.description).not.toMatch(/GPT-4o/);
+			expect(manifest.readme).not.toMatch(/GPT-4o/);
+			expect(manifest.readme).toMatch(/GPT-6 Astra/);
 		});
 	});
 

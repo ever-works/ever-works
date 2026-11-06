@@ -1,6 +1,6 @@
 # @ever-works/opencode-plugin
 
-Full pipeline plugin that delegates work generation to the [OpenCode CLI](https://github.com/sst/opencode). A single OpenCode CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace while using the active Ever Works AI provider for model access.
+Full pipeline plugin that delegates work generation to the [OpenCode CLI](https://github.com/anomalyco/opencode). A single OpenCode CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace while using the active Ever Works AI provider for model access.
 
 ## Plugin metadata
 
@@ -42,9 +42,9 @@ Instead, it resolves the active Ever Works `ai-provider` for the current `{ user
 
 ## Settings
 
-| Setting   | Type   | Scope  | Description                                           |
-| --------- | ------ | ------ | ----------------------------------------------------- |
-| `version` | string | hidden | OpenCode CLI version to install (default: `v1.0.223`) |
+| Setting   | Type   | Scope  | Description                                          |
+| --------- | ------ | ------ | ---------------------------------------------------- |
+| `version` | string | hidden | OpenCode CLI version to install (default: `v1.19.5`) |
 
 ## Form Schema
 
@@ -72,8 +72,17 @@ The plugin downloads the OpenCode CLI binary from GitHub releases:
 
 - Binaries are cached at `{tmpdir}/opencode-generator/bin/opencode-{version}-{platform}/`
 - Platform detection: `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`
-- SHA-256 checksum verification when available
-- Default version: `v1.0.223`
+- SHA-256 checksum verification (fails closed when the release publishes no checksum)
+- Default version: `v1.19.5` ([release](https://github.com/anomalyco/opencode/releases/tag/v1.19.5), GitHub "Latest" v1
+  release on 2026-10-28; was `v1.0.223` before 2026-11-05). Releases come from `anomalyco/opencode`, where the project
+  moved from `sst/opencode`.
+
+### Models
+
+OpenCode has no model list of its own: it runs the work's active AI provider model (its complex-tier model, else its
+default), as of 2026-11-05 — see that provider plugin's README for its current list and default. Availability depends on your account, plan and region; the
+provider's picker also accepts a custom model id and keeps existing saved selections. The 2026-11-05 models refresh
+changes no OpenCode setting; when a provider plugin's default moves, OpenCode follows it.
 
 ## Error Handling
 
@@ -140,7 +149,7 @@ pnpm test:coverage
 - [Ever Works documentation](https://docs.ever.works)
 - [Ever Works repository](https://github.com/ever-co/ever-works)
 - [Plugin system](../../plugin/README.md)
-- [OpenCode CLI homepage](https://github.com/sst/opencode)
+- [OpenCode CLI homepage](https://github.com/anomalyco/opencode)
 
 ## License
 

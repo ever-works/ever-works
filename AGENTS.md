@@ -48,6 +48,7 @@ These are minimal, high-signal reminders; full details are in `CLAUDE.md`.
 - **No stray docs in the repo root.** Working/progress/plan/summary/tracker
   markdown belongs under `docs/internal/` (or `docs/specs/<feature>/`), never the
   root — see the "Documentation layout" rule in `CLAUDE.md`.
+- **Code navigation:** when a local Graphify graph exists (`graphify-out/graph.json` here or, in a worktree, in the primary checkout; never committed), use `graphify query|path|explain` before reading raw files and run `graphify update .` after code changes — see "Code navigation: Graphify" in `CLAUDE.md`.
 
 For architecture, testing patterns, deployment, and detailed conventions, **do not restate them here**—instead, **read and follow `CLAUDE.md`**.
 

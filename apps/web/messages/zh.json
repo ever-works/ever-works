@@ -5532,7 +5532,7 @@
                 "workName": "作品名称",
                 "generationPrompt": "Worker 提示",
                 "modelOverride": "AI 模型覆盖",
-                "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "例如 openai/gpt-6.1-sol 或 openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "可选。默认使用导入或之前的模型，除非在此处覆盖。",
                 "modelOverrideUnavailable": "请先选择一个已配置的 AI 提供方，以便从可用列表中选择模型。",
                 "websiteTemplateHelperText": "选择首次创建作品仓库时将使用的作品模板。",

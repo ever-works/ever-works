@@ -5601,7 +5601,7 @@
                 "workName": "Nombre del trabajo",
                 "generationPrompt": "Prompt de Worker",
                 "modelOverride": "Anulación de modelo de IA",
-                "modelOverridePlaceholder": "p. ej. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "p. ej. openai/gpt-6.1-sol o openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "Opcional. Utiliza el modelo importado o anterior por defecto a menos que lo sobrescribas aquí.",
                 "modelOverrideUnavailable": "Seleccione primero un proveedor de IA configurado para elegir un modelo de la lista disponible.",
                 "websiteTemplateHelperText": "Seleccione la plantilla de trabajo que se utilizará cuando se cree el repositorio del trabajo por primera vez.",

@@ -47,6 +47,24 @@ When selected as the AI provider, Claude handles content generation during work 
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
 
+## Model defaults
+
+Model defaults as of 2026-11-05 — source: [platform.claude.com models overview](https://platform.claude.com/docs/en/about-claude/models/overview) (retirement dates: [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)). Availability depends on your account/plan/region; the picker lists the vendor's live models, accepts a custom model id, and keeps existing saved selections.
+
+| Setting                                                  | Default (2026-11-05) | Previous default                                              |
+| -------------------------------------------------------- | -------------------- | ------------------------------------------------------------- |
+| Default Model                                            | `claude-opus-5-5`    | `claude-opus-5-5` (unchanged)                                 |
+| Simple Tasks Model                                       | `claude-haiku-5-5`   | `claude-haiku-4-5-20251001`                                   |
+| Standard Tasks Model                                     | `claude-sonnet-5-5`  | `claude-sonnet-4-5-20250929` (deprecated, retires 2026-11-30) |
+| Complex Tasks Model                                      | `claude-opus-5-5`    | `claude-opus-5-5` (unchanged)                                 |
+| Bootstrap and fallback (`onLoad`, `getDefaultModelId()`) | `claude-opus-5-5`    | `claude-opus-5-5` (unchanged)                                 |
+
+Each tier gets the vendor's current model for its role: Haiku 5.5 (fastest) for simple tasks, Sonnet 5.5 for standard tasks and Opus 5.5, the model the vendor recommends starting with, for complex tasks.
+
+**Default shift.** Upgrading moves every config that never saved a simple or standard model to the defaults above. A model you saved explicitly is kept and still sent to the Claude API unchanged; `claude-sonnet-4-5-20250929` stops working when it retires on 2026-11-30, so switch away from it before then. Nothing is migrated: Ever Works has no production users yet, and the owner accepted the shift on 2026-11-05.
+
+**Model picker.** The picker calls `GET https://api.anthropic.com/v1/models` with `Authorization: Bearer <your key>`, which the Claude API accepts (`x-api-key` is the legacy header, and `anthropic-version` is optional on this endpoint), and lists each model's `id` from `data[]`. The endpoint returns active and deprecated models, newest first, 20 per page by default, and the picker reads only the first page, so enter an older id as a custom model id. Source: [List Models](https://platform.claude.com/docs/en/api/models/list), checked 2026-11-05.
+
 ## Troubleshooting
 
 | Symptom                                     | Likely cause                                                                                   | Fix                                                                                                                                                   |

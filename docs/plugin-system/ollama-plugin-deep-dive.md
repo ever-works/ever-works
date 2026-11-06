@@ -22,7 +22,7 @@ OllamaPlugin (extends BaseAiProvider)
             |-- Ollama /v1 API (OpenAI-compatible endpoint)
 ```
 
-On `onLoad`, the plugin creates an `AiOperations` instance configured with `providerType: 'ollama'`, the default model `ministral-3:8b`, and a base URL of `http://localhost:11434/v1`. The API key defaults to `'ollama'` since most Ollama installations do not require authentication. Each request resolves its own configuration from the settings hierarchy, enabling per-request model and URL customisation.
+On `onLoad`, the plugin creates an `AiOperations` instance configured with `providerType: 'ollama'`, the default model `qwen3.5:4b`, and a base URL of `http://localhost:11434/v1`. The API key defaults to `'ollama'` since most Ollama installations do not require authentication. Each request resolves its own configuration from the settings hierarchy, enabling per-request model and URL customisation.
 
 ## Configuration
 
@@ -38,10 +38,11 @@ On `onLoad`, the plugin creates an `AiOperations` instance configured with `prov
 interface OllamaSettings {
 	baseUrl: string; // Ollama server URL (user-scoped, required, e.g. 'http://localhost:11434/v1')
 	apiKey: string; // API key, usually not needed (default: 'ollama', user-scoped)
-	defaultModel: string; // Default model (default: 'ministral-3:8b', global scope)
-	simpleModel: string; // Simple tasks model (default: 'ministral-3:8b', global scope)
-	mediumModel: string; // Standard tasks model (default: 'ministral-3:8b', global scope)
-	complexModel: string; // Complex tasks model (default: 'ministral-3:8b', global scope)
+	defaultModel: string; // Default model (default: 'qwen3.5:4b', global scope)
+	simpleModel: string; // Simple tasks model (default: 'qwen3.5:4b', global scope)
+	mediumModel: string; // Standard tasks model (default: 'qwen3.5:4b', global scope)
+	complexModel: string; // Complex tasks model (default: 'qwen3.5:4b', global scope)
+	embeddingModel: string; // Semantic-search embeddings, e.g. 'nomic-embed-text' (no default, global scope)
 	temperature: number; // Response randomness, 0-2 (default: 0.7, hidden)
 	maxTokens: number; // Max response length (default: 4096, hidden)
 }
@@ -51,6 +52,10 @@ interface OllamaSettings {
 - Model fields use the `x-widget: 'model-select'` custom widget.
 - `baseUrl` and `defaultModel` are the only required fields.
 - The `apiKey` defaults to `'ollama'` and is only needed for secured Ollama instances behind an authentication proxy.
+
+Default model as of 2026-11-05: `qwen3.5:4b` on every tier — source: [ollama.com/library/qwen3.5](https://ollama.com/library/qwen3.5) (3.3 GB, 256K context, tool support). Availability depends on the models you have pulled; the picker accepts a custom model id and keeps existing saved selections.
+
+**Default shift (2026-11-05): no default changed.** `qwen3.5:4b` was verified current and stays the default; configs that never saved a model keep using it, and saved selections are kept.
 
 ## Capabilities
 
@@ -92,14 +97,14 @@ interface OllamaSettings {
 
 ### Tiered Model Resolution
 
-The inherited `resolveConfig()` method from `BaseAiProvider` resolves the appropriate model for the task tier. Unlike cloud providers which use different model families for each tier, Ollama defaults all tiers to the same model (`ministral-3:8b`) since model availability depends on what the user has pulled locally:
+The inherited `resolveConfig()` method from `BaseAiProvider` resolves the appropriate model for the task tier. Unlike cloud providers which use different model families for each tier, Ollama defaults all tiers to the same model (`qwen3.5:4b`) since model availability depends on what the user has pulled locally:
 
-- **Simple tier**: `ministral-3:8b` -- tags, short descriptions, quick classifications.
-- **Medium tier**: `ministral-3:8b` -- listings, summaries, content reformatting.
-- **Complex tier**: `ministral-3:8b` -- full page generation and multi-step analysis.
-- **Default**: `ministral-3:8b` -- fallback for unspecified tiers.
+- **Simple tier**: `qwen3.5:4b` -- tags, short descriptions, quick classifications.
+- **Medium tier**: `qwen3.5:4b` -- listings, summaries, content reformatting.
+- **Complex tier**: `qwen3.5:4b` -- full page generation and multi-step analysis.
+- **Default**: `qwen3.5:4b` -- fallback for unspecified tiers; also the `onLoad` bootstrap and `getDefaultModelId()`.
 
-Users are expected to customize these tiers based on their locally available models.
+Users are expected to customize these tiers based on their locally available models. Small tool-capable alternatives in the library on 2026-11-05 include `qwen3.5:9b`, `gemma4:e4b`, `qwen3:4b` and `gpt-oss:20b`.
 
 ### OpenAI-Compatible API
 
@@ -128,7 +133,7 @@ const response = await ollamaPlugin.createChatCompletion({
 	],
 	settings: {
 		baseUrl: 'http://localhost:11434/v1',
-		defaultModel: 'llama3.1:8b'
+		defaultModel: 'qwen3.5:9b'
 	}
 });
 

@@ -22,6 +22,26 @@ import type { AiOperationsConfig } from '@ever-works/plugin/ai';
 import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /**
+ * Tier defaults as of 2026-11-05 (models refresh). Each id was on
+ * https://openrouter.ai/api/v1/models that day and is OpenAI's current model for
+ * its role (https://developers.openai.com/api/docs/models: GPT-6 Astra is the
+ * flagship, GPT-6.1 Sol balances intelligence and cost, GPT-6 Luna is for
+ * cost-sensitive, high-volume work). The default model equals the medium tier
+ * and the onLoad bootstrap / getDefaultModelId() use the simple tier, the shape
+ * this plugin has always had. The previous ids (openai/gpt-5-mini, openai/gpt-5,
+ * openai/gpt-5-nano) shut down at OpenAI on 2026-12-11
+ * (https://developers.openai.com/api/docs/deprecations). A config that saved a
+ * model keeps it; only configs that never saved one move to these defaults
+ * (owner decision, 2026-11-05). Deployments can override every tier with the
+ * PLUGIN_OPENROUTER_*_MODEL env vars.
+ */
+const SIMPLE_MODEL = 'openai/gpt-6-luna';
+const MEDIUM_MODEL = 'openai/gpt-6.1-sol';
+const COMPLEX_MODEL = 'openai/gpt-6-astra';
+const DEFAULT_MODEL = MEDIUM_MODEL;
+const BOOTSTRAP_MODEL = SIMPLE_MODEL;
+
+/**
  * OpenRouter AI provider plugin
  *
  * Provides AI capabilities through the OpenRouter API, which aggregates
@@ -56,7 +76,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'openai/gpt-5-mini',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_DEFAULT_MODEL'
@@ -65,7 +85,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'openai/gpt-5-mini',
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_SIMPLE_MODEL'
@@ -74,7 +94,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'openai/gpt-5-mini',
+				default: MEDIUM_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_MEDIUM_MODEL'
@@ -83,7 +103,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'openai/gpt-5',
+				default: COMPLEX_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_COMPLEX_MODEL'
@@ -130,7 +150,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'openai/gpt-5-nano',
+			model: BOOTSTRAP_MODEL,
 			baseURL: 'https://openrouter.ai/api/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -148,7 +168,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 	// BaseAiProvider abstract implementations
 
 	protected getDefaultModelId(): string {
-		return 'openai/gpt-5-nano';
+		return BOOTSTRAP_MODEL;
 	}
 
 	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
@@ -242,7 +262,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				'',
 				'## Why use it?',
 				'',
-				'- **Unified access** — switch between GPT-4o, Claude, Gemini, Llama, and others without managing separate provider accounts',
+				'- **Unified access** — switch between OpenAI GPT, Claude, Gemini, Grok, Llama, and others without managing separate provider accounts',
 				'- **Cost optimization** — assign economy models to simple tasks and premium models to complex ones',
 				'- **Provider redundancy** — OpenRouter can automatically route to an alternative if a provider is unavailable',
 				'- **Centralized billing** — track usage and spending across all models from a single dashboard',
@@ -289,6 +309,13 @@ export class OpenRouterPlugin extends BaseAiProvider {
 
 		if (s.apiKey && typeof s.apiKey === 'string') {
 			config.apiKey = s.apiKey;
+		}
+
+		// The saved default model, as the base implementation passes it. Without
+		// it, any call that does not name a model (isAvailable, direct plugin
+		// calls) ran on the bootstrap model instead of the configured one.
+		if (s.defaultModel && typeof s.defaultModel === 'string') {
+			config.model = s.defaultModel;
 		}
 
 		if (s.baseUrl && typeof s.baseUrl === 'string') {

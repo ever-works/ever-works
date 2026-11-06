@@ -47,6 +47,22 @@ When selected as the AI provider, Grok handles content generation during work cr
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
 
+## Model defaults
+
+Model defaults as of 2026-11-05 — source: [docs.x.ai/developers/models](https://docs.x.ai/developers/models). Availability depends on your account/plan/region; the picker lists the vendor's live models, accepts a custom model id, and keeps existing saved selections.
+
+| Setting                                                  | Default (2026-11-05) | Previous default       |
+| -------------------------------------------------------- | -------------------- | ---------------------- |
+| Default Model                                            | `grok-4.7`           | `grok-4.7` (unchanged) |
+| Simple Tasks Model                                       | `grok-4.3`           | `grok-4.7`             |
+| Standard Tasks Model                                     | `grok-4.7`           | `grok-4.7` (unchanged) |
+| Complex Tasks Model                                      | `grok-4.7`           | `grok-4.7` (unchanged) |
+| Bootstrap and fallback (`onLoad`, `getDefaultModelId()`) | `grok-4.7`           | `grok-4.7` (unchanged) |
+
+Grok 4.7 is the model xAI recommends for general use, code included ($2 / $6 per million input / output tokens, 500K context). The simple tier now uses Grok 4.3, which xAI describes as fast and reliable ($1.25 / $2.50, 1M context). Before 2026-10-28 every tier defaulted to `grok-2-latest`, which xAI no longer documents.
+
+**Default shift.** Upgrading moves every config that never saved a simple-tier model to `grok-4.3`. A model you saved explicitly is kept and still sent to xAI unchanged. Nothing is migrated: Ever Works has no production users yet, and the owner accepted the shift on 2026-11-05.
+
 ## Troubleshooting
 
 | Symptom                                     | Likely cause                                                                                   | Fix                                                                                                                                     |

@@ -18,6 +18,35 @@ import type {
 } from '@ever-works/plugin';
 
 /**
+ * Tier defaults as of 2026-11-05, from the vendor's models page
+ * (https://developers.openai.com/api/docs/models): GPT-6 Astra is the
+ * recommended starting point, GPT-6.1 Sol balances intelligence and cost, and
+ * GPT-6 Luna is for cost-sensitive, high-volume work. The settings schema reads
+ * one constant per tier; the default model equals the complex tier, and the
+ * onLoad bootstrap and getDefaultModelId() read the simple tier's id, the shape
+ * this plugin has always had.
+ *
+ * The previous ids are deprecated (https://developers.openai.com/api/docs/deprecations):
+ * gpt-5-nano shuts down 2026-12-11, gpt-4o-mini 2027-01-14 and gpt-5.1
+ * 2027-04-01. A config that saved one of them keeps it; only configs that never
+ * saved a model move to these defaults (owner decision, 2026-11-05).
+ */
+const COMPLEX_MODEL = 'gpt-6-astra';
+const MEDIUM_MODEL = 'gpt-6.1-sol';
+const SIMPLE_MODEL = 'gpt-6-luna';
+const DEFAULT_MODEL = COMPLEX_MODEL;
+const BOOTSTRAP_MODEL = SIMPLE_MODEL;
+
+/**
+ * Plugin-wide context hint, used only when neither the live model list nor the
+ * catalogue knows a model's window. It stays at the smallest window of the
+ * models a config may still name (gpt-4o / gpt-4o-mini: 128,000), because the
+ * AI facade also uses it as the output ceiling in its pre-flight cost check;
+ * the GPT-6 family's own 1,050,000-token window comes from the live list.
+ */
+const FALLBACK_CONTEXT_WINDOW = 128000;
+
+/**
  * OpenAI AI provider plugin
  *
  * Provides AI capabilities through OpenAI's API.
@@ -46,7 +75,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'gpt-5.1',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -54,7 +83,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'gpt-5-nano',
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -62,7 +91,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'gpt-4o-mini',
+				default: MEDIUM_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -70,7 +99,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'gpt-5.1',
+				default: COMPLEX_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -127,7 +156,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'gpt-5-nano',
+			model: BOOTSTRAP_MODEL,
 			temperature: 0.7,
 			baseURL: 'https://api.openai.com/v1',
 			maxTokens: 4096,
@@ -321,12 +350,12 @@ export class OpenAiPlugin extends BaseAiProvider {
 			supportsStreaming: true,
 			supportsToolCalling: true,
 			supportsVision: true,
-			maxContextLength: 128000
+			maxContextLength: FALLBACK_CONTEXT_WINDOW
 		};
 	}
 
 	protected getDefaultModelId(): string {
-		return 'gpt-5-nano';
+		return BOOTSTRAP_MODEL;
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
@@ -342,7 +371,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Use OpenAI models like GPT-4o for content generation and AI features',
+			description: 'Use OpenAI models like GPT-6 Astra and GPT-6.1 Sol for content generation and AI features',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -356,7 +385,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			readme: [
 				'## What is the OpenAI plugin?',
 				'',
-				"This plugin connects Ever Works directly to OpenAI's API, providing access to models such as GPT-4o, GPT-4o mini, and OpenAI's text-embedding models. Use it when you prefer a direct connection to OpenAI with your own API key.",
+				"This plugin connects Ever Works directly to OpenAI's API, providing access to models such as GPT-6 Astra, GPT-6.1 Sol, GPT-6 Luna, and OpenAI's text-embedding models. Use it when you prefer a direct connection to OpenAI with your own API key.",
 				'',
 				'## Why use it?',
 				'',

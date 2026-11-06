@@ -48,6 +48,14 @@ When selected as the AI provider, Ever Works routes content generation, conversa
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
 
+## Models
+
+Default model as of 2026-11-05: `qwen3.5:4b` on every tier. Source: https://ollama.com/library/qwen3.5. It is a 3.3 GB download with a 256K context and tool support.
+
+- **Pull it first:** run `ollama pull qwen3.5:4b` before you connect.
+- **Other choices:** any model you have pulled appears in the picker. Current small tool-capable alternatives in the library include `qwen3.5:9b`, `gemma4:e4b`, `qwen3:4b` and `gpt-oss:20b`.
+- **Custom ids and saved selections:** the picker also accepts a custom model id, and existing saved selections stay as they are.
+
 ## Troubleshooting
 
 | Symptom                                     | Likely cause                                                                                   | Fix                                                                                                                                                |

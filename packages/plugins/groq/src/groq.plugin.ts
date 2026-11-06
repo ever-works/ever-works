@@ -16,6 +16,18 @@ import type {
 } from '@ever-works/plugin';
 
 /**
+ * Tier defaults as of 2026-11-05, from https://console.groq.com/docs/models and
+ * https://console.groq.com/docs/deprecations. Every tier used to default to
+ * `qwen/qwen3-32b`, which Groq retired on 2026-07-17 (successor gpt-oss-120b),
+ * so every config that never saved a model was broken. The default model, the
+ * medium and complex tiers, the onLoad bootstrap and getDefaultModelId() now
+ * read the featured production model, and the simple tier its smaller sibling.
+ * A config that saved another id keeps it (owner decision, 2026-11-05).
+ */
+const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+const SIMPLE_MODEL = 'openai/gpt-oss-20b';
+
+/**
  * Groq AI provider plugin
  *
  * Provides AI capabilities through Groq's ultra-fast inference API.
@@ -44,7 +56,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'qwen/qwen3-32b',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -52,7 +64,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'qwen/qwen3-32b',
+				default: SIMPLE_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -60,7 +72,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'qwen/qwen3-32b',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -68,7 +80,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'qwen/qwen3-32b',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -106,7 +118,7 @@ export class GroqPlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'qwen/qwen3-32b',
+			model: DEFAULT_MODEL,
 			baseURL: 'https://api.groq.com/openai/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -158,7 +170,7 @@ export class GroqPlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'qwen/qwen3-32b';
+		return DEFAULT_MODEL;
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
@@ -188,12 +200,12 @@ export class GroqPlugin extends BaseAiProvider {
 			readme: [
 				'## What is the Groq plugin?',
 				'',
-				'Groq provides ultra-fast AI inference using custom LPU (Language Processing Unit) hardware. It runs open-source models such as Llama and Mixtral at significantly higher speeds than conventional cloud providers.',
+				"Groq provides ultra-fast AI inference using custom LPU (Language Processing Unit) hardware. It runs open-weight models such as OpenAI's gpt-oss-120b and gpt-oss-20b at significantly higher speeds than conventional cloud providers.",
 				'',
 				'## Why use it?',
 				'',
 				"- **Exceptional speed** — responses arrive in milliseconds thanks to Groq's purpose-built hardware",
-				'- **Open-source models** — access Llama, Mixtral, and other leading open-weight models',
+				"- **Open-weight models** — access OpenAI's gpt-oss family and the other open-weight models Groq serves",
 				'- **Free tier available** — generous free usage limits for evaluation and small-scale use',
 				'- **Rapid iteration** — fast inference enables quick experimentation when refining work content',
 				'',

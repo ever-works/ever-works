@@ -5532,7 +5532,7 @@
                 "workName": "कार्य का नाम",
                 "generationPrompt": "Worker प्रॉम्प्ट",
                 "modelOverride": "एआई मॉडल ओवरराइड",
-                "modelOverridePlaceholder": "जैसे openai/gpt-4.1 या openrouter/openai/gpt-4.1",
+                "modelOverridePlaceholder": "जैसे openai/gpt-6.1-sol या openrouter/openai/gpt-6.1-sol",
                 "modelOverrideHelperText": "वैकल्पिक। डिफ़ॉल्ट रूप से आयातित या पिछला मॉडल उपयोग किया जाता है जब तक कि आप इसे यहाँ ओवरराइड न करें।",
                 "modelOverrideUnavailable": "सूची से मॉडल चुनने के लिए पहले एक कॉन्फ़िगर किए गए AI प्रदाता का चयन करें।",
                 "websiteTemplateHelperText": "वह कार्य टेम्प्लेट चुनें जो कार्य रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।",
