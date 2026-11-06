@@ -109,6 +109,7 @@ interface GoalRow {
     nextCheckAt: string | null;
     status: string;
     outcome: string | null;
+    workId: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -187,6 +188,12 @@ const GOAL_DTO_KEYS = [
     'loopStatus',
     'loopStartedAt',
     'archivedAt',
+    // The Work a Goal works on (APW-08 T31, FR-45). `toGoalDto` emits it
+    // unconditionally (NULL when the Goal names no Work), so it is part of the
+    // pinned surface. Its companion `workName` is NOT: only the single-Goal
+    // read resolves it, so it is absent from list rows and from this nested
+    // link projection — which is why it is not listed here.
+    'workId',
 ];
 
 async function createMission(
@@ -377,6 +384,8 @@ test.describe('Mission goal-portfolio composition', () => {
             params: { currency: 'usd' },
         });
         expect(nested.status).toBe('draft');
+        // The Goal was created without a Work, and the projection says so.
+        expect(nested.workId).toBeNull();
         // …exposing exactly the GoalDto surface — the ownership scope pair is part
         // of that surface, the owning userId is not.
         expect(Object.keys(nested).sort()).toEqual([...GOAL_DTO_KEYS].sort());

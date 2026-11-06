@@ -7,7 +7,11 @@ import { CalendarRange, ListChecks } from 'lucide-react';
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { AgentSessionsClient } from '@/components/agents/AgentSessionsClient';
 import { RunsClient } from '@/components/runs/RunsClient';
-import { buildRunsSearch, type RunsViewState } from '@/components/runs/runs.shared';
+import {
+    buildRunsSearch,
+    ledgerPayloadAnswers,
+    type RunsViewState,
+} from '@/components/runs/runs.shared';
 import type { RunsAgentOption } from '@/components/runs/RunsFilters';
 import type { RunLedgerPage, RunWindowStats } from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
@@ -151,8 +155,10 @@ export function AgentsActivityClient({
                     initialView={runsView}
                     granularityFromUrl={runs.granularityFromUrl}
                     timeZone={runs.timeZone}
-                    initialPage={runs.page}
-                    initialStats={runs.stats}
+                    // The first render's payload only while it still answers the view:
+                    // switching tabs remounts the ledger with the view it last had.
+                    initialPage={ledgerPayloadAnswers(runsView, runs.view) ? runs.page : null}
+                    initialStats={ledgerPayloadAnswers(runsView, runs.view) ? runs.stats : null}
                     agents={runs.agents}
                     syncUrl={false}
                     onViewChange={setRunsView}

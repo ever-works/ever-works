@@ -31,7 +31,7 @@ import { TaskActivitySection } from './TaskActivitySection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
-import { TaskDeliverySection } from './TaskDeliverySection';
+import { TaskDeliverySection, type TaskDeliveryInitial } from './TaskDeliverySection';
 import { TaskCostSection } from './TaskCostSection';
 import { TaskRunControls, type TaskRunOpenQuestion } from './TaskRunControls';
 import { TaskRunsHistory } from './TaskRunsHistory';
@@ -126,6 +126,7 @@ export function TaskDetailClient({
     initialActivity = [],
     initialActivityTotal = 0,
     initialActivityError = null,
+    initialDelivery = null,
     fleetAction = null,
     fleetSection = null,
     upstreamAction = null,
@@ -156,6 +157,11 @@ export function TaskDetailClient({
     initialActivity?: TaskActivityRow[];
     initialActivityTotal?: number;
     initialActivityError?: string | null;
+    /**
+     * APW-08 T27 — the Delivery section's first answer, read by the page on the server for a
+     * Task the delivery chain tracks; null when it was not read (the section then reads it).
+     */
+    initialDelivery?: TaskDeliveryInitial | null;
     /**
      * Latest run for this Task, server-fetched (`listSessions({ taskId,
      * limit: 1 })`). Feeds BOTH the quality-gate Checks section (Wave 3 M6 —
@@ -567,7 +573,11 @@ export function TaskDetailClient({
                     {/* APW-08 T27 — Delivery, above Checks: only for a merged App Work change
                         the delivery chain tracks (every other Task has no delivery state). */}
                     {task.deliveryState && (
-                        <TaskDeliverySection taskId={task.id} workId={task.workId ?? null} />
+                        <TaskDeliverySection
+                            taskId={task.id}
+                            workId={task.workId ?? null}
+                            initial={initialDelivery}
+                        />
                     )}
 
                     {/* Quality gates (Wave 3 M6) — Checks section */}

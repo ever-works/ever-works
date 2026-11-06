@@ -49,20 +49,32 @@ test.describe('Runs ledger — UI', () => {
 
     test('keyboard shortcuts move the window and the URL follows', async ({ page }) => {
         await page.goto('/en/runs?g=day', { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('runs-window-label')).toBeVisible();
+        const label = page.getByTestId('runs-window-label');
+        await expect(label).toBeVisible();
+        const dayLabel = await label.innerText();
         await page.locator('body').click({ position: { x: 5, y: 5 } });
 
-        await page.keyboard.press('w');
-        await expect(page).toHaveURL(/[?&]g=week/);
+        // The label is server-rendered, so it is visible before React has
+        // hydrated and attached the shortcut listener; a key pressed in that
+        // gap is simply lost. `w` is idempotent, so press it until the page
+        // answers rather than racing hydration once.
+        await expect(async () => {
+            await page.keyboard.press('w');
+            await expect(page).toHaveURL(/[?&]g=week/, { timeout: 1_000 });
+        }).toPass({ timeout: 15_000 });
         await expect(page.getByTestId('runs-rail')).toContainText('THIS WEEK');
+        // The label names the window the viewer asked for in the same commit
+        // as the rail — it does not wait for the window's Server Action.
+        await expect(label).not.toHaveText(dayLabel);
+        const weekLabel = await label.innerText();
 
-        const weekLabel = await page.getByTestId('runs-window-label').innerText();
         await page.keyboard.press('ArrowLeft');
         await expect(page).toHaveURL(/[?&]d=\d{4}-\d{2}-\d{2}/);
-        await expect(page.getByTestId('runs-window-label')).not.toHaveText(weekLabel);
+        await expect(label).not.toHaveText(weekLabel);
 
         await page.keyboard.press('t');
         await expect(page).not.toHaveURL(/[?&]d=/);
+        await expect(label).toHaveText(weekLabel);
     });
 
     test('typing in the search box never triggers a shortcut', async ({ page }) => {

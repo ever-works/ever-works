@@ -221,11 +221,21 @@ describe('runAgentTaskJob — run evidence (self-build slice AP)', () => {
 	it('observes the stream LIVE through readChunk, and reads only the END of a stream past the output ceiling', async () => {
 		const stream = Buffer.from(streamEchoing('x'), 'utf8');
 		// Padding lines in front push the file past the ceiling; the verdict
-		// sits on the last line, inside the window that is read.
+		// sits on the last line, inside the window that is read. What the pad
+		// costs is the transcribing of its CONTENT, which happens twice (live,
+		// and again in the END window): ~8 900 lines whose 900-char pad was
+		// transcribed whole took 1.7 s here and 33 s on a saturated CI runner
+		// (round 13, past the 30 s budget). Each line here carries one string
+		// over the transcript's 1 024-char elision threshold, so — like a long
+		// tool output in a real stream — it is elided to a marker, and ~2 100
+		// lines fill the same 8 MiB in about 0.3 s. Nothing below reads the pad's
+		// transcript; what is asserted is the ceiling, the END read, the live
+		// timings and the verdict.
 		const padLine = Buffer.from(
-			`${JSON.stringify({ type: 'system', subtype: 'noise', pad: 'p'.repeat(900) })}\n`,
+			`${JSON.stringify({ type: 'system', subtype: 'noise', pad: 'p'.repeat(3_900) })}\n`,
 			'utf8'
 		);
+		expect(padLine.length).toBeGreaterThan(1_024);
 		const padCount = Math.ceil((MODEL_CLI_MAX_OUTPUT_BYTES + 1024) / padLine.length);
 		const file = Buffer.concat([...Array.from({ length: padCount }, () => padLine), stream]);
 		const readFile = vi.fn(async () => {

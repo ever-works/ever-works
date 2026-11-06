@@ -111,8 +111,22 @@ function phaseAt(view: TaskDeliveryView, states: readonly TaskDeliveryState[]): 
 
 type Load =
     | { kind: 'loading' }
-    | { kind: 'unavailable' }
+    /** `retry`: the failure may pass (no answer, a 5xx, 408 or 429) — ask again on the poll. */
+    | { kind: 'unavailable'; retry: boolean }
     | { kind: 'ready'; view: TaskDeliveryView; retryEscalationId: string | null };
+
+/** A failed read worth repeating: the request never got an answer, or the server may recover. */
+export function isTransientDeliveryFailure(statusCode: number | undefined): boolean {
+    return (
+        statusCode === undefined || statusCode >= 500 || statusCode === 408 || statusCode === 429
+    );
+}
+
+/** The section's first answer, read by the Task page on the server. */
+export interface TaskDeliveryInitial {
+    view: TaskDeliveryView;
+    retryEscalationId: string | null;
+}
 
 /**
  * APW-08 T27 (`TaskDeliverySection`, spec §6.2) — the Task page's **Delivery** section, above
@@ -132,15 +146,39 @@ type Load =
  *
  * Polls `GET /delivery` every 10 s while the state is open and stops at a terminal state
  * (`live`, `closed_without_deploy`) or 30 minutes after the page opened, whichever is first.
+ *
+ * First paint comes from the server (`initial`, read by the Task page with the rest of it), so
+ * the chip is on screen with the page: a client read is a Server Action, and the App Router runs
+ * those one at a time behind every other action the dashboard has queued, which under load kept
+ * the section on "Loading…" for many seconds. Without `initial` (the server read failed) the
+ * section reads on mount, and a first read that failed TRANSIENTLY (no answer, a 5xx, 408, 429)
+ * is retried on the poll's cadence within the same 30 minutes — the page rendered this section
+ * because the chain tracks the Task, so such an "unavailable" is a moment, not an answer. A
+ * refusal (403, 404) is an answer and is not asked again.
  */
-export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId: string | null }) {
+export function TaskDeliverySection({
+    taskId,
+    workId,
+    initial = null,
+}: {
+    taskId: string;
+    workId: string | null;
+    initial?: TaskDeliveryInitial | null;
+}) {
     const t = useTranslations('dashboard.tasksPage.delivery');
     const tStatus = useTranslations('dashboard.tasksPage.status');
     const chipText = useDeliveryChipText();
     const format = useFormatter();
-    const [load, setLoad] = useState<Load>({ kind: 'loading' });
-    /** Bumped after every read, so a failed poll still schedules the next one. */
-    const [reads, setReads] = useState(0);
+    const [load, setLoad] = useState<Load>(() =>
+        initial
+            ? { kind: 'ready', view: initial.view, retryEscalationId: initial.retryEscalationId }
+            : { kind: 'loading' },
+    );
+    /** Bumped after every read, so a failed poll still schedules the next one. The server's
+     *  answer counts as the first read. */
+    const [reads, setReads] = useState(initial ? 1 : 0);
+    // The server's answer IS the mount read; the effect below skips it once.
+    const skipMountRead = useRef(initial !== null);
     const [pollingStopped, setPollingStopped] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [closing, setClosing] = useState(false);
@@ -171,14 +209,16 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                 });
             } else {
                 // A failed poll keeps the last answer; only a failed FIRST read says so.
+                const retry = isTransientDeliveryFailure(result.statusCode);
                 setLoad((previous) =>
-                    previous.kind === 'ready' ? previous : { kind: 'unavailable' },
+                    previous.kind === 'ready' ? previous : { kind: 'unavailable', retry },
                 );
             }
         } catch {
+            // The action itself failed (network, a crashed render): nothing answered.
             if (!cancelled.current) {
                 setLoad((previous) =>
-                    previous.kind === 'ready' ? previous : { kind: 'unavailable' },
+                    previous.kind === 'ready' ? previous : { kind: 'unavailable', retry: true },
                 );
             }
         } finally {
@@ -189,24 +229,30 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
     useEffect(() => {
         cancelled.current = false;
         startedAt.current = Date.now();
-        void read();
+        if (skipMountRead.current) {
+            skipMountRead.current = false;
+        } else {
+            void read();
+        }
         return () => {
             cancelled.current = true;
         };
     }, [read]);
 
     const state = load.kind === 'ready' ? load.view.state : null;
+    // No read has answered yet (the first one failed transiently): keep asking on the poll.
+    const unanswered = load.kind === 'unavailable' && load.retry;
 
     // The poll: one timer at a time, re-armed after each read while the chain is open.
     useEffect(() => {
-        if (reads === 0 || !isDeliveryOpen(state)) return;
+        if (reads === 0 || (!unanswered && !isDeliveryOpen(state))) return;
         if (Date.now() - startedAt.current >= DELIVERY_POLL_MAX_MS) {
             setPollingStopped(true);
             return;
         }
         const timer = setTimeout(() => void read(), DELIVERY_POLL_INTERVAL_MS);
         return () => clearTimeout(timer);
-    }, [reads, state, read]);
+    }, [reads, state, unanswered, read]);
 
     // Focus goes back where it came from when the confirm closes: the Close button, or — once
     // the change is closed and that button is gone — the section heading.
