@@ -398,11 +398,15 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         // The section is in the server's HTML, so this button can be on screen before React
         // has hydrated it, and a click in that gap is lost. Click until the confirmation opens
         // (never a second time once it is open).
-        const dialog = page.getByRole('dialog');
+        // Key the loop on the confirmation's own button: `getByRole('dialog')` can match more than
+        // one element (or none while the panel is still transitioning in), and a click into an
+        // already-open dialog lands on its overlay and times out.
+        const confirmClose = page.getByTestId('task-delivery-confirm-close');
         await expect(async () => {
-            if (!(await dialog.isVisible())) await close.click({ timeout: 5_000 });
-            await expect(dialog).toBeVisible({ timeout: 2_000 });
+            if (!(await confirmClose.isVisible())) await close.click({ timeout: 5_000 });
+            await expect(confirmClose).toBeVisible({ timeout: 2_000 });
         }).toPass({ timeout: 30_000 });
+        const dialog = page.getByRole('dialog').filter({ has: confirmClose });
         await expect(dialog).toContainText(
             "Close this Task even though its change isn't live? The failure stays on record.",
         );
