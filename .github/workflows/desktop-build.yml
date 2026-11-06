@@ -1,7 +1,20 @@
 name: Desktop App Build
 
 # Builds the Ever Works Desktop Electron app for Windows, macOS and Linux and
-# uploads the installers as workflow artifacts.
+# uploads the installers.
+#
+# Where the installers go (2026-11-06): GitHub's artifact storage for the org is
+# full and stays full (billing locked), so with the CI_ARTIFACTS_S3_* secrets set
+# they go to our own S3 storage (MinIO bucket `ci-artifacts`, deleted after 14
+# days) under ever-works/desktop/<branch>/<sha>/<label>/, and the job summary
+# lists a download link per file, valid 7 days. Forks have no such secrets and
+# keep the workflow artifact. See scripts/ci/upload-ci-artifacts.mjs.
+#
+# Where the cells run: windows on our own Windows machines, macos on
+# macos-latest, linux on ubuntu-latest, or in-cluster (k8s-gitops
+# apps/ci-builds, a catalog entry for this one leg) once the repo variable
+# DESKTOP_LINUX_IN_CLUSTER is 'true'. GitHub then does not request the linux
+# cell: GitHub-hosted runners do not start for the org.
 #
 # Code signing (A11): certificates are read from repository secrets and mapped
 # to env vars by the `Resolve code signing` step below. When those secrets are
@@ -28,18 +41,19 @@ name: Desktop App Build
 # still runs the whole thing on demand against any branch:
 #   gh workflow run <this-file> --ref <your-branch>
 #
-# Note for whoever reads the queue: this matrix runs on ubuntu-latest and
-# macos-latest (GitHub-hosted, NOT the self-hosted ARC pool) and, since
-# 2026-11-05, on our own Windows machines (vars.RUNNER_WINDOWS_X64, hosted
-# windows-latest in forks) — so it was never part of the homelab starvation. It is narrowed here
-# to keep one consistent rule across the repo, and because macOS minutes bill
-# at 10x.
+# Note for whoever reads the queue: this matrix runs on ubuntu-latest (or
+# in-cluster, see above) and macos-latest (GitHub-hosted, NOT the self-hosted
+# ARC pool) and, since 2026-11-05, on our own Windows machines
+# (vars.RUNNER_WINDOWS_X64, hosted windows-latest in forks) — so it was never
+# part of the homelab starvation. It is narrowed here to keep one consistent
+# rule across the repo, and because macOS minutes bill at 10x.
 on:
   push:
     branches: [main, stage]
     paths:
       - 'apps/desktop/**'
       - '.github/workflows/desktop-build.yml'
+      - 'scripts/ci/upload-ci-artifacts.mjs'
   workflow_dispatch:
     inputs:
       bundle_runtime:
@@ -61,33 +75,28 @@ env:
 jobs:
   build:
     name: ${{ matrix.label }}
-    runs-on: ${{ matrix.runner }}
+    # linux: ubuntu-latest (in-cluster: the build pod). windows: our own Windows
+    # machines (ever-co org variable RUNNER_WINDOWS_X64, a JSON label list, owner
+    # rule 2026-11-04); forks do not have the variable and keep the GitHub-hosted
+    # image. macos: macos-latest.
+    runs-on: ${{ matrix.label == 'linux' && 'ubuntu-latest' || matrix.label == 'macos' && 'macos-latest' || vars.RUNNER_WINDOWS_X64 && fromJSON(vars.RUNNER_WINDOWS_X64) || 'windows-latest' }}
+
+    env:
+      # Secrets cannot be read in `if:`, so the upload steps below test this.
+      CI_ARTIFACTS_S3: ${{ secrets.CI_ARTIFACTS_S3_SECRET_ACCESS_KEY != '' && 'true' || 'false' }}
 
     strategy:
       # One red OS should not hide the state of the other two.
       fail-fast: false
       matrix:
-        include:
-          - label: linux
-            runner: ubuntu-latest
-            target: linux
-            artifacts: |
-              apps/desktop/release/*.AppImage
-              apps/desktop/release/*.deb
-          - label: windows
-            # Our own Windows machines (ever-co org variable RUNNER_WINDOWS_X64, a
-            # JSON label list, owner rule 2026-11-04). Forks do not have the
-            # variable and keep the GitHub-hosted image.
-            runner: ${{ vars.RUNNER_WINDOWS_X64 && fromJSON(vars.RUNNER_WINDOWS_X64) || 'windows-latest' }}
-            target: win
-            artifacts: |
-              apps/desktop/release/*.exe
-          - label: macos
-            runner: macos-latest
-            target: mac
-            artifacts: |
-              apps/desktop/release/*.dmg
-              apps/desktop/release/*.zip
+        # With DESKTOP_LINUX_IN_CLUSTER = 'true' the linux cell runs in-cluster
+        # only, so GitHub is asked for windows and macos. In-cluster
+        # (vars.CI_IN_CLUSTER) and in forks (no variable) the list keeps all
+        # three. A list and not `include` entries: GitHub adds an `include`
+        # entry back as a cell of its own whatever the list holds. Each cell's
+        # runner is chosen in `runs-on` above, its target and installer files in
+        # the `Describe this cell` step.
+        label: ${{ fromJSON(vars.DESKTOP_LINUX_IN_CLUSTER == 'true' && vars.CI_IN_CLUSTER != 'true' && '["windows","macos"]' || '["linux","windows","macos"]') }}
 
     steps:
       - name: Checkout repository
@@ -100,6 +109,23 @@ jobs:
       - name: Self-hosted Windows setup
         if: runner.os == 'Windows'
         uses: ./.github/actions/self-hosted-windows-setup
+
+      # The electron-builder target and the installer files of this cell, for
+      # the packaging and upload steps.
+      - name: Describe this cell
+        id: cell
+        shell: bash
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          case "$LABEL" in
+            linux) target=linux; artifacts='apps/desktop/release/*.AppImage apps/desktop/release/*.deb' ;;
+            windows) target=win; artifacts='apps/desktop/release/*.exe' ;;
+            macos) target=mac; artifacts='apps/desktop/release/*.dmg apps/desktop/release/*.zip' ;;
+            *) echo "::error::unknown cell $LABEL"; exit 1 ;;
+          esac
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          { echo 'artifacts<<EOF'; tr ' ' '\n' <<< "$artifacts"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v3
@@ -137,7 +163,7 @@ jobs:
         run: |
           if [ "${{ inputs.bundle_runtime }}" = "true" ]; then
             echo "stage=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" != "pull_request" ] && [ "${{ matrix.target }}" = "linux" ]; then
+          elif [ "${{ github.event_name }}" != "pull_request" ] && [ "${{ steps.cell.outputs.target }}" = "linux" ]; then
             # Cost gate: a full platform build per OS is expensive. Prove the
             # bundled path on Linux for pushes; use the workflow_dispatch input
             # to produce fully self-contained installers for all three.
@@ -180,16 +206,38 @@ jobs:
           DESKTOP_APPLE_ID: ${{ secrets.DESKTOP_APPLE_ID }}
           DESKTOP_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.DESKTOP_APPLE_APP_SPECIFIC_PASSWORD }}
           DESKTOP_APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
-        run: node scripts/package-app.js --os ${{ matrix.target }}
+        run: node scripts/package-app.js --os ${{ steps.cell.outputs.target }}
 
       - name: List produced artifacts
         shell: bash
         run: ls -la apps/desktop/release || true
 
+      # Our own S3 storage (see the top of this file). Fails the job when no
+      # installer is found or an upload fails after retries: the upload is the
+      # point of the job. Secrets go in as env vars, never as arguments.
+      - name: Upload installers to CI artifact storage
+        if: env.CI_ARTIFACTS_S3 == 'true'
+        shell: bash
+        env:
+          CI_ARTIFACTS_S3_ENDPOINT: ${{ secrets.CI_ARTIFACTS_S3_ENDPOINT }}
+          CI_ARTIFACTS_S3_BUCKET: ${{ secrets.CI_ARTIFACTS_S3_BUCKET }}
+          CI_ARTIFACTS_S3_ACCESS_KEY_ID: ${{ secrets.CI_ARTIFACTS_S3_ACCESS_KEY_ID }}
+          CI_ARTIFACTS_S3_SECRET_ACCESS_KEY: ${{ secrets.CI_ARTIFACTS_S3_SECRET_ACCESS_KEY }}
+          # The host in the links, when people reach the store under another
+          # name than the build does (https://cdn.ever.co works from anywhere).
+          CI_ARTIFACTS_S3_DOWNLOAD_ENDPOINT: ${{ vars.CI_ARTIFACTS_S3_DOWNLOAD_ENDPOINT }}
+          PREFIX: ever-works/desktop/${{ github.ref_name }}/${{ github.sha }}/${{ matrix.label }}
+          ARTIFACTS: ${{ steps.cell.outputs.artifacts }}
+        run: |
+          node scripts/ci/upload-ci-artifacts.mjs --self-test
+          mapfile -t patterns <<< "$ARTIFACTS"
+          node scripts/ci/upload-ci-artifacts.mjs --prefix "$PREFIX" "${patterns[@]}"
+
       - name: Upload installers
+        if: env.CI_ARTIFACTS_S3 != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: ever-works-desktop-${{ matrix.label }}
-          path: ${{ matrix.artifacts }}
+          path: ${{ steps.cell.outputs.artifacts }}
           if-no-files-found: error
           retention-days: 14
