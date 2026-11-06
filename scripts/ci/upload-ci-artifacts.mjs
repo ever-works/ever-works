@@ -111,9 +111,17 @@ export function expand(pattern) {
 	} catch {
 		return [];
 	}
+	// statSync follows symlinks, so a link to a regular file counts, as on the literal-path branch.
 	return entries
-		.filter((e) => e.isFile() && re.test(e.name))
+		.filter((e) => re.test(e.name))
 		.map((e) => path.posix.join(dir, e.name))
+		.filter((f) => {
+			try {
+				return statSync(f).isFile();
+			} catch {
+				return false;
+			}
+		})
 		.sort();
 }
 
@@ -138,20 +146,32 @@ function request(url, { method, headers = {}, body }) {
 async function putFile(url, file, size) {
 	const md5 = createHash('md5');
 	const sha = createHash('sha256');
-	const res = await request(url, {
-		method: 'PUT',
-		headers: { 'Content-Length': String(size), 'Content-Type': 'application/octet-stream' },
-		body: (req) => {
-			const stream = createReadStream(file);
-			stream.on('data', (c) => {
-				md5.update(c);
-				sha.update(c);
-			});
-			stream.on('error', (e) => req.destroy(e));
-			stream.pipe(req);
-		}
+	// One stream per attempt. It is stopped when the request fails or the store answers early (an error before the
+	// whole body was sent), and the hashes are read only once it has closed, so a failed attempt never keeps reading
+	// the file while the next one starts.
+	const stream = createReadStream(file);
+	const closed = new Promise((resolve) => stream.on('close', resolve));
+	stream.on('data', (c) => {
+		md5.update(c);
+		sha.update(c);
 	});
-	return { res, md5: md5.digest('hex'), sha256: sha.digest('hex') };
+	try {
+		const res = await request(url, {
+			method: 'PUT',
+			headers: { 'Content-Length': String(size), 'Content-Type': 'application/octet-stream' },
+			body: (req) => {
+				stream.on('error', (e) => req.destroy(e));
+				stream.pipe(req);
+			}
+		});
+		if (res.status !== 200) stream.destroy();
+		await closed;
+		return { res, md5: md5.digest('hex'), sha256: sha.digest('hex') };
+	} catch (e) {
+		stream.destroy();
+		await closed;
+		throw e;
+	}
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -192,6 +212,13 @@ async function upload(prefix, patterns, env) {
 	if (!files.length) throw new Error(`No files match ${patterns.join(', ')}`);
 
 	const cleanPrefix = prefix.replace(/^\/+|\/+$/g, '');
+	// Every file lands at <prefix>/<file name>: two files with one name would overwrite each other.
+	const names = files.map((f) => path.posix.basename(f));
+	const dupes = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))];
+	if (dupes.length) throw new Error(`More than one file is named ${dupes.join(', ')}: they would share one key`);
+	// Keys are signed as written; an empty, "." or ".." segment could be normalized on the way and break the signature.
+	const bad = [cleanPrefix, ...names].join('/').split('/').filter((seg) => seg === '' || seg === '.' || seg === '..');
+	if (bad.length) throw new Error(`Key prefix ${cleanPrefix} or a file name has an empty, "." or ".." segment`);
 	const rows = [];
 	for (const file of files) {
 		const size = statSync(file).size;
@@ -264,6 +291,19 @@ function selfTest() {
 		expires: SEVEN_DAYS,
 		date: new Date('2026-11-06T00:00:00Z')
 	});
+	// A presigned PUT as botocore 1.x signs it (S3SigV4QueryAuth, same keys and date), computed independently.
+	const put = presignUrl({
+		method: 'PUT',
+		endpoint: 'http://192.168.1.181:9000',
+		bucket: 'ci-artifacts',
+		key: 'ever-cli/native/develop/abc/x86_64-unknown-linux-gnu/ever-cli-linux-x64-gnu.tar.gz',
+		accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
+		secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+		region: 'us-east-1',
+		expires: 3600,
+		date: new Date('2013-05-24T00:00:00Z')
+	});
+	check('PUT signature (botocore)', put.split('X-Amz-Signature=')[1], '5b5292e016e78be7b4432cc0faec7ff55d757f1c9395907bd147e4e4745e5db0');
 	check('path-style URL', url.startsWith('http://192.168.1.181:9000/ci-artifacts/a/b.deb?X-Amz-Algorithm='), true);
 	check('seven days', /X-Amz-Expires=604800&/.test(url), true);
 	if (failures.length) {
