@@ -4,10 +4,10 @@ name: Desktop App Build
 # uploads the installers.
 #
 # Where the installers go (2026-11-06): GitHub's artifact storage for the org is
-# full and stays full (billing locked), so with the CI_ARTIFACTS_S3_* secrets set
-# they go to our own S3 storage (MinIO bucket `ci-artifacts`, deleted after 14
+# full and stays full (billing locked), so with the CI_ARTIFACTS_S3_* settings
+# present they go to our own S3 storage (MinIO bucket `ci-artifacts`, deleted after 14
 # days) under ever-works/desktop/<branch>/<sha>/<label>/, and the job summary
-# lists a download link per file, valid 7 days. Forks have no such secrets and
+# lists a download link per file, valid 7 days. Forks have no such settings and
 # keep the workflow artifact. See scripts/ci/upload-ci-artifacts.mjs.
 #
 # Where the cells run: windows on our own Windows machines, macos on
@@ -83,7 +83,7 @@ jobs:
 
     env:
       # Secrets cannot be read in `if:`, so the upload steps below test this.
-      CI_ARTIFACTS_S3: ${{ secrets.CI_ARTIFACTS_S3_SECRET_ACCESS_KEY != '' && 'true' || 'false' }}
+      CI_ARTIFACTS_S3: ${{ secrets.CI_ARTIFACTS_S3_SECRET_ACCESS_KEY != '' && vars.CI_ARTIFACTS_S3_BUCKET != '' && 'true' || 'false' }}
 
     strategy:
       # One red OS should not hide the state of the other two.
@@ -214,14 +214,16 @@ jobs:
 
       # Our own S3 storage (see the top of this file). Fails the job when no
       # installer is found or an upload fails after retries: the upload is the
-      # point of the job. Secrets go in as env vars, never as arguments.
+      # point of the job. Only the secret key is a secret: the runner masks
+      # secret values in the log and the summary, and the bucket and key id
+      # are part of every link. Secrets go in as env vars, never as arguments.
       - name: Upload installers to CI artifact storage
         if: env.CI_ARTIFACTS_S3 == 'true'
         shell: bash
         env:
-          CI_ARTIFACTS_S3_ENDPOINT: ${{ secrets.CI_ARTIFACTS_S3_ENDPOINT }}
-          CI_ARTIFACTS_S3_BUCKET: ${{ secrets.CI_ARTIFACTS_S3_BUCKET }}
-          CI_ARTIFACTS_S3_ACCESS_KEY_ID: ${{ secrets.CI_ARTIFACTS_S3_ACCESS_KEY_ID }}
+          CI_ARTIFACTS_S3_ENDPOINT: ${{ vars.CI_ARTIFACTS_S3_ENDPOINT }}
+          CI_ARTIFACTS_S3_BUCKET: ${{ vars.CI_ARTIFACTS_S3_BUCKET }}
+          CI_ARTIFACTS_S3_ACCESS_KEY_ID: ${{ vars.CI_ARTIFACTS_S3_ACCESS_KEY_ID }}
           CI_ARTIFACTS_S3_SECRET_ACCESS_KEY: ${{ secrets.CI_ARTIFACTS_S3_SECRET_ACCESS_KEY }}
           # The host in the links, when people reach the store under another
           # name than the build does (https://cdn.ever.co works from anywhere).

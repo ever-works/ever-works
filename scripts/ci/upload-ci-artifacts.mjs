@@ -4,8 +4,9 @@
  * and prints a presigned download link for each file, valid 7 days (the SigV4 maximum).
  *
  * Why: GitHub's artifact storage for the org is full ("Artifact storage quota has been hit"), so
- * `actions/upload-artifact` fails. Workflows call this when the `CI_ARTIFACTS_S3_*` secrets exist and keep
- * `actions/upload-artifact` for forks, which have no such secrets.
+ * `actions/upload-artifact` fails. Workflows call this when the `CI_ARTIFACTS_S3_*` settings exist and keep
+ * `actions/upload-artifact` for forks, which have none. Only the secret key should be a secret: runners mask secret
+ * values in logs and summaries, and the bucket and key id are part of every link.
  *
  *   node scripts/ci/upload-ci-artifacts.mjs --self-test
  *   node scripts/ci/upload-ci-artifacts.mjs --prefix ever-works/desktop/<branch>/<sha>/<label> 'apps/desktop/release/*.deb' ...
