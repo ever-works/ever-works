@@ -662,7 +662,14 @@ test.describe('Mission clone — deep copy-vs-reset semantics', () => {
             description: `linkage probe ${s}`,
             type: 'one-shot',
             guardrailsOverride: { maxItemsPerWork: 1 },
+            // Non-default output config (the default is `ideas` with 1 / 3), so the
+            // copy assertions below can fail. With no App Work attached the create
+            // answer says `noAppWorkRelation` and accepts it all the same (S27).
+            outputMode: 'both',
+            taskOutput: { tasksPerTick: 2, openTasksCap: 5 },
         });
+        expect(source.outputMode).toBe('both');
+        expect(source.taskOutput).toMatchObject({ tasksPerTick: 2, openTasksCap: 5 });
 
         // A standalone user-manual Idea on the owner — born missionId=null, so
         // it is NEVER scoped to either the source or the clone.
@@ -688,7 +695,7 @@ test.describe('Mission clone — deep copy-vs-reset semantics', () => {
         // The output configuration is the Mission's own and is copied like the
         // other config columns; the "nothing to file" notice stamp is per-row
         // state, so the clone starts without one.
-        expect(cloned.outputMode).toBe(source.outputMode);
+        expect(cloned.outputMode).toBe('both');
         expect(cloned.taskOutput).toEqual(source.taskOutput);
         expect(cloned.taskOutputNoticeAt).toBeNull();
 

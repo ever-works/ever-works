@@ -111,8 +111,16 @@ function phaseAt(view: TaskDeliveryView, states: readonly TaskDeliveryState[]): 
 
 type Load =
     | { kind: 'loading' }
-    | { kind: 'unavailable' }
+    /** `retry`: the failure may pass (no answer, a 5xx, 408 or 429) — ask again on the poll. */
+    | { kind: 'unavailable'; retry: boolean }
     | { kind: 'ready'; view: TaskDeliveryView; retryEscalationId: string | null };
+
+/** A failed read worth repeating: the request never got an answer, or the server may recover. */
+export function isTransientDeliveryFailure(statusCode: number | undefined): boolean {
+    return (
+        statusCode === undefined || statusCode >= 500 || statusCode === 408 || statusCode === 429
+    );
+}
 
 /** The section's first answer, read by the Task page on the server. */
 export interface TaskDeliveryInitial {
@@ -143,9 +151,10 @@ export interface TaskDeliveryInitial {
  * the chip is on screen with the page: a client read is a Server Action, and the App Router runs
  * those one at a time behind every other action the dashboard has queued, which under load kept
  * the section on "Loading…" for many seconds. Without `initial` (the server read failed) the
- * section reads on mount, and a read that has never answered is retried on the poll's cadence —
- * the page rendered this section because the chain tracks the Task, so "unavailable" is a moment,
- * not an answer.
+ * section reads on mount, and a first read that failed TRANSIENTLY (no answer, a 5xx, 408, 429)
+ * is retried on the poll's cadence within the same 30 minutes — the page rendered this section
+ * because the chain tracks the Task, so such an "unavailable" is a moment, not an answer. A
+ * refusal (403, 404) is an answer and is not asked again.
  */
 export function TaskDeliverySection({
     taskId,
@@ -200,14 +209,16 @@ export function TaskDeliverySection({
                 });
             } else {
                 // A failed poll keeps the last answer; only a failed FIRST read says so.
+                const retry = isTransientDeliveryFailure(result.statusCode);
                 setLoad((previous) =>
-                    previous.kind === 'ready' ? previous : { kind: 'unavailable' },
+                    previous.kind === 'ready' ? previous : { kind: 'unavailable', retry },
                 );
             }
         } catch {
+            // The action itself failed (network, a crashed render): nothing answered.
             if (!cancelled.current) {
                 setLoad((previous) =>
-                    previous.kind === 'ready' ? previous : { kind: 'unavailable' },
+                    previous.kind === 'ready' ? previous : { kind: 'unavailable', retry: true },
                 );
             }
         } finally {
@@ -229,8 +240,8 @@ export function TaskDeliverySection({
     }, [read]);
 
     const state = load.kind === 'ready' ? load.view.state : null;
-    // No read has answered yet (the first one failed): keep asking on the poll's cadence.
-    const unanswered = load.kind === 'unavailable';
+    // No read has answered yet (the first one failed transiently): keep asking on the poll.
+    const unanswered = load.kind === 'unavailable' && load.retry;
 
     // The poll: one timer at a time, re-armed after each read while the chain is open.
     useEffect(() => {

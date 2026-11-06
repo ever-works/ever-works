@@ -395,8 +395,14 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         //     nothing is written.
         const close = section.getByTestId('task-delivery-close');
         await expect(close).toHaveText('Close anyway');
-        await close.click();
+        // The section is in the server's HTML, so this button can be on screen before React
+        // has hydrated it, and a click in that gap is lost. Click until the confirmation opens
+        // (never a second time once it is open).
         const dialog = page.getByRole('dialog');
+        await expect(async () => {
+            if (!(await dialog.isVisible())) await close.click({ timeout: 5_000 });
+            await expect(dialog).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 30_000 });
         await expect(dialog).toContainText(
             "Close this Task even though its change isn't live? The failure stays on record.",
         );

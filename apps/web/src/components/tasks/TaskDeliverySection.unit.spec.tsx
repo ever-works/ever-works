@@ -45,6 +45,7 @@ import {
     DELIVERY_POLL_MAX_MS,
     TaskDeliverySection,
     deliveryErrorKey,
+    isTransientDeliveryFailure,
 } from './TaskDeliverySection';
 
 const copy = messages.dashboard.tasksPage.delivery;
@@ -267,6 +268,28 @@ describe('TaskDeliverySection — the timeline (APW-08 T27)', () => {
         // Answered with a terminal state: the retries are over, as the poll would be.
         await flush(DELIVERY_POLL_INTERVAL_MS * 3);
         expect(getDelivery).toHaveBeenCalledTimes(3);
+    });
+
+    it('never repeats a first read the API refused (a 404 is an answer)', async () => {
+        vi.useFakeTimers();
+        getDelivery.mockResolvedValue({ ok: false, code: 'NOT_FOUND', statusCode: 404 });
+        renderSection();
+        await flush();
+        expect(screen.getByTestId('task-delivery-unavailable')).toBeTruthy();
+
+        await flush(DELIVERY_POLL_INTERVAL_MS * 5);
+        expect(getDelivery).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats only an unanswered, 5xx, 408 or 429 read as transient', () => {
+        expect(isTransientDeliveryFailure(undefined)).toBe(true);
+        expect(isTransientDeliveryFailure(500)).toBe(true);
+        expect(isTransientDeliveryFailure(503)).toBe(true);
+        expect(isTransientDeliveryFailure(408)).toBe(true);
+        expect(isTransientDeliveryFailure(429)).toBe(true);
+        expect(isTransientDeliveryFailure(400)).toBe(false);
+        expect(isTransientDeliveryFailure(403)).toBe(false);
+        expect(isTransientDeliveryFailure(404)).toBe(false);
     });
 });
 

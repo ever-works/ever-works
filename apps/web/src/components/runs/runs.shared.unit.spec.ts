@@ -10,6 +10,7 @@ import {
     hasOpenRuns,
     isSearchUsable,
     isTypingTarget,
+    ledgerPayloadAnswers,
     mergeRefreshedRows,
     parseRunsViewState,
     requestedRunWindow,
@@ -167,6 +168,23 @@ describe('runs.shared', () => {
             expect(runsWindowKey({ granularity: 'day', date: '2026-09-08' })).not.toBe(
                 runsWindowKey({ granularity: 'week', date: '2026-09-08' }),
             );
+        });
+
+        // A host that keeps the ledger's view across its own tabs remounts the
+        // ledger with that view; the first render's payload answers it only
+        // while the window and the filters are still the ones it was read for.
+        it('says when a server payload still answers a view', () => {
+            const served = {
+                granularity: 'day' as const,
+                date: '2026-09-08',
+                filters: { statuses: ['failed' as const] },
+                runId: null,
+            };
+            expect(ledgerPayloadAnswers(served, served)).toBe(true);
+            expect(ledgerPayloadAnswers({ ...served, runId: RUN }, served)).toBe(true);
+            expect(ledgerPayloadAnswers({ ...served, date: '2026-09-07' }, served)).toBe(false);
+            expect(ledgerPayloadAnswers({ ...served, granularity: 'week' }, served)).toBe(false);
+            expect(ledgerPayloadAnswers({ ...served, filters: {} }, served)).toBe(false);
         });
     });
 

@@ -172,6 +172,20 @@ export function runsWindowKey(view: Pick<RunsViewState, 'granularity' | 'date'>)
     return `${view.granularity}|${view.date ?? ''}`;
 }
 
+/**
+ * Does the server render's ledger payload answer `view`? It does when the
+ * window and the filters match the view the server read for (the open receipt
+ * changes neither). A host that keeps the ledger's view across its own tabs
+ * hands the payload to a REMOUNTED ledger only then; otherwise the ledger
+ * fetches its window itself, instead of showing the first render's rows (and
+ * stepping from its anchor) under a newer view.
+ */
+export function ledgerPayloadAnswers(view: RunsViewState, served: RunsViewState): boolean {
+    return (
+        buildRunsSearch({ ...view, runId: null }) === buildRunsSearch({ ...served, runId: null })
+    );
+}
+
 /** Today's calendar date (`YYYY-MM-DD`) in `timeZone`; UTC's when the zone is unknown. */
 export function calendarDateIn(timeZone: string, now: Date = new Date()): string {
     try {
