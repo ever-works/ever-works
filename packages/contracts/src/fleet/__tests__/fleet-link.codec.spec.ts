@@ -44,6 +44,42 @@ function rawFrame(channel: number, kind: number, declaredLength: number, payload
 	return out;
 }
 
+/** Every payload decoder, on one payload. */
+function decodePayload(payload: Uint8Array): void {
+	decodeFleetLinkControl(payload);
+	decodeFleetLinkJson(payload);
+	decodeFleetLinkResize(payload);
+	decodeFleetLinkExit(payload);
+	decodeFleetLinkAck(payload);
+	decodeFleetLinkCloseReason(payload);
+}
+
+/** The frame decoder, the channel peek, and every payload decoder on what the frame carried. */
+function decodeEverything(bytes: Uint8Array): void {
+	const frame = decodeFleetLinkFrame(bytes);
+	if (frame) decodePayload(frame.payload);
+	peekFleetLinkFrameChannel(bytes);
+}
+
+/** Counts the inputs a decoder threw on, keeping the first few by name for the failure message. */
+class ThrowLog {
+	private count = 0;
+	private readonly first: string[] = [];
+
+	probe(label: string, run: () => void): void {
+		try {
+			run();
+		} catch (error) {
+			this.count += 1;
+			if (this.first.length < 5) this.first.push(`${label}: ${String(error)}`);
+		}
+	}
+
+	report(): { count: number; first: string[] } {
+		return { count: this.count, first: this.first };
+	}
+}
+
 function controlOf(value: unknown) {
 	const frame = encodeFleetLinkJson(0, value);
 	expect(frame).not.toBeNull();
@@ -114,12 +150,17 @@ describe('frames', () => {
 		expect(encodeFleetLinkFrame(1, 7 as FleetLinkFrameKind, new Uint8Array(0))).toBeNull();
 	});
 
+	// One assertion per RUN, naming the inputs that threw: an `expect(...)`
+	// per buffer cost more than the decoding it guarded (1.3 s of a 1.7 s
+	// test here), and on a saturated CI runner the test ran past its 30 s
+	// budget (round 13) without proving anything more.
 	it('never throws on 10 000 random buffers', () => {
 		let seed = 0x2f6b_1c3d;
 		const next = () => {
 			seed = (Math.imul(seed, 1_103_515_245) + 12_345) >>> 0;
 			return seed;
 		};
+		const threw = new ThrowLog();
 		for (let i = 0; i < 10_000; i += 1) {
 			const length = next() % 64;
 			const bytes = new Uint8Array(length);
@@ -130,19 +171,58 @@ describe('frames', () => {
 				view.setUint8(4, FLEET_LINK_FRAME_KINDS.JSON);
 				view.setUint32(5, length - FLEET_LINK_FRAME_HEADER_BYTES, false);
 			}
-			expect(() => {
-				const frame = decodeFleetLinkFrame(bytes);
-				if (frame) {
-					decodeFleetLinkControl(frame.payload);
-					decodeFleetLinkJson(frame.payload);
-					decodeFleetLinkResize(frame.payload);
-					decodeFleetLinkExit(frame.payload);
-					decodeFleetLinkAck(frame.payload);
-					decodeFleetLinkCloseReason(frame.payload);
-				}
-				peekFleetLinkFrameChannel(bytes);
-			}).not.toThrow();
+			threw.probe(`random #${i}`, () => decodeEverything(bytes));
 		}
+		expect(threw.report()).toEqual({ count: 0, first: [] });
+	});
+
+	// Random bytes are almost never valid UTF-8, so they rarely reach
+	// `JSON.parse` or the shape checks behind it. These do, on purpose, in
+	// every frame kind and behind every header lie.
+	it('never throws on hostile text, nesting, binary shapes and lying headers', () => {
+		const texts = [
+			'',
+			'{',
+			'}',
+			'[]',
+			'null',
+			'1',
+			'1e999',
+			'"x"',
+			'true',
+			'{"type":',
+			'{"type":"link.ping"}',
+			'{"type":"link.ping","channel":-1,"ts":"never"}',
+			'{"type":"channel.open","channel":4294967296}',
+			'{"type":"channel.close","reason":{"toString":1}}',
+			'{"__proto__":{"polluted":true},"type":"link.pong"}',
+			'{"constructor":{"prototype":{"x":1}}}',
+			'{"cols":65536,"rows":-1}',
+			'\ufeff{}',
+			`{"a":${'['.repeat(10_000)}${']'.repeat(10_000)}}`,
+			`${'{"a":'.repeat(5_000)}1${'}'.repeat(5_000)}`
+		].map(text);
+		const binary = [
+			[0xc3, 0x28], // invalid UTF-8 continuation
+			[0xed, 0xa0, 0x80], // an encoded lone surrogate
+			[0xc0, 0xaf], // an overlong encoding
+			[0xff, 0xff, 0xff, 0xff],
+			[0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+			[0x00, 0x00, 0xff, 0xff, 0xff]
+		].map((bytes) => new Uint8Array(bytes));
+		const kinds = [...(Object.values(FLEET_LINK_FRAME_KINDS) as number[]), 0, 99, 255];
+		const threw = new ThrowLog();
+		for (const [index, payload] of [...texts, ...binary].entries()) {
+			threw.probe(`payload #${index}`, () => decodePayload(payload));
+			for (const kind of kinds) {
+				for (const declared of [payload.byteLength, payload.byteLength + 1, 0, 0xffff_ffff]) {
+					threw.probe(`payload #${index} kind ${kind} len ${declared}`, () =>
+						decodeEverything(rawFrame(1, kind, declared, payload))
+					);
+				}
+			}
+		}
+		expect(threw.report()).toEqual({ count: 0, first: [] });
 	});
 });
 

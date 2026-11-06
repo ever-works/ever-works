@@ -24,11 +24,14 @@ import {
     RUNS_GRANULARITY_STORAGE_KEY,
     RUNS_POLL_INTERVAL_MS,
     buildRunsSearch,
+    calendarDateIn,
     countActiveFilters,
     hasOpenRuns,
     isTypingTarget,
     mergeRefreshedRows,
     parseRunsViewState,
+    requestedRunWindow,
+    runsWindowKey,
     stepAnchorDate,
     windowIncludesNow,
     type RunsViewState,
@@ -121,16 +124,33 @@ export function RunsClient({
         onViewChangeRef.current = onViewChange;
     }, [onViewChange]);
 
+    // Which view (`runsWindowKey`) the list's and the rail's windows answer.
+    // The server's window is the authority on a view it has answered (it
+    // resolves the offsets and clamps an anchor out of reach); until it has
+    // answered the CURRENT view, the calendar shows the window the viewer asked
+    // for. Binding the label and the arrows to the server's answer made both
+    // trail every keystroke by a Server Action round trip — and the App Router
+    // runs Server Actions one at a time, behind every other action the
+    // dashboard shell has queued — so the URL and the rail said "previous
+    // week" for seconds while the label still named today, and a second arrow
+    // pressed before the answer stepped from the same stale anchor again.
+    const [pageKey, setPageKey] = useState<string | null>(() =>
+        initialPage ? runsWindowKey(initialView) : null,
+    );
+    const [statsKey, setStatsKey] = useState<string | null>(() =>
+        initialStats ? runsWindowKey(initialView) : null,
+    );
+    const pageWindow = page?.window ?? null;
+    const statsWindow = stats?.window ?? null;
+    const answeredWindowFor = useCallback(
+        (key: string): RunLedgerWindow | null =>
+            (key === pageKey ? pageWindow : null) ?? (key === statsKey ? statsWindow : null),
+        [pageKey, pageWindow, statsKey, statsWindow],
+    );
+
     const rows = useMemo(() => page?.rows ?? [], [page]);
-    const ledgerWindow: RunLedgerWindow = page?.window ??
-        stats?.window ?? {
-            granularity: view.granularity,
-            anchorDate: view.date ?? new Date().toISOString().slice(0, 10),
-            from: '',
-            to: '',
-            timezone: timeZone,
-            clamped: false,
-        };
+    const ledgerWindow: RunLedgerWindow =
+        answeredWindowFor(runsWindowKey(view)) ?? requestedRunWindow(view, timeZone);
 
     const query = useMemo(
         () => ({
@@ -213,6 +233,10 @@ export function RunsClient({
     const load = useCallback(
         async (target: 'both' | 'list' | 'stats' = 'both') => {
             const tasks: Promise<void>[] = [];
+            const answers = runsWindowKey({
+                granularity: query.granularity,
+                date: query.date ?? null,
+            });
             if (target !== 'stats') {
                 const seq = ++listSeq.current;
                 setListLoading(true);
@@ -221,6 +245,7 @@ export function RunsClient({
                         .then((next) => {
                             if (seq !== listSeq.current) return;
                             setPage(next);
+                            setPageKey(answers);
                             setListError(false);
                             setFocusedIndex(-1);
                         })
@@ -241,6 +266,7 @@ export function RunsClient({
                         .then((next) => {
                             if (seq !== statsSeq.current) return;
                             setStats(next);
+                            setStatsKey(answers);
                             setStatsError(false);
                         })
                         .catch(() => {
@@ -279,6 +305,7 @@ export function RunsClient({
     useEffect(() => {
         if (!live) return;
         let inFlight = false;
+        const answers = runsWindowKey({ granularity: query.granularity, date: query.date ?? null });
         const timer = setInterval(() => {
             if (inFlight || (typeof document !== 'undefined' && document.hidden)) return;
             inFlight = true;
@@ -296,7 +323,9 @@ export function RunsClient({
                               }
                             : nextPage,
                     );
+                    setPageKey(answers);
                     setStats(nextStats);
+                    setStatsKey(answers);
                 })
                 .catch(() => undefined)
                 .finally(() => {
@@ -316,14 +345,23 @@ export function RunsClient({
         }
     }, []);
 
+    // Steps from the CURRENT view's anchor: the server's (possibly clamped) one
+    // once it has answered that view, else the one the viewer asked for — so
+    // arrows pressed before an answer lands each move one more window.
     const step = useCallback(
         (direction: -1 | 1) => {
-            setView((current) => ({
-                ...current,
-                date: stepAnchorDate(ledgerWindow.anchorDate, current.granularity, direction),
-            }));
+            setView((current) => {
+                const anchor =
+                    answeredWindowFor(runsWindowKey(current))?.anchorDate ??
+                    current.date ??
+                    calendarDateIn(timeZone);
+                return {
+                    ...current,
+                    date: stepAnchorDate(anchor, current.granularity, direction),
+                };
+            });
         },
-        [ledgerWindow.anchorDate],
+        [answeredWindowFor, timeZone],
     );
 
     const goToday = useCallback(() => setView((current) => ({ ...current, date: null })), []);
@@ -465,7 +503,9 @@ export function RunsClient({
 
     // ── Render ────────────────────────────────────────────────────────
     const activeFilters = countActiveFilters(view.filters);
-    const windowLabel = formatWindowLabel(ledgerWindow, locale);
+    // The table's caption names the window its ROWS came from, which is the
+    // previous one while the next window is still loading.
+    const windowLabel = formatWindowLabel(page?.window ?? ledgerWindow, locale);
     const emptyVariant: RunsEmptyVariant =
         activeFilters > 0 ? 'filters' : page?.everRan === false ? 'never' : 'window';
 

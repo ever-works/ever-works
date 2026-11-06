@@ -164,6 +164,71 @@ export function stepAnchorDate(
     );
 }
 
+/**
+ * Which window a view asks for: its granularity and anchor. Filters, the open
+ * receipt and the search never move the window, so they are not part of it.
+ */
+export function runsWindowKey(view: Pick<RunsViewState, 'granularity' | 'date'>): string {
+    return `${view.granularity}|${view.date ?? ''}`;
+}
+
+/**
+ * Does the server render's ledger payload answer `view`? It does when the
+ * window and the filters match the view the server read for (the open receipt
+ * changes neither). A host that keeps the ledger's view across its own tabs
+ * hands the payload to a REMOUNTED ledger only then; otherwise the ledger
+ * fetches its window itself, instead of showing the first render's rows (and
+ * stepping from its anchor) under a newer view.
+ */
+export function ledgerPayloadAnswers(view: RunsViewState, served: RunsViewState): boolean {
+    return (
+        buildRunsSearch({ ...view, runId: null }) === buildRunsSearch({ ...served, runId: null })
+    );
+}
+
+/** Today's calendar date (`YYYY-MM-DD`) in `timeZone`; UTC's when the zone is unknown. */
+export function calendarDateIn(timeZone: string, now: Date = new Date()): string {
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(now);
+        const part = (type: Intl.DateTimeFormatPartTypes) =>
+            parts.find((entry) => entry.type === type)?.value;
+        const year = part('year');
+        const month = part('month');
+        const day = part('day');
+        if (year && month && day) return `${year}-${month}-${day}`;
+    } catch {
+        // An unknown zone name — fall through to UTC, as the server does.
+    }
+    return now.toISOString().slice(0, 10);
+}
+
+/**
+ * The window a view asks for, as the client knows it before the server has
+ * answered: the requested granularity and anchor ("today" in the viewer's
+ * timezone when the view names no date). `from`/`to` stay empty — only the
+ * server resolves those (timezone offsets, DST, the 12-month reach) — which
+ * also keeps the live refresh off until the server's answer lands.
+ */
+export function requestedRunWindow(
+    view: Pick<RunsViewState, 'granularity' | 'date'>,
+    timeZone: string,
+    now: Date = new Date(),
+): RunLedgerWindow {
+    return {
+        granularity: view.granularity,
+        anchorDate: view.date ?? calendarDateIn(timeZone, now),
+        from: '',
+        to: '',
+        timezone: timeZone,
+        clamped: false,
+    };
+}
+
 /** Does the window contain `now`? Only then can a listed run still change. */
 export function windowIncludesNow(
     window: Pick<RunLedgerWindow, 'from' | 'to'>,

@@ -377,7 +377,12 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
 
         await gotoDashboard(page, `/en/tasks/${task.id}`);
         const section = page.getByTestId('task-delivery-section');
-        await expect(section).toBeVisible({ timeout: 45_000 });
+        // The chip renders only once a delivery read has ANSWERED, and `data-state` leaves
+        // `loading` / `unavailable` exactly then. The page paints the server's answer; should
+        // that read miss, the section reads (and retries) on its own through a Server Action,
+        // which can queue for seconds behind the dashboard's others. So wait on the answer, with
+        // the page's budget — the section merely being visible (as "Loading…") proves nothing.
+        await expect(section).toHaveAttribute('data-state', 'build_failed', { timeout: 45_000 });
         await expect(section.getByTestId('task-delivery-chip')).toHaveText(/^Build failed ✗/);
         await expect(section).toContainText('Pull request #7 merged');
 
@@ -390,8 +395,14 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         //     nothing is written.
         const close = section.getByTestId('task-delivery-close');
         await expect(close).toHaveText('Close anyway');
-        await close.click();
+        // The section is in the server's HTML, so this button can be on screen before React
+        // has hydrated it, and a click in that gap is lost. Click until the confirmation opens
+        // (never a second time once it is open).
         const dialog = page.getByRole('dialog');
+        await expect(async () => {
+            if (!(await dialog.isVisible())) await close.click({ timeout: 5_000 });
+            await expect(dialog).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 30_000 });
         await expect(dialog).toContainText(
             "Close this Task even though its change isn't live? The failure stays on record.",
         );
@@ -438,9 +449,14 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
 
         // The reload reads the same answer from the server.
         await page.reload({ waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('task-delivery-section')).toHaveAttribute(
+            'data-state',
+            'closed_without_deploy',
+            { timeout: 45_000 },
+        );
         await expect(
             page.getByTestId('task-delivery-section').getByTestId('task-delivery-chip'),
-        ).toHaveText('Closed without deploying', { timeout: 45_000 });
+        ).toHaveText('Closed without deploying');
     });
 
     test('a built change on an App Work that is not deployed reads Built ✓ · Waiting for a deployment and offers Close without deploying', async ({
@@ -455,7 +471,8 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
 
         await gotoDashboard(page, `/en/tasks/${task.id}`);
         const section = page.getByTestId('task-delivery-section');
-        await expect(section).toBeVisible({ timeout: 45_000 });
+        // Wait on the delivery read's answer (see the Close anyway test), not on the chip alone.
+        await expect(section).toHaveAttribute('data-state', 'built', { timeout: 45_000 });
         await expect(section.getByTestId('task-delivery-chip')).toHaveText(
             /^Built ✓ · Waiting for a deployment/,
         );

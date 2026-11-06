@@ -4,7 +4,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import type { RunLedgerPage, RunLedgerRow, RunWindowStats } from '@ever-works/contracts';
 import { RunsClient } from './RunsClient';
-import { buildRunsSearch, RUNS_GRANULARITY_STORAGE_KEY } from './runs.shared';
+import { formatWindowLabel } from './RunsCalendarBar';
+import { buildRunsSearch, requestedRunWindow, RUNS_GRANULARITY_STORAGE_KEY } from './runs.shared';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
@@ -376,6 +377,78 @@ describe('RunsClient', () => {
 
         await waitFor(() => expect(getRunsAction).toHaveBeenCalled());
         expect(getRunsAction.mock.calls[0][0]).toMatchObject({ date: '2026-09-07' });
+    });
+
+    // The e2e "keyboard shortcuts move the window and the URL follows" saw the
+    // URL and the rail on the previous week while the label still named today
+    // for 5 s: the label waited for the window's Server Action, and the App
+    // Router runs those one at a time behind everything else the shell queued.
+    // The label names the window the viewer asked for in the keystroke's own
+    // commit — the loads below never answer.
+    it('names the window the viewer asked for at once, before its load lands', () => {
+        getRunsAction.mockReturnValue(new Promise(() => undefined));
+        getRunStatsAction.mockReturnValue(new Promise(() => undefined));
+        renderClient();
+        const label = () => screen.getByTestId('runs-window-label').textContent;
+        const today = label();
+
+        fireEvent.keyDown(document.body, { key: 'w' });
+
+        const thisWeek = formatWindowLabel(
+            requestedRunWindow({ granularity: 'week', date: '2026-09-08' }, 'UTC'),
+            'en-US',
+        );
+        expect(label()).toBe(thisWeek);
+        expect(thisWeek).not.toBe(today);
+
+        fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+
+        expect(addressBar()).toBe('/runs?g=week&d=2026-09-01');
+        expect(label()).toBe(
+            formatWindowLabel(
+                requestedRunWindow({ granularity: 'week', date: '2026-09-01' }, 'UTC'),
+                'en-US',
+            ),
+        );
+        expect(label()).not.toBe(thisWeek);
+    });
+
+    it('moves one more window for every arrow pressed before a load lands', () => {
+        getRunsAction.mockReturnValue(new Promise(() => undefined));
+        getRunStatsAction.mockReturnValue(new Promise(() => undefined));
+        renderClient();
+
+        fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+        fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+        fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+
+        expect(addressBar()).toBe('/runs?g=day&d=2026-09-05');
+        expect(getRunsAction.mock.lastCall?.[0]).toMatchObject({ date: '2026-09-05' });
+    });
+
+    it("adopts the server's answer once it lands, a clamped anchor included", async () => {
+        // The server answers the requested day with an anchor of its own and
+        // says it clamped — what it does for a day beyond the 12-month reach.
+        const clamped = { ...WINDOW, anchorDate: '2025-09-08', clamped: true };
+        getRunsAction.mockResolvedValue(page({ window: clamped }));
+        getRunStatsAction.mockResolvedValue(stats({ window: clamped }));
+        renderClient();
+
+        fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+        fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+
+        await waitFor(() =>
+            expect(screen.getByTestId('runs-window-label').textContent).toBe(
+                formatWindowLabel(clamped, 'en-US'),
+            ),
+        );
+        expect(screen.getByTestId('runs-clamped-notice')).toBeDefined();
+
+        // The next arrow steps from the anchor the server resolved, not from
+        // the unreachable one in the address bar.
+        fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+
+        expect(addressBar()).toBe('/runs?g=day&d=2025-09-09');
     });
 
     it('moves row focus with j/k and opens the focused receipt with Enter', async () => {
