@@ -46,13 +46,13 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      a partial field set; this pins schedule/cap/autoBuild/guardrails both
  *      ways and re-GETs both rows after each direction).
  *   5. NO acceptedWork / idea / work linkage is carried over — the cloned
- *      mission DTO carries EXACTLY the 18 modeled columns and no extra linkage
+ *      mission DTO carries EXACTLY the 21 modeled columns and no extra linkage
  *      key, its Mission-scoped Idea list is empty, and it gets its OWN
  *      zero-state budget bucket keyed on the CLONE's id (a cross-feature angle
  *      the budget spec, which never clones, does not cover).
  *
  * ── PROBED LIVE (http://127.0.0.1:3100, 2026-06-12) ──
- *   POST /api/me/missions                       → 201 MissionDto (18 keys)
+ *   POST /api/me/missions                       → 201 MissionDto (21 keys)
  *   POST /api/me/missions/:id/clone  {title?}    → 201 { mission, ideasCloned, ideasSkipped }
  *     · copies: description,type,schedule,autoBuildWorks,outstandingIdeasCap(-1 too),
  *               guardrailsOverride,missionTemplateRepo  (verbatim)
@@ -73,12 +73,19 @@ const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
 
 // The complete modeled mission-DTO key set — used to prove the clone carries
 // NO extra linkage column (acceptedWork / ideaIds / workIds / etc.).
-// This is the FULL 18-key projection emitted by `toMissionDto`
+// This is the FULL 21-key projection emitted by `toMissionDto`
 // (packages/agent/src/missions/types.ts) — the `outcome` + `completedAt`
 // pair was added by the PR-3 domain-model evolution and is present on every
 // mission DTO (null until a human records a conclusion at Complete); the
 // `organizationId` + `tenantId` pair was added by "fix(api): expose and
-// enforce organization ownership" and is null for personal-scope missions.
+// enforce organization ownership" and is null for personal-scope missions;
+// the `outputMode` + `taskOutput` + `taskOutputNoticeAt` trio is the Mission's
+// OWN output configuration (APW-08 T34, FR-51/FR-54) — what it files (Ideas /
+// Tasks / both), the normalized Task-output bounds, and when the "nothing to
+// file" notice was last recorded. None of the three is a linkage to another
+// row, and `toMissionDto` writes all three unconditionally (defaults / null),
+// so they belong in the exact surface. (`warnings` is a write-answer-only
+// optional key and never appears on a clone answer.)
 const MISSION_KEYS = [
     'autoBuildWorks',
     'completedAt',
@@ -90,10 +97,13 @@ const MISSION_KEYS = [
     'missionTemplateRepo',
     'organizationId',
     'outcome',
+    'outputMode',
     'outstandingIdeasCap',
     'schedule',
     'sourceMissionId',
     'status',
+    'taskOutput',
+    'taskOutputNoticeAt',
     'tenantId',
     'title',
     'type',
@@ -117,6 +127,9 @@ interface MissionDto {
     missionTemplateRepo: string | null;
     missionRepo: string | null;
     sourceMissionId: string | null;
+    outputMode: 'ideas' | 'tasks' | 'both';
+    taskOutput: { tasksPerTick: number; openTasksCap: number; agentId?: string };
+    taskOutputNoticeAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -632,7 +645,7 @@ test.describe('Mission clone — deep copy-vs-reset semantics', () => {
 
     /**
      * NO acceptedWork / idea / work linkage is carried over: the cloned mission
-     * DTO carries EXACTLY the 18 modeled columns (no linkage key), and its
+     * DTO carries EXACTLY the 21 modeled columns (no linkage key), and its
      * Mission-scoped Idea list is empty (the owner's standalone unlinked Idea
      * never surfaces on it).
      */
@@ -649,7 +662,14 @@ test.describe('Mission clone — deep copy-vs-reset semantics', () => {
             description: `linkage probe ${s}`,
             type: 'one-shot',
             guardrailsOverride: { maxItemsPerWork: 1 },
+            // Non-default output config (the default is `ideas` with 1 / 3), so the
+            // copy assertions below can fail. With no App Work attached the create
+            // answer says `noAppWorkRelation` and accepts it all the same (S27).
+            outputMode: 'both',
+            taskOutput: { tasksPerTick: 2, openTasksCap: 5 },
         });
+        expect(source.outputMode).toBe('both');
+        expect(source.taskOutput).toMatchObject({ tasksPerTick: 2, openTasksCap: 5 });
 
         // A standalone user-manual Idea on the owner — born missionId=null, so
         // it is NEVER scoped to either the source or the clone.
@@ -672,6 +692,12 @@ test.describe('Mission clone — deep copy-vs-reset semantics', () => {
         // ideaIds / workIds linkage key snuck in.
         const cloneKeys = Object.keys(cloned as unknown as Record<string, unknown>).sort();
         expect(cloneKeys).toEqual(MISSION_KEYS);
+        // The output configuration is the Mission's own and is copied like the
+        // other config columns; the "nothing to file" notice stamp is per-row
+        // state, so the clone starts without one.
+        expect(cloned.outputMode).toBe('both');
+        expect(cloned.taskOutput).toEqual(source.taskOutput);
+        expect(cloned.taskOutputNoticeAt).toBeNull();
 
         // No Mission-scoped Idea carried over.
         const cloneScopedIdeas = await listMissionScopedIdeas(request, token, cloned.id);

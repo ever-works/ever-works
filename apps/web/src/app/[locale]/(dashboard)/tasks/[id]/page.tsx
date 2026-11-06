@@ -8,6 +8,7 @@ import {
 } from '@/lib/api/tasks';
 import { agentsAPI } from '@/lib/api/agents';
 import { inboxAPI } from '@/lib/api/inbox';
+import { getTaskDeliveryAction } from '@/app/actions/tasks';
 import { TaskDetailClient } from '@/components/tasks/TaskDetailClient';
 import { FixOnComputerSlot } from '@/components/fleet/tasks/FixOnComputerSlot';
 import { TaskFleetSection } from '@/components/fleet/tasks/TaskFleetSection';
@@ -50,6 +51,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         subtaskResult,
         activityResult,
         openQuestionResult,
+        deliveryResult,
     ] = await Promise.allSettled([
         tasksAPI.listChat(id, { limit: 50 }),
         // FU-5 — list initial attachments alongside the chat thread so
@@ -82,6 +84,11 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         // item points at the run, not the other way round). Best-effort
         // like the rest: a miss renders the classic resume form.
         inboxAPI.list({ taskId: id, status: 'open', limit: 5 }),
+        // APW-08 T27 — the Delivery section's first answer, for a Task the delivery chain
+        // tracks, so its chip paints with the page instead of after a client Server Action
+        // (those run one at a time behind everything else the dashboard has queued). The
+        // same read the section polls with; a miss leaves the section to read it itself.
+        task.deliveryState ? getTaskDeliveryAction(id) : Promise.resolve(null),
     ]);
 
     const chat =
@@ -103,6 +110,13 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         openQuestionResult.status === 'fulfilled'
             ? (openQuestionResult.value?.data ?? []).find((item) => item.kind === 'question')
             : undefined;
+    const delivery =
+        deliveryResult.status === 'fulfilled' && deliveryResult.value?.ok
+            ? {
+                  view: deliveryResult.value.view,
+                  retryEscalationId: deliveryResult.value.retryEscalationId,
+              }
+            : null;
 
     return (
         <TaskDetailClient
@@ -123,6 +137,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             initialSubtasksMeta={subtasks.meta ?? { total: 0, doneCount: 0 }}
             initialActivity={activity.data ?? []}
             initialActivityTotal={activity.meta?.total ?? 0}
+            initialDelivery={delivery}
             initialChatError={
                 chatResult.status === 'rejected'
                     ? errorMessage(chatResult.reason, 'Failed to load conversation')

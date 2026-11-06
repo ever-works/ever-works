@@ -39,7 +39,12 @@ import type {
 } from '@ever-works/contracts';
 import { RunsClient } from '@/components/runs/RunsClient';
 import { RunsShortcutSheet, type ShortcutRow } from '@/components/runs/RunsShortcutSheet';
-import { buildRunsSearch, isTypingTarget, type RunsViewState } from '@/components/runs/runs.shared';
+import {
+    buildRunsSearch,
+    isTypingTarget,
+    ledgerPayloadAnswers,
+    type RunsViewState,
+} from '@/components/runs/runs.shared';
 import type { RunsAgentOption } from '@/components/runs/RunsFilters';
 import { toast } from 'sonner';
 import {
@@ -819,8 +824,11 @@ export function ActivityClient({
                         initialView={runsView}
                         granularityFromUrl={runs.granularityFromUrl}
                         timeZone={runs.timeZone}
-                        initialPage={runs.page}
-                        initialStats={runs.stats}
+                        // The server render's payload only while it still answers the
+                        // view: coming back from another view remounts the ledger with
+                        // the view it last had, which the payload may no longer match.
+                        initialPage={ledgerPayloadAnswers(runsView, runs.view) ? runs.page : null}
+                        initialStats={ledgerPayloadAnswers(runsView, runs.view) ? runs.stats : null}
                         agents={runs.agents}
                         syncUrl={false}
                         onViewChange={setRunsView}
