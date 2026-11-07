@@ -400,6 +400,95 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         expect(runtimeEnv.STRIPE_SECRET_KEY).toBeUndefined();
     });
 
+    describe('site GH_TOKEN and GHCR pull credential (least privilege)', () => {
+        const ENV_KEYS = [
+            'EVER_WORKS_SITES_GIT_TOKEN',
+            'EVER_WORKS_CUSTOMERS_SITES_GIT_TOKEN',
+            'TENANT_USER_GIT_TOKEN_ENABLED',
+            'EVER_WORKS_GHCR_PULL_TOKEN',
+            'EVER_WORKS_GITHUB_PAT_CLASSIC',
+        ];
+        afterEach(() => {
+            for (const key of ENV_KEYS) delete process.env[key];
+        });
+
+        const deployEverWorksSite = async () => {
+            const plugin = managedPlugin();
+            const built = buildService({
+                plugin,
+                settings: { clusterSource: 'k8s-works', namespace: 'ever-works' },
+                settingSources: { clusterSource: 'work', namespace: 'default' },
+                websiteOwner: 'ever-works',
+                isPlatformAdmin: true,
+            });
+            await built.service.deploy('work-1', 'user-1');
+            const [config] = plugin.deploy.mock.calls[0];
+            const pushed = new Map<string, string>(
+                built.githubPlugin.setActionSecret.mock.calls.map((c: unknown[]) => {
+                    const s = c[0] as { key: string; value: string };
+                    return [s.key, s.value] as [string, string];
+                }),
+            );
+            return {
+                config,
+                runtimeEnv: config.options.runtimeEnv as Record<string, string>,
+                pushed,
+            };
+        };
+
+        it("uses the platform site token, not the user's OAuth token, for the data repo's org", async () => {
+            process.env.EVER_WORKS_SITES_GIT_TOKEN = 'site-contents-only-token';
+
+            const { runtimeEnv, pushed } = await deployEverWorksSite();
+
+            expect(runtimeEnv.GH_TOKEN).toBe('site-contents-only-token');
+            // The website repo's GH_TOKEN Actions secret gets the same token.
+            expect(pushed.get('GH_TOKEN')).toBe('site-contents-only-token');
+        });
+
+        it("keeps the user's token when no platform site token exists (default, unchanged)", async () => {
+            const { runtimeEnv } = await deployEverWorksSite();
+
+            expect(runtimeEnv.GH_TOKEN).toBe('gh-token');
+        });
+
+        it("TENANT_USER_GIT_TOKEN_ENABLED=false never hands the user's token to the site", async () => {
+            process.env.TENANT_USER_GIT_TOKEN_ENABLED = 'false';
+
+            const { runtimeEnv, pushed, config } = await deployEverWorksSite();
+
+            expect(runtimeEnv.GH_TOKEN).toBeUndefined();
+            expect(pushed.has('GH_TOKEN')).toBe(false);
+            // Nor as the GHCR pull-secret fallback.
+            expect(config.options.githubReadPackagesToken).not.toBe('gh-token');
+        });
+
+        it("a site token for another org does not apply to this Work's data repo", async () => {
+            process.env.EVER_WORKS_CUSTOMERS_SITES_GIT_TOKEN = 'customers-site-token';
+
+            const { runtimeEnv } = await deployEverWorksSite();
+
+            expect(runtimeEnv.GH_TOKEN).toBe('gh-token');
+        });
+
+        it('prefers the read:packages-only GHCR pull token over the broad classic PAT', async () => {
+            process.env.EVER_WORKS_GITHUB_PAT_CLASSIC = 'ghp-repo-workflow-write-packages';
+            process.env.EVER_WORKS_GHCR_PULL_TOKEN = 'ghp-read-packages-only';
+
+            const { config } = await deployEverWorksSite();
+
+            expect(config.options.githubReadPackagesToken).toBe('ghp-read-packages-only');
+        });
+
+        it('falls back to the classic PAT for pulls when no pull token is configured', async () => {
+            process.env.EVER_WORKS_GITHUB_PAT_CLASSIC = 'ghp-repo-workflow-write-packages';
+
+            const { config } = await deployEverWorksSite();
+
+            expect(config.options.githubReadPackagesToken).toBe('ghp-repo-workflow-write-packages');
+        });
+    });
+
     it('managed tier → branch alias image tag (main → prod)', async () => {
         const plugin = managedPlugin();
         const { service } = buildService({

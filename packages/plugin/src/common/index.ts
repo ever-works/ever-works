@@ -35,6 +35,8 @@ export {
 	GITHUB_SCOPES,
 	GITHUB_LOGIN_SCOPES,
 	GITHUB_FULL_SCOPES,
+	GITHUB_DELETE_REPO_SCOPE,
+	isGithubDeleteRepoScopeEnabled,
 	type GitHubScope,
 	type GitHubLoginScope,
 	type GitHubFullScope

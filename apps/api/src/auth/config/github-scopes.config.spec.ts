@@ -3,6 +3,8 @@ import {
     GITHUB_SCOPES as PluginGithubScopes,
     GITHUB_LOGIN_SCOPES as PluginGithubLoginScopes,
     GITHUB_FULL_SCOPES as PluginGithubFullScopes,
+    GITHUB_DELETE_REPO_SCOPE,
+    isGithubDeleteRepoScopeEnabled,
 } from '@ever-works/plugin';
 
 describe('github-scopes.config (re-export of @ever-works/plugin)', () => {
@@ -56,6 +58,21 @@ describe('github-scopes.config (re-export of @ever-works/plugin)', () => {
     it('all entries are unique', () => {
         const set = new Set<string>(localBarrel.GITHUB_SCOPES);
         expect(set.size).toBe(localBarrel.GITHUB_SCOPES.length);
+    });
+
+    it('does not request delete_repo unless GITHUB_OAUTH_DELETE_REPO_SCOPE_ENABLED=true', () => {
+        // The broad set reaches tenant workloads and is stored per user; a
+        // delete_repo grant lets anyone holding it delete every repo the
+        // user administers. The flag is read at module load and unset here.
+        expect(localBarrel.GITHUB_FULL_SCOPES).not.toContain('delete_repo');
+        expect(isGithubDeleteRepoScopeEnabled({})).toBe(false);
+        expect(
+            isGithubDeleteRepoScopeEnabled({ GITHUB_OAUTH_DELETE_REPO_SCOPE_ENABLED: 'false' }),
+        ).toBe(false);
+        expect(
+            isGithubDeleteRepoScopeEnabled({ GITHUB_OAUTH_DELETE_REPO_SCOPE_ENABLED: ' TRUE ' }),
+        ).toBe(true);
+        expect(GITHUB_DELETE_REPO_SCOPE).toBe('delete_repo');
     });
 
     it('matches the plugin-package source-of-truth array element-for-element (same order)', () => {
