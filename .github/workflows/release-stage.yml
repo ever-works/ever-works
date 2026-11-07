@@ -67,6 +67,9 @@ jobs:
           pre_release_branches: something_to_possible_use_later
 
       - name: Create a GitHub release
+        # With no new commit since the last tag (a re-run of a tagged commit) the tag step skips and leaves new_tag empty,
+        # and this step then failed with "No tag found in ref or input" (release-dev, 2026-11-07).
+        if: steps.tag_version.outputs.new_tag != ''
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
