@@ -14,6 +14,7 @@ const DEPLOY_DIR = path.resolve('/app/deploy');
 const PLUGINS_DEST = path.join(DEPLOY_DIR, 'plugins');
 const DEPLOY_NODE_MODULES = path.join(DEPLOY_DIR, 'node_modules');
 const PLUGINS_NODE_MODULES = path.join(PLUGINS_DEST, 'node_modules');
+const ROOT_PACKAGE_JSON = path.resolve('/app/package.json');
 
 function main() {
 	console.log('==> Preparing plugins for production...');
@@ -157,19 +158,28 @@ function writePluginDepsPackageJson() {
 	const pkgPath = path.join(PLUGINS_DEST, 'package.json');
 	const existingPkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) : {};
 
-	fs.writeFileSync(
-		pkgPath,
-		JSON.stringify(
-			{
-				...existingPkg,
-				name: 'ever-works-plugins',
-				private: true,
-				dependencies: existingPkg.dependencies ?? {}
-			},
-			null,
-			2
-		) + '\n'
-	);
+	// `pnpm add` here runs outside the workspace and without its lockfile, so the
+	// root's security overrides (vulnerable transitive versions pinned to their
+	// patched ranges) must be carried over, or plugin deps install the
+	// vulnerable versions again.
+	const rootOverrides = readRootOverrides();
+	const pkg = {
+		...existingPkg,
+		name: 'ever-works-plugins',
+		private: true,
+		dependencies: existingPkg.dependencies ?? {}
+	};
+	if (rootOverrides) {
+		pkg.pnpm = { ...existingPkg.pnpm, overrides: rootOverrides };
+	}
+
+	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+}
+
+function readRootOverrides() {
+	if (!fs.existsSync(ROOT_PACKAGE_JSON)) return null;
+	const overrides = JSON.parse(fs.readFileSync(ROOT_PACKAGE_JSON, 'utf-8')).pnpm?.overrides;
+	return overrides && Object.keys(overrides).length > 0 ? overrides : null;
 }
 
 function copyDirSync(src, dest) {
