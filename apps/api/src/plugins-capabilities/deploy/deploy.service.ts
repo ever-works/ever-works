@@ -393,7 +393,17 @@ export class DeployService {
             omitDeployToken: serverSide,
         });
         await this.setKubernetesGhcrPullSecret(ctx, work, userId, plugin);
-        await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
+        // GH_TOKEN pushed to the website repo is the SITE's data-repo
+        // credential (build-time clone + runtime env on the workflow path),
+        // so it gets the same least-privilege token as the server-side path,
+        // never the deploying user's broad OAuth token when a platform
+        // site token exists. `gitToken` itself is still used above/below for
+        // the platform's own repo operations.
+        await this.setOptionalSecrets(
+            ctx,
+            options.teamScope,
+            this.resolveSiteGitToken(work, gitToken),
+        );
         await this.ensureCronSecret(ctx);
         await this.ensureWebhookSecret(ctx, work);
         await this.ensureRuntimeEnv(ctx, work, plugin);
@@ -1445,7 +1455,13 @@ export class DeployService {
         // "DATA_REPOSITORY and GH_TOKEN environment variables are required",
         // which kills sync, moderation, /api/items/* and every admin route.
         // envFrom optional:true means its absence fails silently at runtime.
-        if (gitToken) env.GH_TOKEN = gitToken;
+        // It is the SITE's credential for its own data repo (clone, pull,
+        // commit + push), so it comes from resolveSiteGitToken: a
+        // platform-managed, contents-only token when one is configured for
+        // the data repo's owner, never the deploying user's OAuth token
+        // (which carries repo/workflow/delete_repo for every repo they own).
+        const siteGitToken = this.resolveSiteGitToken(work, gitToken);
+        if (siteGitToken) env.GH_TOKEN = siteGitToken;
         if (primaryHost) env.COOKIE_DOMAIN = primaryHost;
         try {
             env.AUTH_SECRET = await this.workRuntimeEnvService.getOrGenerateAuthSecret(work.id);
@@ -1570,6 +1586,67 @@ export class DeployService {
                 }`,
             );
         }
+        // The user's git token as an imagePullSecret lands in the tenant
+        // namespace; TENANT_USER_GIT_TOKEN_ENABLED=false refuses that.
+        return DeployService.userGitTokenAllowedInTenants() ? (gitToken ?? '') : '';
+    }
+
+    /**
+     * Platform-managed git credential a deployed directory site uses for its
+     * OWN data repo, keyed by the data repo's owner (same org switch as
+     * {@link getPlatformGhcrCredentials}).
+     *
+     * Provision it as a fine-grained PAT whose resource owner is that org,
+     * with repository access limited to the data repos and only
+     * **Contents: read and write** (Metadata: read is implied). Such a token
+     * can clone, pull and push the data repos and nothing else: no
+     * administration (so no delete / transfer / visibility / branch
+     * protection changes), no workflows, no other org.
+     *
+     * Env: `EVER_WORKS_SITES_GIT_TOKEN` (`ever-works`),
+     * `EVER_WORKS_CUSTOMERS_SITES_GIT_TOKEN` (`ever-works-cloud`).
+     */
+    private static getPlatformSiteGitToken(dataRepoOwner: string): string {
+        switch (dataRepoOwner.toLowerCase()) {
+            case 'ever-works':
+                return (process.env.EVER_WORKS_SITES_GIT_TOKEN || '').trim();
+            case 'ever-works-cloud':
+                return (process.env.EVER_WORKS_CUSTOMERS_SITES_GIT_TOKEN || '').trim();
+            default:
+                return '';
+        }
+    }
+
+    /**
+     * Whether the deploying user's own git token may be handed to tenant
+     * workloads (runtime `GH_TOKEN`, the `GH_TOKEN` repo secret, the GHCR
+     * pull-secret fallback) when no platform credential applies. Default
+     * true (unchanged behaviour); set `TENANT_USER_GIT_TOKEN_ENABLED=false`
+     * once every site's data-repo owner has a platform site token.
+     */
+    private static userGitTokenAllowedInTenants(): boolean {
+        return (process.env.TENANT_USER_GIT_TOKEN_ENABLED || '').trim().toLowerCase() !== 'false';
+    }
+
+    /**
+     * The `GH_TOKEN` a directory site gets: the platform site token for its
+     * data repo's owner when configured; otherwise the user's git token,
+     * unless `TENANT_USER_GIT_TOKEN_ENABLED=false`, in which case none (the
+     * site then cannot sync or write its data repo, which is logged loudly
+     * rather than leaking a broad credential into a tenant pod).
+     */
+    private resolveSiteGitToken(work: Work, gitToken?: string): string {
+        const dataRepoOwner = work.getRepoOwner('data');
+        const platformToken = DeployService.getPlatformSiteGitToken(dataRepoOwner);
+        if (platformToken) return platformToken;
+        if (!DeployService.userGitTokenAllowedInTenants()) {
+            this.logger.error(
+                `Work ${work.id}: no platform site git token for data-repo owner '${dataRepoOwner}' ` +
+                    `and TENANT_USER_GIT_TOKEN_ENABLED=false — GH_TOKEN is not set, so the site ` +
+                    `cannot sync or write its data repo until one is configured.`,
+            );
+            return '';
+        }
         return gitToken ?? '';
     }
 
@@ -1643,17 +1720,26 @@ export class DeployService {
     } {
         const empty = { classic: '', fineGrained: '', username: '' };
         const username = (process.env.EVER_WORKS_GITHUB_PAT_OWNER || '').trim();
+        const env = (name: string) => (process.env[name] || '').trim();
+        // Every caller uses these to PULL images (tenant imagePullSecret,
+        // REGISTRY_PASSWORD for the deploy workflow). A dedicated classic
+        // `read:packages`-only token (`*_GHCR_PULL_TOKEN`) wins over the
+        // broad `*_GITHUB_PAT_CLASSIC` (repo + workflow + write:packages),
+        // which otherwise ends up in every tenant namespace.
         switch (websiteRepoOwner.toLowerCase()) {
             case 'ever-works':
                 return {
-                    classic: (process.env.EVER_WORKS_GITHUB_PAT_CLASSIC || '').trim(),
-                    fineGrained: (process.env.EVER_WORKS_GITHUB_PAT || '').trim(),
+                    classic:
+                        env('EVER_WORKS_GHCR_PULL_TOKEN') || env('EVER_WORKS_GITHUB_PAT_CLASSIC'),
+                    fineGrained: env('EVER_WORKS_GITHUB_PAT'),
                     username,
                 };
             case 'ever-works-cloud':
                 return {
-                    classic: (process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT_CLASSIC || '').trim(),
-                    fineGrained: (process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT || '').trim(),
+                    classic:
+                        env('EVER_WORKS_CUSTOMERS_GHCR_PULL_TOKEN') ||
+                        env('EVER_WORKS_CUSTOMERS_GITHUB_PAT_CLASSIC'),
+                    fineGrained: env('EVER_WORKS_CUSTOMERS_GITHUB_PAT'),
                     username,
                 };
             default:

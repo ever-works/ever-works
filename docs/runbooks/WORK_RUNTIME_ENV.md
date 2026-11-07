@@ -24,6 +24,31 @@ It does **not** cover the platform-managed keys (`AUTH_SECRET`,
 `WorkRuntimeEnvService` on every deploy and are deliberately **not** settable
 through this surface — the allow-list is the guard.
 
+### `GH_TOKEN`: the site's data-repo credential
+
+The site uses `GH_TOKEN` to clone, pull and push **its own data repo** (items,
+categories, collections, moderation). `DeployService.resolveSiteGitToken`
+picks it, in this order:
+
+1. The platform site token for the data repo's owner:
+   `EVER_WORKS_SITES_GIT_TOKEN` (`ever-works`),
+   `EVER_WORKS_CUSTOMERS_SITES_GIT_TOKEN` (`ever-works-cloud`). Make it a
+   fine-grained PAT with that org as resource owner, the `*-data` repos as
+   repository access and **Contents: Read and write** only. It cannot delete,
+   transfer or reconfigure a repo, touch workflows or reach another org.
+2. Otherwise the deploying user's git token, unless
+   `TENANT_USER_GIT_TOKEN_ENABLED=false`. That token reaches every repo the
+   user can access (for the GitHub "connect" grant: `repo`, `workflow`,
+   `write:repo_hook`, and `delete_repo` when
+   `GITHUB_OAUTH_DELETE_REPO_SCOPE_ENABLED=true`), so production should run
+   with a site token and the flag at `false`.
+
+The same token goes to the website repo's `GH_TOKEN` Actions secret (build-time
+data clone on the workflow path). Image pulls use `EVER_WORKS_GHCR_PULL_TOKEN`
+/ `EVER_WORKS_CUSTOMERS_GHCR_PULL_TOKEN` (classic, `read:packages` only) ahead
+of the broader `*_GITHUB_PAT_CLASSIC`. A running site picks up a changed token
+only on its next deploy (the Secret is read through `envFrom`).
+
 ## The allow-list
 
 Source of truth: `WORK_RUNTIME_ENV_ALLOWED_KEYS` in
